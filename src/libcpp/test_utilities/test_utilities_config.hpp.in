@@ -1,0 +1,21 @@
+/*
+ * test_utilities_config.hpp
+ *
+ *  Created on: May 27, 2015
+ *      Author: fbeier
+ */
+
+#ifndef LIBCPP_TEST_UTILITIES_TEST_UTILITIES_CONFIG_HPP_
+#define LIBCPP_TEST_UTILITIES_TEST_UTILITIES_CONFIG_HPP_
+
+
+namespace ns_test_utilities {
+
+/// the path to the root directory for storing test data files
+static const char* DEFAULT_TEST_DATA_ROOT="@CONF_TEST_DATA_ROOT@";
+
+
+} /* end namespace ns_test_utilities */
+
+
+#endif /* LIBCPP_TEST_UTILITIES_TEST_UTILITIES_CONFIG_HPP_ */

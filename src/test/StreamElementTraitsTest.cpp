@@ -1,0 +1,159 @@
+/*
+ * StreamElementTraitsTest.cpp
+ *
+ *  Created on: Feb 16, 2015
+ *      Author: fbeier
+ */
+
+ #define CATCH_CONFIG_MAIN  // This tells Catch to provide a main() - only do this in one cpp file
+
+ #include "catch.hpp"
+
+#include <boost/mpl/assert.hpp>
+#include <boost/mpl/equal.hpp>
+#include <boost/mpl/if.hpp>
+#include <boost/mpl/vector.hpp>
+#include <string>
+
+#include "core/StreamElementTraits.hpp"
+#include "core/Tuple.hpp"
+#include "core/PFabricTypes.hpp"
+#include "libcpp/mpl/algorithms/StaticForEach.hpp"
+
+
+using namespace pfabric;
+using namespace boost::mpl;
+
+
+/**
+ * @brief Custom element type satisfying the @c StreamElementTraits.
+ */
+struct CustomElement {
+	static const TupleSize NUM_ATTRIBUTES = 3;
+	typedef std::tuple< int&, char&, int& > Values;
+
+	CustomElement( const int a, const char b, const int c ) :
+		v0( a ), v1( b ), v2( c ), values( std::tie( v0, v1, v2 ) ) {
+		for( int i = 0; i < NUM_ATTRIBUTES; ++i ) {
+			nulls[ i ] = false;
+		}
+	};
+
+	template< AttributeIdx ID >
+	struct getAttributeType {
+		typedef typename std::remove_reference<
+			typename std::tuple_element< ID, Values >::type
+		>::type type;
+	};
+
+	template< AttributeIdx ID >
+	typename getAttributeType< ID >::type& getAttribute() {
+		return std::get< ID >( values );
+	}
+
+	template< AttributeIdx ID >
+	const typename getAttributeType< ID >::type& getAttribute() const {
+		return std::get< ID >( values );
+	}
+
+	template< AttributeIdx ID, typename Value >
+	void setAttribute( const Value& value ) {
+		std::get< ID >( values ) = value;
+	}
+
+
+	bool isNull( const AttributeIdx& index ) const { return nulls[ index ]; }
+	void setNull( const AttributeIdx& index, const bool value = true ) { nulls[ index ] = value; }
+	void setNull() {
+		for( int i = 0; i < NUM_ATTRIBUTES; ++i ) {
+			nulls[ i ] = true;
+		}
+	}
+
+	int v0;
+	char v1;
+	int v2;
+	Values values;
+	bool nulls[ NUM_ATTRIBUTES ];
+};
+
+
+struct TestStreamElementTraits {
+
+	template< typename ElementType >
+	static void apply() {
+		typedef StreamElementTraits< ElementType > ElementTraits;
+
+		// check number of attributes
+		BOOST_MPL_ASSERT(( equal< typename ElementTraits::StreamElement, ElementType > ));
+		REQUIRE( ElementTraits::NUM_ATTRIBUTES == 3 );
+		REQUIRE( ElementTraits::getNumAttributes() == 3 );
+
+		static_assert( std::is_same< typename ElementTraits::template getAttributeType< 0 >::type, int >::value,
+			"attribute 0 is expected to be an int"
+		);
+
+		static_assert( std::is_same< typename ElementTraits::template getAttributeType< 1 >::type, char >::value,
+			"attribute 0 is expected to be a char"
+		);
+
+		static_assert( std::is_same< typename ElementTraits::template getAttributeType< 2 >::type, int >::value,
+			"attribute 2 is expected to be an int"
+		);
+
+		// check element creation
+		auto element = ElementTraits::create( 1, 'a', 2 );
+		REQUIRE( ElementTraits::template getAttribute< 0 >( element ) == 1 );
+		REQUIRE( getAttribute< 1 >( element ) == 'a' );
+		REQUIRE( getAttribute< 2 >( element ) == 2 );
+
+		// check attribute modification
+		// via traits
+		ElementTraits::template setAttribute< 0 >( element, 10 );
+		REQUIRE( getAttribute< 0 >( element ) == 10 );
+		REQUIRE( getAttribute< 1 >( element ) == 'a' );
+		REQUIRE( getAttribute< 2 >( element ) == 2 );
+
+		// via global accessor functions
+		setAttribute< 1 >( element, 'b' );
+		REQUIRE( getAttribute< 0 >( element ) == 10 );
+		REQUIRE( getAttribute< 1 >( element ) == 'b' );
+		REQUIRE( getAttribute< 2 >( element ) == 2 );
+
+			// check null properties
+		REQUIRE( !ElementTraits::isNull( element, 0 ) );
+		REQUIRE( !ElementTraits::isNull( element, 1 ) );
+		REQUIRE( !ElementTraits::isNull( element, 2 ) );
+
+		ElementTraits::setNull( element, 1 );
+		REQUIRE( !ElementTraits::isNull( element, 0 ) );
+		REQUIRE( ElementTraits::isNull( element, 1 ) );
+		REQUIRE( !ElementTraits::isNull( element, 2 ) );
+
+		ElementTraits::setNull( element );
+		REQUIRE( ElementTraits::isNull( element, 0 ) );
+		REQUIRE( ElementTraits::isNull( element, 1 ) );
+		REQUIRE( ElementTraits::isNull( element, 2 ) );
+
+		if( ns_types::PointerTraits< ElementType >::isPointer::value ) {
+			ns_types::destroyPointer( element );
+		}
+	}
+
+};
+
+
+TEST_CASE( "Properties of StreamElementTraits", "[StreamElementTraits]" ) {
+	typedef Tuple< int, char , int > TestTuple;
+	typedef TuplePtr< TestTuple > TestTuplePtr;
+	typedef TestTuple* RawTestTuplePtr;
+
+	typedef boost::mpl::vector<
+		CustomElement,
+		TestTuple,
+		TestTuplePtr,
+		RawTestTuplePtr
+	> TestElementTypes;
+
+	ns_mpl::staticForEach< TestElementTypes, TestStreamElementTraits >();
+}
