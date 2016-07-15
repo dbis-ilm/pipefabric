@@ -6,6 +6,7 @@ by C++ developers, too.
 
 ### Installation ###
 
+First of all, you need a very recent C++ compiler supporting the C++14 standard.
 PipeFabcric relies on several open source components which have to be installed before:
 
  + CMake 3.0 (or newer) build environment
