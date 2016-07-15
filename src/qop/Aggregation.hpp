@@ -30,20 +30,10 @@
 #include "qop/OperatorMacros.hpp"
 #include "qop/UnaryTransform.hpp"
 #include "qop/TriggerNotifier.hpp"
+#include "qop/AggregateStateBase.hpp"
 
-// #include <boost/thread/thread.hpp>
 
 namespace pfabric {
-
-  class BaseAggregateState {
-  public:
-    BaseAggregateState() {}
-    virtual ~BaseAggregateState() {}
-
-    virtual void init() = 0;
-    virtual AggregateStatePtr clone() const = 0;
-  };
-
 
   /**
    * @brief An aggregation operator for streams of tuples.
@@ -60,8 +50,8 @@ namespace pfabric {
    *    the data stream element type produced by the projection
    */
   template<
-  typename InputStreamElement,
-  typename OutputStreamElement,
+    typename InputStreamElement,
+    typename OutputStreamElement,
     typename AggregateState
   >
   class Aggregation : public UnaryTransform< InputStreamElement, OutputStreamElement > {

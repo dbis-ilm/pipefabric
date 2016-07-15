@@ -21,7 +21,7 @@
 #ifndef GroupedAggregation_hpp_
 #define GroupedAggregation_hpp_
 
-#include "qop/GroupedAggregateState.hpp"
+#include "qop/AggregateStateBase.hpp"
 #include "qop/AggregateFunctions.hpp"
 #include "qop/UnaryTransform.hpp"
 #include "qop/OperatorMacros.hpp"

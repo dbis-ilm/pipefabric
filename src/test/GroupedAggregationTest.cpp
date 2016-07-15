@@ -29,7 +29,7 @@ typedef TuplePtr<OutTuple2> OutTuple2Ptr;
 /*----------------------------------------------------------------------- */
 
 template< typename StreamElement >
-class MyAggregateState : public GroupedAggregateState< StreamElement > {
+class MyAggregateState : public AggregateStateBase< StreamElement > {
 public:
 	int group1_;
 	AggrSum<double> sum1_;
@@ -45,7 +45,7 @@ public:
 		cnt3_.init();
 	}
 
-	virtual GroupedAggregateState< StreamElement > *clone() const override {
+	virtual AggregateStateBase< StreamElement > *clone() const override {
 		return new MyAggregateState< StreamElement >();
 	}
 };
@@ -113,7 +113,7 @@ TEST_CASE( "Compute a simple punctuation based groupby with aggregates", "[Group
 /*-------------------------------------------------------------------------- */
 
 template< typename StreamElement >
-class MyAggregateState2 : public GroupedAggregateState< StreamElement > {
+class MyAggregateState2 : public AggregateStateBase< StreamElement > {
 public:
 	int group1_;
 	AggrMinMax<double, std::less<double>> min1_;
@@ -129,7 +129,7 @@ public:
 		lrecent3_.init();
 	}
 
-	virtual GroupedAggregateState< StreamElement > *clone() const override {
+	virtual AggregateStateBase< StreamElement > *clone() const override {
 		return new MyAggregateState2< StreamElement >();
 	}
 };

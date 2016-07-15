@@ -42,7 +42,8 @@ template<
 >
 class AggregateFunc {
 public:
-
+	typedef Tres ResultType;
+	
 	AggregateFunc() {
 	}
 
