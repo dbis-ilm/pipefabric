@@ -24,6 +24,7 @@
 #include <iostream>
 #include <fstream>
 #include <memory>
+#include <thread>
 
 #include "core/Punctuation.hpp"
 #include "core/Tuple.hpp"
@@ -44,14 +45,51 @@ namespace pfabric {
 
 
     FromTable(TablePtr tbl,
-      typename Table<StreamElement, KeyType>::NotificationMode mode = Table<StreamElement, KeyType>::Immediate) {}
+      TableParams::NotificationMode mode = TableParams::Immediate) : mInterrupted(false)  {
+        tbl->registerObserver([this](const StreamElement& data, TableParams::ModificationMode m) {
+          tableCallback(data, m);
+        }, mode);
+        mProducerThread = std::thread(&FromTable<StreamElement, KeyType>::producer, this);
+      }
 
     /**
      * Deallocates all resources.
      */
-    ~FromTable() {}
+    ~FromTable() {
+      mInterrupted = true;
+      {
+        std::unique_lock<std::mutex> lock(mMtx);
+        mCondVar.notify_one();
+      }
+      if (mProducerThread.joinable())
+        mProducerThread.join();
+
+    }
 
   protected:
+    void tableCallback(const StreamElement& data, TableParams::ModificationMode mode) {
+      std::unique_lock<std::mutex> lock(mMtx);
+      mQueue.push_back({ data, mode == TableParams::Insert});
+      mCondVar.notify_one();
+    }
+
+    void producer() {
+      while (!mInterrupted) {
+        std::unique_lock<std::mutex> lock(mMtx);
+        mCondVar.wait(lock, [&](){ return mInterrupted || !mQueue.empty(); });
+        while (!mQueue.empty()) {
+          auto tpair = mQueue.front();
+          mQueue.pop_front();
+          this->getOutputDataChannel().publish(tpair.first, tpair.second);
+        }
+      }
+    }
+
+    std::list<std::pair<StreamElement, bool>> mQueue;
+    std::mutex mMtx;
+    std::condition_variable mCondVar;
+    bool mInterrupted;
+    std::thread mProducerThread;
   };
 
 }

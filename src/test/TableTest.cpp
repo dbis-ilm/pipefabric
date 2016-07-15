@@ -75,4 +75,31 @@ TEST_CASE("Creating a table with a given schema, inserting and deleting data", "
   SECTION("updating some data by predicate") {
     // TODO
   }
+
+  SECTION("observing inserts and deletes on a table") {
+    REQUIRE(testTable->size() == 10000);
+    bool insertDetected = false, deleteDetected = false;
+
+    auto observer = [&insertDetected, &deleteDetected](const MyTuplePtr& rec,
+      TableParams::ModificationMode mode) {
+      switch (mode) {
+      case TableParams::Insert:
+        if (rec->getAttribute<0>() == 20000lu)
+          insertDetected = true;
+        break;
+      case TableParams::Delete:
+        if (rec->getAttribute<0>() == 20000lu)
+          deleteDetected = true;
+        break;
+      default:
+        break;
+      }
+    };
+    testTable->registerObserver(observer, TableParams::Immediate);
+    testTable->insert(20000, makeTuplePtr(20000lu, 20, std::string("A String"), 100.0));
+    REQUIRE(insertDetected == true);
+
+    testTable->deleteByKey(20000);
+    REQUIRE(deleteDetected == true);
+  }
 }

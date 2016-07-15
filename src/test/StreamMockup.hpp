@@ -75,6 +75,8 @@ public:
 		}
 	}
 
+	int numTuplesProcessed() const { return tuplesProcessed; }
+	
 	/**
 	 * @brief Bind the callback for the data channel.
 	 */
