@@ -138,6 +138,7 @@ for (p = (char*) f; (pch = (char*) strchr(p, '\n')); ++p) {
 #else
 	file.close();
 #endif
+    delete [] store;
 	return ntuples;
 
 }

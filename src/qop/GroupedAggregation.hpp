@@ -126,10 +126,10 @@ public:
 		mAggrStatePrototype(dynamic_cast<AggregateState *>(aggrs->clone())),
 		mGroupByFunc(groupby_fun),
 		mIterateFunc(it_fun), mFinalFunc(final_fun),
-    mTriggerInterval( tInterval ), mTriggerType(tType), 
+    mTriggerInterval( tInterval ),
     mNotifier(tInterval > 0 && tType == TriggerByTime ?
              new TriggerNotifier(std::bind(&GroupedAggregation::notificationCallback, this), tInterval) : nullptr),
-    mLastTriggerTime(0), mCounter(0) {
+    mLastTriggerTime(0), mTriggerType(tType), mCounter(0) {
 	}
 
 	/**

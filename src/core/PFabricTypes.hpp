@@ -17,7 +17,7 @@ namespace pfabric {
 
   typedef unsigned long DefaultKeyType;
 
-  
+
 /// a name for a query operator parameter
 typedef std::string ParameterName;
 
@@ -51,18 +51,18 @@ typedef std::vector< std::string > StringTuple;
 class Punctuation;
 
 /// a shared pointer to a stream punctuation
-typedef ns_types::SharedPtr< Punctuation > PunctuationPtr;
+typedef std::shared_ptr< Punctuation > PunctuationPtr;
 
 
 /// a pointer to a generic tuple
 template< typename TupleType >
-using TuplePtr = ns_types::IntrusivePtr< TupleType >;
+using TuplePtr = boost::intrusive_ptr< TupleType >;
 
 
 class BaseAggregateState;
 
 /// a shared pointer to an aggregation state
-typedef ns_types::SharedPtr<BaseAggregateState> AggregateStatePtr;
+typedef std::shared_ptr<BaseAggregateState> AggregateStatePtr;
 
 
 template<class T>
@@ -70,7 +70,7 @@ class GroupedAggregateState;
 
 /// a shared pointer to a grouped aggregation state
 template<class T>
-using GroupedAggregateStatePtr = ns_types::SharedPtr< GroupedAggregateState< T > >;
+using GroupedAggregateStatePtr = std::shared_ptr< GroupedAggregateState< T > >;
 
 
   // possible types of triggers for producing results in aggregation.

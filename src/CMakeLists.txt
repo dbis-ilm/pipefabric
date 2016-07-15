@@ -127,6 +127,7 @@ add_library(pfabric_core SHARED
   qop/Window.cpp
   qop/TriggerNotifier.cpp
   topology/Topology.cpp
+  topology/PFabricContext.cpp
   3rdparty/format/format.cpp
   ${ZEROMQ_SOURCES}
 )

@@ -22,6 +22,8 @@
 #ifndef Aggregation_hpp_
 #define Aggregation_hpp_
 
+#include <thread>
+
 #include "core/Tuple.hpp"
 #include "core/Punctuation.hpp"
 #include "qop/AggregateFunctions.hpp"
@@ -29,7 +31,7 @@
 #include "qop/UnaryTransform.hpp"
 #include "qop/TriggerNotifier.hpp"
 
-#include <boost/thread/thread.hpp>
+// #include <boost/thread/thread.hpp>
 
 namespace pfabric {
 
@@ -59,13 +61,16 @@ namespace pfabric {
    */
   template<
   typename InputStreamElement,
-  typename OutputStreamElement
+  typename OutputStreamElement,
+    typename AggregateState
   >
   class Aggregation : public UnaryTransform< InputStreamElement, OutputStreamElement > {
   protected:
     PFABRIC_UNARY_TRANSFORM_TYPEDEFS(InputStreamElement, OutputStreamElement);
 
   public:
+    	typedef std::shared_ptr<AggregateState> AggregateStatePtr;
+
     typedef std::function<Timestamp(const InputStreamElement&)> TimestampExtractorFunc;
 
     /**
@@ -96,16 +101,15 @@ namespace pfabric {
      */
     Aggregation( AggregateStatePtr aggrs, FinalFunc final_fun, IterateFunc it_fun,
                 AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0) :
-    mAggrState( aggrs->clone() ), mIterateFunc( it_fun ), mFinalFunc( final_fun ),
-    mTriggerType(tType), mTriggerInterval( tInterval ),
+    mAggrState( dynamic_cast<AggregateState *>(aggrs->clone()) ), mIterateFunc( it_fun ), mFinalFunc( final_fun ),
     mNotifier(tInterval > 0 && tType == TriggerByTime ?
              new TriggerNotifier(std::bind(&Aggregation::notificationCallback, this), tInterval) : nullptr),
-    mLastTriggerTime(0), mCounter(0) {
+    mLastTriggerTime(0), mTriggerType(tType), mTriggerInterval( tInterval ), mCounter(0) {
     }
 
     Aggregation( AggregateStatePtr aggrs, FinalFunc final_fun, IterateFunc it_fun,
                 TimestampExtractorFunc func, const unsigned int tInterval) :
-    mAggrState( aggrs->clone() ), mIterateFunc( it_fun ), mFinalFunc( final_fun ),
+    mAggrState( dynamic_cast<AggregateState *>(aggrs->clone()) ), mIterateFunc( it_fun ), mFinalFunc( final_fun ),
     mTimestampExtractor(func),
     mTriggerType(TriggerByTimestamp), mTriggerInterval( tInterval ),
     mNotifier(nullptr),
@@ -136,7 +140,7 @@ namespace pfabric {
      *    flag indicating whether the tuple is new or invalidated now
      */
     void processDataElement( const InputStreamElement& data, const bool outdated ) {
-      boost::lock_guard<boost::mutex> guard(aggrMtx);
+      std::lock_guard<std::mutex> guard(aggrMtx);
 
       // the actual aggregation is outsourced to a user-defined expression
       mIterateFunc(data, mAggrState, outdated);
@@ -198,7 +202,7 @@ namespace pfabric {
      * @brief TODO doc
      */
     void produceAggregates() {
-      boost::lock_guard<boost::mutex> guard(aggrMtx);
+      std::lock_guard<std::mutex> guard(aggrMtx);
 
       auto aggregationResult = mFinalFunc( mAggrState );
       this->getOutputDataChannel().publish( aggregationResult, false );
@@ -215,7 +219,7 @@ namespace pfabric {
 
     TimestampExtractorFunc mTimestampExtractor; //!< a pointer to the function for extracting the timestamp from the tuple
     AggregateStatePtr mAggrState;               //!< a pointer to the object representing the aggregation state
-    mutable boost::mutex aggrMtx;               //!< a mutex for synchronizing access between the trigger notifier thread
+    mutable std::mutex aggrMtx;               //!< a mutex for synchronizing access between the trigger notifier thread
                                                 //!< and aggregation operator
     IterateFunc mIterateFunc;                   //!< a pointer to the iteration function called for each tuple
     FinalFunc mFinalFunc;                       //!< a  pointer to a function computing the final (or periodical) aggregates

@@ -312,10 +312,10 @@ namespace pfabric {
 
     template <typename Tin, typename Tout, typename AggrState>
     Pipe& aggregate(std::shared_ptr<AggrState> aggrStatePtr,
-                    typename Aggregation<Tin, Tout>::FinalFunc finalFun,
-                    typename Aggregation<Tin, Tout>::IterateFunc iterFun,
+                    typename Aggregation<Tin, Tout, AggrState>::FinalFunc finalFun,
+                    typename Aggregation<Tin, Tout, AggrState>::IterateFunc iterFun,
                     AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0) {
-      auto op = std::make_shared<Aggregation<Tin, Tout> >(aggrStatePtr, finalFun, iterFun, tType, tInterval);
+      auto op = std::make_shared<Aggregation<Tin, Tout, AggrState> >(aggrStatePtr, finalFun, iterFun, tType, tInterval);
       auto pOp = dynamic_cast<DataSource<Tin>*>(getPublisher().get());
       BOOST_ASSERT_MSG(pOp != nullptr,
         "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");

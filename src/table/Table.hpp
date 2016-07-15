@@ -27,8 +27,15 @@ struct TableParams {
   };
 };
 
+class BaseTable {
+protected:
+  BaseTable() {}
+
+  virtual ~BaseTable() {}
+};
+
 template <typename RecordType, typename KeyType = DefaultKeyType>
-class Table {
+class Table : public BaseTable {
 public:
   typedef std::function<bool(const RecordType&)> Predicate;
   typedef std::function<RecordType(const RecordType&)> UpdaterFunc;
@@ -37,7 +44,7 @@ public:
 
   Table() {}
 
-  ~Table() {}
+    ~Table() { std::cout << "deallocate table" << std::endl; }
 
   void insert(KeyType key, const RecordType& rec) throw (TableException) {
     mDataTable.insert({key, rec});

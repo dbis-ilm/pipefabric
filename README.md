@@ -33,6 +33,9 @@ which allows to specify processing steps in a DSL very similar to Apache Spark. 
 code snippet gives an example. See below for an explanation of the provided operators.
 
 ```
+typedef TuplePtr<Tuple<int, std::string, double> > T1;
+typedef TuplePtr<Tuple<double, int> > T2;
+
 Topology t;
 auto s = t.newStreamFromFile("file.csv")
   .extract<T1>(',')

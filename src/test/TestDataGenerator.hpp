@@ -4,6 +4,8 @@
 #include <string>
 #include <fstream>
 
+#include <boost/filesystem.hpp>
+
 #include "format/format.hpp"
 
 namespace pfabric {
