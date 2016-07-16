@@ -1,3 +1,23 @@
+/*
+ * Copyright (c) 2014-16 The PipeFabric team,
+ *                       All Rights Reserved.
+ *
+ * This file is part of the PipeFabric package.
+ *
+ * PipeFabric is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License (GPL) as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; see the file LICENSE.
+ * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
+ */
 #ifndef Pipe_hpp_
 #define Pipe_hpp_
 
@@ -54,7 +74,7 @@ namespace pfabric {
      * @param[in] op
      *     an operator producing the tuple for the this pipeline
      */
-    Pipe(std::shared_ptr<BaseOp> op) {
+    Pipe(BaseOpPtr op) {
       publishers.push_back(op);
     }
 
@@ -72,14 +92,22 @@ namespace pfabric {
   public:
     /**
      * @brief Destructor of the pipe.
+     *
+     * Destroys the pipe and removes all publishers.
      */
     ~Pipe() { publishers.clear(); }
 
     /**
      * @brief Defines the key extractor function for all subsequent operators.
      *
+     * Defines a function for extracting a key value from a tuple which is used
+     * for all subsequent operators which require such a function,
+     * e.g. join, groupBy.
+     *
      * @tparam T
      *      the input tuple type (usually a TuplePtr) for the operator.
+     * @tparam KeyType
+     *      the data type of the key
      * @param[in] func
      *      a function pointer to a function extracting the key from the tuple
      * @return a reference to the pipe
@@ -92,6 +120,9 @@ namespace pfabric {
 
     /**
      * @brief Defines the timestamp extractor function for all subsequent operators.
+     *
+     * Defines a function for extracting a timestamp from a tuple which is used
+     * for all subsequent operators which require such a function, e.g. windows.
      *
      * @tparam T
      *      the input tuple type (usually a TuplePtr) for the operator.
@@ -108,6 +139,8 @@ namespace pfabric {
     /**
      * @brief Creates a sliding window operator as the next operator on the pipe.
      *
+     * Creates a sliding window operator of the given type and size.
+     *
      * @tparam T
      *      the input tuple type (usually a TuplePtr) for the operator.
      * @param[in] wt
@@ -116,18 +149,22 @@ namespace pfabric {
      *      the window size (in number of tuples for row window or in milliseconds for range
      *      windows)
      * @param[in] sd
+     *      @TODO
      * @return a reference to the pipe
      */
     template <typename T>
-    Pipe& slidingWindow(const WindowParams::WinType& wt, const unsigned int sz,
+    Pipe& slidingWindow(const WindowParams::WinType& wt,
+                        const unsigned int sz,
                         const unsigned int sd = 0) {
       typedef typename Window<T>::TimestampExtractorFunc ExtractorFunc;
-
+      // we use a try block because the type cast of the timestamp extractor
+      // could fail
       try {
         ExtractorFunc fn;
         std::shared_ptr<SlidingWindow<T> > op;
 
         if (wt == WindowParams::RangeWindow) {
+          // a range window requires a timestamp extractor
           fn = boost::any_cast<ExtractorFunc>(timestampExtractor);
           op = std::make_shared<SlidingWindow<T> >(fn, wt, sz, sd);
         }
@@ -148,6 +185,8 @@ namespace pfabric {
     /**
      * @brief Creates a tumbling window operator as the next operator on the pipe.
      *
+     * Creates a tumbling window operator of the given type and size.
+     *
      * @tparam T
      *      the input tuple type (usually a TuplePtr) for the operator.
      * @param[in] wt
@@ -155,17 +194,18 @@ namespace pfabric {
      * @param[in] sz
      *      the window size (in number of tuples for row window or in milliseconds for range
      *      windows)
-     * @param[in] sd
      * @return a reference to the pipe
      */
     template <typename T>
-    Pipe& tumblingWindow(const WindowParams::WinType& wt, const unsigned int sz) {
+    Pipe& tumblingWindow(const WindowParams::WinType& wt,
+                         const unsigned int sz) {
       typedef typename Window<T>::TimestampExtractorFunc ExtractorFunc;
       try {
         ExtractorFunc fn;
         std::shared_ptr<TumblingWindow<T> > op;
 
         if (wt == WindowParams::RangeWindow) {
+          // a range window requires a timestamp extractor
           fn = boost::any_cast<ExtractorFunc>(timestampExtractor);
           op = std::make_shared<TumblingWindow<T> >(fn, wt, sz);
         }
@@ -187,14 +227,21 @@ namespace pfabric {
      * @brief Creates a print operator (ConsoleWriter) with an optional user-defined formatting function
      *        as the next operator on the pipe.
      *
+     * Create a operator which prints all incoming tuples to the given ostream
+     * (usually std::cout or a stringstream) possibly with a user-defined
+     * formatting function.
+     *
      * @tparam T
      *      the input tuple type (usually a TuplePtr) for the operator.
-     * @param[in] ffun
      * @param[in] os
+     *      the output stream (std::cout, a stringstream)
+     * @param[in] ffun
+     *      an optional formatting function producing a string from the tuple
      * @return a reference to the pipe
      */
     template <typename T>
-    Pipe& print(std::ostream& os = std::cout, typename ConsoleWriter<T>::FormatterFunc ffun = ConsoleWriter<T>::defaultFormatter) {
+    Pipe& print(std::ostream& os = std::cout,
+                typename ConsoleWriter<T>::FormatterFunc ffun = ConsoleWriter<T>::defaultFormatter) {
       auto op = std::make_shared<ConsoleWriter<T> >(os, ffun);
       auto pOp = dynamic_cast<DataSource<T>*>(getPublisher().get());
       BOOST_ASSERT_MSG(pOp != nullptr, "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
@@ -206,17 +253,22 @@ namespace pfabric {
     }
 
     /**
-     * @brief Creates an operator for saving tuples to a file (FileWriter)
-     *        as the next operator on the pipe.
+     * @brief Creates an operator for saving tuples to a file.
+     *
+     * Creates an operator for saving tuples to a file with the given name
+     * as the next operator on the pipe.
      *
      * @tparam T
      *      the input tuple type (usually a TuplePtr) for the operator.
-     * @param[in] ffun
      * @param[in] fname
+     *      the name of the output file
+     * @param[in] ffun
+     *      an optional formatting function producing a string from the tuple
      * @return a reference to the pipe
      */
    template <typename T>
-    Pipe& saveToFile(const std::string& fname, typename FileWriter<T>::FormatterFunc ffun = ConsoleWriter<T>::defaultFormatter) {
+    Pipe& saveToFile(const std::string& fname,
+                     typename FileWriter<T>::FormatterFunc ffun = ConsoleWriter<T>::defaultFormatter) {
       auto op = std::make_shared<FileWriter<T> >(fname, ffun);
       auto pOp = dynamic_cast<DataSource<T>*>(getPublisher().get());
       BOOST_ASSERT_MSG(pOp != nullptr, "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
@@ -228,8 +280,10 @@ namespace pfabric {
     }
 
     /**
-     * @brief Creates an operator for extracting typed fields from a simple string tuple
-     *        as the next operator on the pipe.
+     * @brief Creates an data extraction operator.
+     *
+     * Creates an operator for extracting typed fields from a simple string tuple
+     * as the next operator on the pipe.
      *
      * @tparam T
      *      the input tuple type (usually a TuplePtr) for the operator.
@@ -247,6 +301,13 @@ namespace pfabric {
       return *this;
     }
 
+    /**
+     * @brief
+     *
+     * @tparam T
+     *      the input tuple type (usually a TuplePtr) for the operator.
+     * @return a reference to the pipe
+     */
     template <class T>
     Pipe& deserialize() {
       auto op = std::make_shared<TupleDeserializer<T> >();
@@ -257,8 +318,10 @@ namespace pfabric {
       return *this;
     }
    /**
-     * @brief Creates a filter operator which forwards only tuples satisfying the given filter predicate
-     *        as the next operator on the pipe.
+     * @brief Creates a filter operator for selecting tuples.
+     *
+     * Creates a filter operator which forwards only tuples satisfying the given filter predicate
+     * as the next operator on the pipe.
      *
      * @tparam T
      *      the input tuple type (usually a TuplePtr) for the operator.
@@ -277,6 +340,18 @@ namespace pfabric {
       return *this;
     }
 
+    /**
+     * @brief Creates a queue operator for decoupling operators.
+     *
+     * Creates a queue operator which allows to decouple two operators in the
+     * dataflow. The upstream part inserts tuples into the queue which is
+     * processed by a seperate thread to retrieve tuples from the queue and sent
+     * them downstream. In this way, the upstream part is not blocked anymore.
+     *
+     * @tparam T
+     *      the input tuple type (usually a TuplePtr) for the operator.
+     * @return a reference to the pipe
+     */
     template <typename T>
     Pipe& queue() {
       auto op = std::make_shared<Queue<T> >();
@@ -288,8 +363,10 @@ namespace pfabric {
     }
 
     /**
-     * @brief Creates a map operator which applies a mapping (projection) function to each tuples
-     *        as the next operator on the pipe.
+     * @brief Creates a projection operator.
+     *
+     * Creates a map operator which applies a mapping (projection) function to each tuples
+     * as the next operator on the pipe.
      *
      * @tparam Tin
      *      the input tuple type (usually a TuplePtr) for the operator.
@@ -310,12 +387,56 @@ namespace pfabric {
       return *this;
     }
 
+    /**
+     * @brief Creates an operator for calculating aggregates over the entire stream.
+     *
+     * Creates an operator for calculating a set of aggregates over the stream,
+     * possibly supported by a window. Depending on the parameters each input
+     * tuple triggers the calculating and produces a new aggregate value which
+     * is forwarded as a result tuple.
+     * The following example illustrates the usage of this method with the
+     * helper template classes Aggregator1:
+     * @code
+     * // calculate the sum of column #0
+     * typedef Aggregator1<T1, AggrSum<double>, 0> MyAggrState;
+     * typedef std::shared_ptr<MyAggrState> MyAggrStatePtr;
+     *
+     * // Aggregator1 defines already functions for finalize and iterate
+     * t->newStreamFrom...
+     *    .aggregate<T1, T2, MyAggrState> (std::make_shared<MyAggrState>(),
+     *                                    MyAggrState::finalize,
+     *                                    MyAggrState::iterate)
+     * @endcode
+     *
+     * @tparam Tin
+     *      the input tuple type (usually a TuplePtr) for the operator.
+     * @tparam Tout
+     *      the result tuple type (usually a TuplePtr) for the operator.
+     * @tparam AggrState
+     *      the type of representing the aggregation state as a subclass of
+     *      @c AggregationStateBase. There are predefined template classes
+     *      @c Aggregator1 ... @c AggregatorN which can be used directly here.
+     * @param[in] aggrStatePtr
+     *      an instance of the AggrState class which is used as prototype
+     * @param[in] finalFun
+     *    a function pointer for constructing the aggregation tuple
+     * @param[in] iterFun
+     *    a function pointer for increment/decrement (in case of outdated tuple)
+     *    the aggregate values.
+     * @param[in] tType
+     *    the mode for triggering the calculation of the aggregate (TriggerAll,
+          TriggerByCount, TriggerByTime, TriggerByTimestamp)
+     * @param[in] tInterval
+     *    the interval for producing aggregate tuples
+     * @return a reference to the pipe
+     */
     template <typename Tin, typename Tout, typename AggrState>
     Pipe& aggregate(std::shared_ptr<AggrState> aggrStatePtr,
                     typename Aggregation<Tin, Tout, AggrState>::FinalFunc finalFun,
                     typename Aggregation<Tin, Tout, AggrState>::IterateFunc iterFun,
                     AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0) {
-      auto op = std::make_shared<Aggregation<Tin, Tout, AggrState> >(aggrStatePtr, finalFun, iterFun, tType, tInterval);
+      auto op = std::make_shared<Aggregation<Tin, Tout, AggrState> >(aggrStatePtr,
+          finalFun, iterFun, tType, tInterval);
       auto pOp = dynamic_cast<DataSource<Tin>*>(getPublisher().get());
       BOOST_ASSERT_MSG(pOp != nullptr,
         "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
@@ -324,26 +445,80 @@ namespace pfabric {
       return *this;
     }
 
+    /**
+     * @brief Creates an operator for calculating grouped aggregates over the entire stream.
+     *
+     * Creates an operator implementing a groupBy together with aggregations which
+     * are represented internally by instances of AggregateState. The operator supports
+     * window-based aggregation by handling delete tuples accordingly.
+     *
+     * @tparam Tin
+     *      the input tuple type (usually a TuplePtr) for the operator.
+     * @tparam Tout
+     *      the result tuple type (usually a TuplePtr) for the operator.
+     *      the type of representing the aggregation state as a subclass of
+     *      @c AggregationStateBase. There are predefined template classes
+     *      @c Aggregator1 ... @c AggregatorN which can be used directly here.
+     * @tparam KeyType
+     *      the data type for representing keys (grouping values)
+     * @param[in] aggrStatePtr
+     *      an instance of the AggrState class which is used as prototype
+     * @param[in] finalFun
+     *    a function pointer for constructing the aggregation tuple
+     * @param[in] iterFun
+     *    a function pointer for increment/decrement (in case of outdated tuple)
+     *    the aggregate values.
+     * @param[in] tType
+     *    the mode for triggering the calculation of the aggregate (TriggerAll,
+          TriggerByCount, TriggerByTime, TriggerByTimestamp)
+     * @param[in] tInterval
+     *    the interval for producing aggregate tuples
+     * @return a reference to the pipe
+     */
     template <typename Tin, typename Tout, typename AggrState, typename KeyType = DefaultKeyType>
     Pipe& groupBy(std::shared_ptr<AggrState> aggrStatePtr,
                     typename GroupedAggregation<Tin, Tout, AggrState, KeyType>::FinalFunc finalFun,
                     typename GroupedAggregation<Tin, Tout, AggrState, KeyType>::IterateFunc iterFun,
                     AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0) {
       try {
-      typedef std::function<KeyType(const Tin&)> KeyExtractorFunc;
-      KeyExtractorFunc keyFunc = boost::any_cast<KeyExtractorFunc>(keyExtractor);
+        typedef std::function<KeyType(const Tin&)> KeyExtractorFunc;
+        KeyExtractorFunc keyFunc = boost::any_cast<KeyExtractorFunc>(keyExtractor);
 
-      auto op = std::make_shared<GroupedAggregation<Tin, Tout, AggrState, KeyType> >(aggrStatePtr, keyFunc, finalFun, iterFun, tType, tInterval);
-      auto pOp = dynamic_cast<DataSource<Tin>*>(getPublisher().get());
-      BOOST_ASSERT_MSG(pOp != nullptr, "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
-      CREATE_LINK(pOp, op);
-      publishers.push_back(op);
-    } catch (boost::bad_any_cast &e) {
-      BOOST_ASSERT_MSG(false, "No KeyExtractor defined for groupBy.");
-    }
+        auto op =
+          std::make_shared<GroupedAggregation<Tin, Tout, AggrState, KeyType> >(aggrStatePtr,
+              keyFunc, finalFun, iterFun, tType, tInterval);
+        auto pOp = dynamic_cast<DataSource<Tin>*>(getPublisher().get());
+        BOOST_ASSERT_MSG(pOp != nullptr,
+          "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
+          CREATE_LINK(pOp, op);
+          publishers.push_back(op);
+      } catch (boost::bad_any_cast &e) {
+        BOOST_ASSERT_MSG(false, "No KeyExtractor defined for groupBy.");
+      }
       return *this;
     }
 
+    /**
+     * @brief Creates an operator for joining two streams represented by pipes.
+     *
+     * Creates an operator implementing a symmetric hash join to join two streams.
+     * In addition to the inherent key comparison of the hash join an additional
+     * join predicate can be specified. Note, that the output tuple type is derived
+     * from the two input types.
+     *
+     * @tparam T1
+     *      the input tuple type (usually a TuplePtr) of the left stream.
+     * @tparam T2
+     *      the input tuple type (usually a TuplePtr) of the right stream.
+     * @tparam KeyType
+     *      the data type for representing keys (join values)
+     * @param[in] otherPipe
+     *      the pipe representing the right stream
+     * @param[in] pred
+     *      the join predicate which is applied in addition to the equi-join
+     *      condition of the hash join
+     * @return a reference to the pipe
+     */
     template <typename T1, typename T2, typename KeyType = DefaultKeyType>
     Pipe& join(Pipe& otherPipe,
                typename SHJoin<T1, T2, KeyType>::JoinPredicateFunc pred) {
@@ -377,6 +552,25 @@ namespace pfabric {
       return *this;
     }
 
+    /**
+     * @brief Creates an operator storing stream tuples in the given table.
+     *
+     * Creates an operator which stores tuples from the input stream into
+     * the given table and forwards them to its subscribers. Outdated tuples
+     * are handled as deletes, non-outdated tuples either as insert (if the key
+     * does not exist yet) or update (otherwise).
+     *
+     * @tparam T
+     *    the input tuple type (usually a TuplePtr) for the operator which is also
+     *    used as the record type of the table.
+     * @tparam KeyType
+     *    the data type representing keys in the table
+     * @param[in] tbl
+     *    a pointer to the table object where the tuples are stored
+     * @param[in] autoCommit
+     *    @c true if each tuple is handled within its own transaction context
+     * @return a reference to the pipe
+     */
     template <typename T, typename KeyType = DefaultKeyType>
     Pipe& toTable(std::shared_ptr<Table<T, KeyType>> tbl, bool autoCommit = true) {
       typedef std::function<KeyType(const T&)> KeyExtractorFunc;

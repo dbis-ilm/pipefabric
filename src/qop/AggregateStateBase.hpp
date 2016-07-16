@@ -70,6 +70,43 @@ public:
 template <
 	typename StreamElement,
 	typename Aggr1Func, int Aggr1Col,
+	typename Aggr2Func, int Aggr2Col
+>
+class Aggregator2 : public AggregateStateBase<StreamElement> {
+	Aggr1Func aggr1_;
+	Aggr2Func aggr2_;
+
+public:
+	typedef TuplePtr<Tuple<typename Aggr1Func::ResultType,
+												 typename Aggr2Func::ResultType>> ResultTypePtr;
+	typedef std::shared_ptr<Aggregator2<StreamElement, Aggr1Func, Aggr1Col,
+		Aggr2Func, Aggr2Col>> AggrStatePtr;
+
+	Aggregator2() {}
+
+	void init() override {
+		aggr1_.init();
+		aggr2_.init();
+	}
+
+	AggregateStateBase<StreamElement> *clone() const override {
+		return new Aggregator2< StreamElement, Aggr1Func, Aggr1Col,
+			Aggr2Func, Aggr2Col >();
+	}
+
+	static void iterate(const StreamElement& tp, AggrStatePtr state, const bool outdated) {
+		state->aggr1_.iterate(getAttribute<Aggr1Col>(*tp), outdated);
+		state->aggr2_.iterate(getAttribute<Aggr2Col>(*tp), outdated);
+	}
+
+	static ResultTypePtr finalize(AggrStatePtr state) {
+		return makeTuplePtr(state->aggr1_.value(), state->aggr2_.value());
+	}
+};
+
+template <
+	typename StreamElement,
+	typename Aggr1Func, int Aggr1Col,
 	typename Aggr2Func, int Aggr2Col,
 	typename Aggr3Func, int Aggr3Col
 >

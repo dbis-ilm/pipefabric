@@ -38,7 +38,7 @@ namespace pfabric {
   /**
    * @brief An aggregation operator for streams of tuples.
    *
-   * This operator implements the aggregation of data streams. For each incoming tuple the
+   * This operator implements the calculation of aggregates over a data streams. For each incoming tuple the
    * aggregates are computed incrementally using the IterateFunc function. The final aggregation
    * results calculated by an FinalFunc function are either produced periodically or at the end
    * of the stream. This class implements the non-realtime variant of aggregation, i.e., the slen
@@ -48,6 +48,7 @@ namespace pfabric {
    *    the data stream element type consumed by the projection
    * @tparam OutputStreamElement
    *    the data stream element type produced by the projection
+   * @tparam AggregateState
    */
   template<
     typename InputStreamElement,

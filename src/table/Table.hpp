@@ -8,12 +8,18 @@
 #include <exception>
 
 #include <boost/signals2.hpp>
+#include "format/format.hpp"
 
 namespace pfabric {
 
 class TableException : public std::exception {
+  std::string msg;
+
+public:
+    TableException(const char *s = "") : msg(s) {}
+
     virtual const char* what() const throw() {
-      return "TableException";
+      return fmt::format("TableException: {}", msg).c_str();
     }
 };
 

@@ -1,3 +1,23 @@
+/*
+ * Copyright (c) 2014-16 The PipeFabric team,
+ *                       All Rights Reserved.
+ *
+ * This file is part of the PipeFabric package.
+ *
+ * PipeFabric is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License (GPL) as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; see the file LICENSE.
+ * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
+ */
 #ifndef Topology_hpp_
 #define Topology_hpp_
 
@@ -31,8 +51,9 @@ namespace pfabric {
    *
    * @code
    * // T1 and T2 a typedefs of TuplePtr
-   * Topology t;
-   * auto s = t.newStreamFromFile("file.csv")
+   * TopologyPtr t = ctx.createTopology();
+   *
+   * auto s = t->newStreamFromFile("file.csv")
    *           .extract<T1>(',')
    *           .where<T1>([](auto tp, bool outdated) {
    *                     return getAttribute<0>(*tp) % 2 == 0;
@@ -112,18 +133,73 @@ namespace pfabric {
      */
     Pipe& newStreamFromFile(const std::string& fname);
 
+    /**
+     * @brief Creates a pipe from a REST source as input.
+     *
+     * Creates a new pipe for receiving tuples via a REST server.
+     * Each call of the REST service produces a single tuple (consisting
+     * of a single string).
+     *
+     * @param[in] port
+     *    the TCP port for receiving REST calls
+     * @param[in] path
+     *    the local part (path) of the REST URI
+     * @param[in] method
+     *    the REST method for invoking the service (GET, PUT, POST)
+     * @param[in] numThreads
+     *    the number of threads to run the service
+     * @return
+     *    a new pipe where RESTSource acts as a producer.
+     */
     Pipe& newStreamFromREST(unsigned int port,
-      const std::string& path,
-      RESTSource::RESTMethod method,
-      unsigned short numThreads = 1);
+                            const std::string& path,
+                            RESTSource::RESTMethod method,
+                            unsigned short numThreads = 1);
 
+    /**
+     * @brief Creates a pipe from a ZMQ source as input.
+     *
+     * Creates a new pipe for receiving tuples via ZMQ and sent them
+     * over the stream either as one string (tuple) per message or
+     * binary encoded.
+     *
+     * @param[in] path
+     *    the path describing the network connection endpoint, e.g.
+     *    tcp://localhost:5678 for a TCP connection at port 5678
+     * @param[in] encoding
+     *    the encoding used for sending data over ZMQ (ASCII or binary)
+     * @param[in] stype
+     *    the communication type as provided by ZMQ (Subscriber for PubSub
+     *    or Pull).
+     * @return
+     *    a new pipe where ZMQSource acts as a producer.
+     */
     Pipe& newStreamFromZMQ(const std::string& path,
       ZMQParams::EncodingMode encoding = ZMQParams::AsciiMode,
       ZMQParams::SourceType stype = ZMQParams::SubscriberSource);
 
+    /**
+     * @brief Creates a pipe for monitoring updates on a table.
+     *
+     * Creates a new pipe for producing a stream from updates on a
+     * table. Each update creates a tuple sent to the stream. Updates
+     * can either sent immediately (@c Immediate) or after the commit
+     * of an transaction.
+     *
+     * @tparam T
+     *    the record type of the table, usually a @c TuplePtr<Tuple<...> >
+     * @tparam KeyType
+     *    the data type of the key of the table
+     * @param[in] tbl
+     *    the table acting as the source for the stream.
+     * @param[in] mode
+     *    the monitoring mode (@c Immediate or @c OnCommit)
+     * @return
+     *    a new pipe where RESTSource acts as a producer.
+     */
     template<typename T, typename KeyType = DefaultKeyType>
     Pipe& newStreamFromTable(std::shared_ptr<Table<T, KeyType>> tbl,
-      typename Table<T, KeyType>::NotificationMode mode = Table<T, KeyType>::Immediate) {
+                             TableParams::NotificationMode mode = TableParams::Immediate) {
       auto op = std::make_shared<FromTable<T, KeyType>>(tbl, mode);
       auto s = new Pipe(op);
       pipes.push_back(s);

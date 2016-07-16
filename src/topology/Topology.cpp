@@ -1,3 +1,23 @@
+/*
+ * Copyright (c) 2014-16 The PipeFabric team,
+ *                       All Rights Reserved.
+ *
+ * This file is part of the PipeFabric package.
+ *
+ * PipeFabric is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License (GPL) as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; see the file LICENSE.
+ * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
+ */
 #include <vector>
 #include <future>
 
@@ -51,7 +71,10 @@ Pipe& Topology::newStreamFromFile(const std::string& fname) {
   return *s;
 }
 
-Pipe& Topology::newStreamFromREST(unsigned int port, const std::string& path, RESTSource::RESTMethod method, unsigned short numThreads) {
+Pipe& Topology::newStreamFromREST(unsigned int port,
+                                  const std::string& path,
+                                  RESTSource::RESTMethod method,
+                                  unsigned short numThreads) {
   // create a new TextFileSource
   auto op = std::make_shared<RESTSource>(port, path, method, numThreads);
   // register it's start function
@@ -63,8 +86,12 @@ Pipe& Topology::newStreamFromREST(unsigned int port, const std::string& path, RE
   return *s;
 }
 
-Pipe& Topology::newStreamFromZMQ(const std::string& path, ZMQParams::EncodingMode encoding, ZMQParams::SourceType stype) {
+Pipe& Topology::newStreamFromZMQ(const std::string& path,
+                                 ZMQParams::EncodingMode encoding,
+                                 ZMQParams::SourceType stype) {
   Pipe *pipe = nullptr;
+  // depending on the encoding mode, we create a ZMQSource with
+  // different type parameters
   if (encoding == ZMQParams::AsciiMode) {
     auto op = std::make_shared<ZMQSource<TStringPtr> >(path, stype);
     pipe = new Pipe(op);
@@ -76,4 +103,3 @@ Pipe& Topology::newStreamFromZMQ(const std::string& path, ZMQParams::EncodingMod
   pipes.push_back(pipe);
   return *pipe;
 }
-
