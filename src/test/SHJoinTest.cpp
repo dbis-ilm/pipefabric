@@ -61,7 +61,7 @@ private:
 	void processPunctuation( const PunctuationPtr& punctuation ) {}
 
 	void processDataElement( const ResultType& data, const bool outdated ) {
-		REQUIRE( getAttribute<0>( data ) == getAttribute<2>( data ) );
+		REQUIRE( (getAttribute<0>( data ) == getAttribute<2>( data )) );
 		if (outdated) {
 			mOutdatedTuplesProcessed++;
 		}

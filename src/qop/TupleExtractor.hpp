@@ -96,7 +96,7 @@ namespace pfabric {
      */
     void processDataElement( const TStringPtr& line, const bool outdated ) {
       auto s = line->getAttribute<0>().begin();
-      int i = 0;
+      unsigned i = 0;
       while (*s) {
         char* item = (char *)s;
         while (*s && *s != ifs) s++;

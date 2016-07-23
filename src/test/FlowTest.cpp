@@ -43,7 +43,7 @@ public:
 private:
 
 	void checkResult( const ResultType& result ) {
-		REQUIRE( result == boost::fusion::at_key< ResultType >(testResults) );
+		REQUIRE((result == boost::fusion::at_key< ResultType >(testResults)));
 	}
 };
 

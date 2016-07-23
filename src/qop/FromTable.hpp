@@ -25,6 +25,7 @@
 #include <fstream>
 #include <memory>
 #include <thread>
+#include <condition_variable>
 
 #include "core/Punctuation.hpp"
 #include "core/Tuple.hpp"

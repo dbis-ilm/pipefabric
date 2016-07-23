@@ -24,6 +24,7 @@
 #include <iostream>
 #include <fstream>
 #include <memory>
+#include <mutex>
 
 #include "core/Punctuation.hpp"
 #include "core/Tuple.hpp"

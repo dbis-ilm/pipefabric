@@ -23,6 +23,7 @@
 #define Aggregation_hpp_
 
 #include <thread>
+#include <mutex>
 
 #include "core/Tuple.hpp"
 #include "core/Punctuation.hpp"

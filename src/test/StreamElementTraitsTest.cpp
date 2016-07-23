@@ -34,7 +34,7 @@ struct CustomElement {
 
 	CustomElement( const int a, const char b, const int c ) :
 		v0( a ), v1( b ), v2( c ), values( std::tie( v0, v1, v2 ) ) {
-		for( int i = 0; i < NUM_ATTRIBUTES; ++i ) {
+		for( unsigned i = 0; i < NUM_ATTRIBUTES; ++i ) {
 			nulls[ i ] = false;
 		}
 	};
@@ -65,7 +65,7 @@ struct CustomElement {
 	bool isNull( const AttributeIdx& index ) const { return nulls[ index ]; }
 	void setNull( const AttributeIdx& index, const bool value = true ) { nulls[ index ] = value; }
 	void setNull() {
-		for( int i = 0; i < NUM_ATTRIBUTES; ++i ) {
+		for( unsigned i = 0; i < NUM_ATTRIBUTES; ++i ) {
 			nulls[ i ] = true;
 		}
 	}
@@ -86,8 +86,8 @@ struct TestStreamElementTraits {
 
 		// check number of attributes
 		BOOST_MPL_ASSERT(( equal< typename ElementTraits::StreamElement, ElementType > ));
-		REQUIRE( ElementTraits::NUM_ATTRIBUTES == 3 );
-		REQUIRE( ElementTraits::getNumAttributes() == 3 );
+		REQUIRE( (ElementTraits::NUM_ATTRIBUTES == 3) );
+		REQUIRE( (ElementTraits::getNumAttributes() == 3) );
 
 		static_assert( std::is_same< typename ElementTraits::template getAttributeType< 0 >::type, int >::value,
 			"attribute 0 is expected to be an int"

@@ -90,7 +90,7 @@ public:
 private:
 
 	void processDataElement( const OutputStreamElement& data, const bool outdated ) {
-		REQUIRE(tuplesProcessed < expectedTuples.size());
+		REQUIRE(unsigned(tuplesProcessed) < expectedTuples.size());
 		REQUIRE(data->data() == expectedTuples[tuplesProcessed]->data());
 		tuplesProcessed++;
 	}

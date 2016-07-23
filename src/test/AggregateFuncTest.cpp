@@ -112,7 +112,7 @@ TEST_CASE("Calculate global minimum of strings", "[AggregateFunc]") {
 	std::vector<std::string> data = { "aaa", "bbb", "ccc", "ddd" };
 
 	AggrGlobalMin<std::string> aggr;
-	for (int i = 0; i < data.size(); i++) {
+	for (unsigned i = 0; i < data.size(); i++) {
 		aggr.iterate(data[i]);
 	}
 	REQUIRE(aggr.value() == "aaa");
@@ -131,7 +131,7 @@ TEST_CASE("Calculate global maximum of strings", "[AggregateFunc]") {
 	std::vector<std::string> data = { "aaa", "bbb", "ccc", "ddd", "aa" };
 
 	AggrGlobalMax<std::string> aggr;
-	for (int i = 0; i < data.size(); i++) {
+	for (unsigned i = 0; i < data.size(); i++) {
 		aggr.iterate(data[i]);
 	}
 	REQUIRE(aggr.value() == "ddd");
