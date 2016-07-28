@@ -31,11 +31,10 @@
  * lived structures. To detect the complex event, then engine should go through this pool (or a partition "part") and process these sequences.
  */
 namespace pfabric {
-template<class Tin, class Tout, class Tdep>
+template<class TinPtr, class ToutPtr, class TdepPtr>
 class StructurePool: public ValueIDMultimap<
-		typename NFAStructure<Tin, Tout, Tdep>::NFAStructurePtr, boost::intrusive_ptr<Tin>> {
-	typedef boost::intrusive_ptr<Tin> TinPtr;
-	typedef boost::shared_ptr<StructurePool<Tin, Tout, Tdep>> StructurePoolPtr;
+		typename NFAStructure<TinPtr, ToutPtr, TdepPtr>::NFAStructurePtr, TinPtr> {
+	typedef boost::shared_ptr<StructurePool<TinPtr, ToutPtr, TdepPtr>> StructurePoolPtr;
 public:
 	/**
 	 * A default constructor
@@ -55,11 +54,11 @@ public:
 	 * @param p the partition of this sequence in the pool
 	 * @return a created sequence from this pool
 	 */
-	const typename NFAStructure<Tin, Tout, Tdep>::NFAStructurePtr getStructure(
-			const typename NFAController<Tin, Tout, Tdep>::NFAControllerPtr& nfa,
+	const typename NFAStructure<TinPtr, ToutPtr, TdepPtr>::NFAStructurePtr getStructure(
+			const typename NFAController<TinPtr, ToutPtr, TdepPtr>::NFAControllerPtr& nfa,
 			Partition<TinPtr>* p) {
-		typename NFAStructure<Tin, Tout, Tdep>::NFAStructurePtr str(
-				new NFAStructure<Tin, Tout, Tdep>(nfa));
+		typename NFAStructure<TinPtr, ToutPtr, TdepPtr>::NFAStructurePtr str(
+				new NFAStructure<TinPtr, ToutPtr, TdepPtr>(nfa));
 		str->setEqualityValue(p);
 		this->appendValue(p, str);
 		return str;

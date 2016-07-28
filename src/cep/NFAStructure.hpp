@@ -30,38 +30,36 @@
 #include "util/Partition.hpp"
 
 namespace pfabric {
-template<class Tin, class Tout, class Tdep>
+template<class TinPtr, class ToutPtr, class TdepPtr>
 struct compare {
-	compare(KleeneState<Tin, Tout, Tdep>* val) :
+	compare(KleeneState<TinPtr, ToutPtr, TdepPtr>* val) :
 			val_(val) {
 	}
-	bool operator()(const std::pair<KleeneState<Tin, Tout, Tdep>*, short>& elem) const {
+	bool operator()(const std::pair<KleeneState<TinPtr, ToutPtr, TdepPtr>*, short>& elem) const {
 		return val_ == elem.first;
 	}
 private:
-	KleeneState<Tin, Tout, Tdep>* val_;
+	KleeneState<TinPtr, ToutPtr, TdepPtr>* val_;
 };
 //template<class Tin, class Tout>
 //class NFAStructure;
-template<class Tin, class Tout, class Tdep>
+template<class TinPtr, class ToutPtr, class TdepPtr>
 class StructurePool;
 
-template<class Tin, class Tout, class Tdep>
+template<class TinPtr, class ToutPtr, class TdepPtr>
 class NFAStructure {
-	typedef boost::intrusive_ptr<Tin> TinPtr;
-	typedef boost::intrusive_ptr<Tin> ToutPtr;
 	mutable boost::atomic<short> refCount;
 
 private:
 	/**
 	 * store the events of this structure which contribute on complex event
 	 */
-	std::vector<typename Instance<Tin, Tout>::InstancePtr> events;
+	std::vector<typename Instance<TinPtr, ToutPtr>::InstancePtr> events;
 
 	/**
 	 * which state the structure is at
 	 */
-	NFAState<Tin>* currentState;
+	NFAState<TinPtr>* currentState;
 
 	/**
 	 * boolean indicating whether the structure is complete to make a match
@@ -70,29 +68,29 @@ private:
 	/**
 	 * our working NFA
 	 */
-	typename NFAController<Tin, Tout, Tdep>::NFAControllerPtr  nfa;
+	typename NFAController<TinPtr, ToutPtr, TdepPtr>::NFAControllerPtr  nfa;
 
 	/**
 	 * store related values
 	 */
-	Tdep relatedValues;
+	TdepPtr relatedValues;
 
 	/*
 	 * the partition of  this structure
 	 */
 	Partition<TinPtr>* equality;
 
-	std::vector<std::pair<KleeneState<Tin, Tout, Tdep>*, short> > kleeneState;
+	std::vector<std::pair<KleeneState<TinPtr, ToutPtr, TdepPtr>*, short> > kleeneState;
 
 
 
 public:
-	typedef boost::intrusive_ptr<NFAStructure<Tin, Tout, Tdep>> NFAStructurePtr;
+	typedef boost::intrusive_ptr<NFAStructure<TinPtr, ToutPtr, TdepPtr>> NFAStructurePtr;
 	/**
 	 * constructor
 	 * @param start the current state is set to start state
 	 */
-	NFAStructure(typename NFAController<Tin, Tout, Tdep>::NFAControllerPtr  nfa);
+	NFAStructure(typename NFAController<TinPtr, ToutPtr, TdepPtr>::NFAControllerPtr  nfa);
 
 	/**
 	 * virtual destructor
@@ -103,12 +101,12 @@ public:
 	 * Get the current state
 	 * @return the current state
 	 */
-	NFAState<Tin>* getCurrentState() const { return this->currentState; }
+	NFAState<TinPtr>* getCurrentState() const { return this->currentState; }
 	/**
 	 * set the current state
 	 * @param current_state the current state to set
 	 */
-	void setCurrentState(NFAState<Tin>* cur) {
+	void setCurrentState(NFAState<TinPtr>* cur) {
 		assert(currentState);
 		this->currentState = cur;
 	}
@@ -116,12 +114,12 @@ public:
 	 * get all event taht match this structure
 	 * @return all event for this structure
 	 */
-	const std::vector<typename Instance<Tin, Tout>::InstancePtr>& getEvents() const { return this->events; }
+	const std::vector<typename Instance<TinPtr, ToutPtr>::InstancePtr>& getEvents() const { return this->events; }
 	/**
 	 * set all event ids for this structure
 	 * @param events all event ids for this structure
 	 */
-	void setEvents(std::vector<typename Instance<Tin, Tout>::InstancePtr> events) {	this->events = events; }
+	void setEvents(std::vector<typename Instance<TinPtr, ToutPtr>::InstancePtr> events) {	this->events = events; }
 	/**
 	 * Checks whether this structure is ready to make a matcht
 	 * @return the complete flag
@@ -138,27 +136,27 @@ public:
 	 * get the nfa controller
 	 * @return the nfa
 	 */
-	typename NFAController<Tin, Tout, Tdep>::NFAControllerPtr getNFA() const { return this->nfa; }
+	typename NFAController<TinPtr, ToutPtr, TdepPtr>::NFAControllerPtr getNFA() const { return this->nfa; }
 	/**
 	 * set the nfa
 	 * @param nfa the nfa to set
 	 */
-	void setNFA(typename NFAController<Tin, Tout, Tdep>::NFAControllerPtr  nfa);
+	void setNFA(typename NFAController<TinPtr, ToutPtr, TdepPtr>::NFAControllerPtr  nfa);
 	/**
 	 * Adds an event to this structure, and makes necessary updates
 	 * @param event the event to be added
 	 * @param the current edge
 	 */
-	void addEvent(const TinPtr& event, NFAEdge<Tin, Tout, Tdep>* currentEdge);
+	void addEvent(const TinPtr& event, NFAEdge<TinPtr, ToutPtr, TdepPtr>* currentEdge);
 	/**
 	 * Clones the structure
 	 * @return new structure
 	 */
-	//typename NFAStructure<Tin, Tout, Tdep>::NFAStructurePtr clone( StructurePool<Tin, Tout, Tdep>* pool) ;
+	//typename NFAStructure<TinPtr, ToutPtr, TdepPtr>::NFAStructurePtr clone( StructurePool<TinPtr, ToutPtr, TdepPtr>* pool) ;
 	/**
 	 * get a particular event
 	 */
-	typename Instance<Tin, Tout>::InstancePtr getEvent(long index) const {
+	typename Instance<TinPtr, ToutPtr>::InstancePtr getEvent(long index) const {
 		assert(index < events.size());
 		return this->events[index];
 	}
@@ -212,15 +210,15 @@ public:
 		}
 	}
 
-	const Tdep& getRelatedValue() {return relatedValues;}
+	const TdepPtr& getRelatedValue() {return relatedValues;}
 
 	void setEqualityValue(Partition<TinPtr>* par) { this->equality = par; }
 
 	Partition<TinPtr>* getEqualityValue() { return equality; }
 
-	short getCurrentKleene(KleeneState<Tin, Tout, Tdep>* kState) const {
+	short getCurrentKleene(KleeneState<TinPtr, ToutPtr, TdepPtr>* kState) const {
 		return std::find_if(kleeneState.begin(), kleeneState.end(),
-			compare<Tin, Tout, Tdep>((KleeneState<Tin, Tout, Tdep>*) (currentState)))->second;
+			compare<TinPtr, ToutPtr, TdepPtr>((KleeneState<TinPtr, ToutPtr, TdepPtr>*) (currentState)))->second;
 	};
 
 };
@@ -229,8 +227,8 @@ public:
 
 namespace pfabric {
 
-template<class Tin, class Tout, class Tdep>
-NFAStructure<Tin, Tout, Tdep>::NFAStructure(typename NFAController<Tin, Tout, Tdep>::NFAControllerPtr  nfa) :
+template<class TinPtr, class ToutPtr, class TdepPtr>
+NFAStructure<TinPtr, ToutPtr, TdepPtr>::NFAStructure(typename NFAController<TinPtr, ToutPtr, TdepPtr>::NFAControllerPtr  nfa) :
 		refCount(0), kleeneState(nfa->getKleeneStatesCount()) {
 
 	this->nfa = nfa;
@@ -242,10 +240,10 @@ NFAStructure<Tin, Tout, Tdep>::NFAStructure(typename NFAController<Tin, Tout, Td
 	relatedValues = this->nfa->init();
 }
 
-template<class Tin, class Tout, class Tdep>
-void NFAStructure<Tin, Tout, Tdep>::addEvent(const TinPtr& event,
-		NFAEdge<Tin, Tout, Tdep>* currentEdge) {
-	typename Instance<Tin, Tout>::InstancePtr inst(new Instance<Tin, Tout>(event));
+template<class TinPtr, class ToutPtr, class TdepPtr>
+void NFAStructure<TinPtr, ToutPtr, TdepPtr>::addEvent(const TinPtr& event,
+		NFAEdge<TinPtr, ToutPtr, TdepPtr>* currentEdge) {
+	typename Instance<TinPtr, ToutPtr>::InstancePtr inst(new Instance<TinPtr, ToutPtr>(event));
 
 	this->events.push_back(inst);
 
@@ -254,37 +252,37 @@ void NFAStructure<Tin, Tout, Tdep>::addEvent(const TinPtr& event,
 
 	this->nfa->update( relatedValues, currentEdge->getID(), event);
 
-	if (currentEdge->getEdgeType() == NFAEdge<Tin, Tout, Tdep>::Forward) {
+	if (currentEdge->getEdgeType() == NFAEdge<TinPtr, ToutPtr, TdepPtr>::Forward) {
 		this->currentState =
-				((ForwardEdge<Tin, Tout, Tdep>*) (currentEdge))->getDestState();
-	} else if (currentEdge->getEdgeType() == NFAEdge<Tin, Tout, Tdep>::Loop) {
+				((ForwardEdge<TinPtr, ToutPtr, TdepPtr>*) (currentEdge))->getDestState();
+	} else if (currentEdge->getEdgeType() == NFAEdge<TinPtr, ToutPtr, TdepPtr>::Loop) {
 
-		typename vector<std::pair<KleeneState<Tin, Tout, Tdep>*, short> >::iterator res = std::find_if(
+		typename vector<std::pair<KleeneState<TinPtr, ToutPtr, TdepPtr>*, short> >::iterator res = std::find_if(
 				kleeneState.begin(), kleeneState.end(),
-				compare<Tin, Tout, Tdep>((KleeneState<Tin, Tout, Tdep>*) (currentState)));
+				compare<TinPtr, ToutPtr, TdepPtr>((KleeneState<TinPtr, ToutPtr, TdepPtr>*) (currentState)));
 		res->second = res->second + 1;
 	}
-	if (currentState->getStateType() == NFAState<Tin>::Final) {
+	if (currentState->getStateType() == NFAState<TinPtr>::Final) {
 		this->complete = true;
 
-	} else if (currentState->getStateType() == NFAState<Tin>::Kleene) {
+	} else if (currentState->getStateType() == NFAState<TinPtr>::Kleene) {
 		//initRelatedValue(event,
 			//	((KleeneState*) this->currentState)->getLoopEdge());
 	}
 }
 /*
 template<class Tin, class Tout>
-typename NFAStructure<Tin, Tout, Tdep>::NFAStructurePtr NFAStructure<Tin, Tout, Tdep>::clone(StructurePool<Tin, Tout, Tdep>* pool) {
+typename NFAStructure<TinPtr, ToutPtr, TdepPtr>::NFAStructurePtr NFAStructure<TinPtr, ToutPtr, TdepPtr>::clone(StructurePool<TinPtr, ToutPtr, TdepPtr>* pool) {
 	int counter = 0;
-	std::vector<typename Instance<Tin, Tout, Tdep>::InstancePtr> vector(this->events.size());
-	for (std::vector<typename Instance<Tin, Tout, Tdep>::InstancePtr>::iterator it = this->events.begin();
+	std::vector<typename Instance<TinPtr, ToutPtr, TdepPtr>::InstancePtr> vector(this->events.size());
+	for (std::vector<typename Instance<TinPtr, ToutPtr, TdepPtr>::InstancePtr>::iterator it = this->events.begin();
 			it != this->events.end(); it++) {
 		vector.at(counter++) = *it;
 	}
 	counter = 0;
 	//vector_related_value related(this->related_values.size());
 
-	for (std::vector<typename Instance<Tin, Tout, Tdep>::InstancePtr>::iterator it = this->events.begin();
+	for (std::vector<typename Instance<TinPtr, ToutPtr, TdepPtr>::InstancePtr>::iterator it = this->events.begin();
 			it != this->events.end(); it++) {
 		vector.at(counter++) = *it;
 	}
@@ -299,20 +297,20 @@ typename NFAStructure<Tin, Tout, Tdep>::NFAStructurePtr NFAStructure<Tin, Tout, 
 //}
 /*
 template<class Tin, class Tout>
-void NFAStructure<Tin, Tout, Tdep>::addStateSource() {
+void NFAStructure<TinPtr, ToutPtr, TdepPtr>::addStateSource() {
 	for (int i = 0; i < this->nfa->getTransitions().size(); i++) {
 		relatedValues.addRelatedValue(
 				this->nfa->getTransitions()[i]->getSourceOf());
 	}
 }
 template<class Tin, class Tout>
-any NFAStructure<Tin, Tout, Tdep>::getRelatedValue(int edge_id, int index) {
+any NFAStructure<TinPtr, ToutPtr, TdepPtr>::getRelatedValue(int edge_id, int index) {
 
 	std::vector<RelatedStateValuePtr> values = relatedValues.at(edge_id);
 	return values[index]->getValue();
 }
 template<class Tin, class Tout>
-void NFAStructure<Tin, Tout, Tdep>::updateRelatedValue(const tuple_ptr& inst,
+void NFAStructure<TinPtr, ToutPtr, TdepPtr>::updateRelatedValue(const tuple_ptr& inst,
 		NFAEdge* edge) {
 
 	if (edge->hasRelatedValues()) {
@@ -324,7 +322,7 @@ void NFAStructure<Tin, Tout, Tdep>::updateRelatedValue(const tuple_ptr& inst,
 	}
 }
 template<class Tin, class Tout>
-void NFAStructure<Tin, Tout, Tdep>::initRelatedValue(const TinPtr& inst,
+void NFAStructure<TinPtr, ToutPtr, TdepPtr>::initRelatedValue(const TinPtr& inst,
 		NFAEdge* edge) {
 
 	if (edge->hasRelatedValues()) {

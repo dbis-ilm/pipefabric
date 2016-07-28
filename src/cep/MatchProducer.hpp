@@ -30,14 +30,12 @@
  */
 
 namespace pfabric {
-template<class Tin, class Tout, class Tdep>
+template<class TinPtr, class ToutPtr, class TdepPtr>
 class MatchProducer {
 public:
-	typedef boost::shared_ptr<MatchProducer<Tin, Tout, Tdep>> MatchProducerPtr;
-	typedef boost::intrusive_ptr<Tin> TinPtr;
-	typedef boost::intrusive_ptr<Tout> ToutPtr;
-	typedef typename std::vector<typename Instance<Tin, Tout>::InstancePtr> matchesList;
-	typedef typename std::vector<typename Instance<Tin, Tout>::InstancePtr>::const_iterator matchConstIterator;
+	typedef boost::shared_ptr<MatchProducer<TinPtr, ToutPtr, TdepPtr>> MatchProducerPtr;
+	typedef typename std::vector<typename Instance<TinPtr, ToutPtr>::InstancePtr> matchesList;
+	typedef typename std::vector<typename Instance<TinPtr, ToutPtr>::InstancePtr>::const_iterator matchConstIterator;
 	/**
 	 * A constructor to receive and build a match from a 'structure' which has events ids for the match, then get the actual events
 	 * from an event buffer to build a match
@@ -51,13 +49,13 @@ public:
 	 * @return a new tuple which has all corresponding events
 	 */
 	ToutPtr produceTogether(
-			const typename NFAStructure<Tin, Tout, Tdep>::NFAStructurePtr& str) {
+			const typename NFAStructure<TinPtr, ToutPtr, TdepPtr>::NFAStructurePtr& str) {
 		//int index = 0;
-		typename MatchProducer<Tin, Tout, Tdep>::matchesList matches;
+		typename MatchProducer<TinPtr, ToutPtr, TdepPtr>::matchesList matches;
 
-		std::vector<typename Instance<Tin, Tout>::InstancePtr> l =
+		std::vector<typename Instance<TinPtr, ToutPtr>::InstancePtr> l =
 				str->getEvents();
-		for (typename std::vector<typename Instance<Tin, Tout>::InstancePtr>::const_iterator i =
+		for (typename std::vector<typename Instance<TinPtr, ToutPtr>::InstancePtr>::const_iterator i =
 				l.begin(); i != l.end(); i++) {
 			auto tup = (*i)->getOriginalEvent();
 			for (int j = 0; j < tup->size(); j++) {
@@ -74,7 +72,7 @@ public:
 	 * @return a list of all matches for this structure
 	 */
 	matchesList produceAsList(
-			const typename NFAStructure<Tin, Tout, Tdep>::NFAStructurePtr& str) {
+			const typename NFAStructure<TinPtr, ToutPtr, TdepPtr>::NFAStructurePtr& str) {
 		return str->getEvents();
 	}
 
@@ -83,7 +81,7 @@ public:
 	 * @return the size
 	 */
 	int sizeOfMatch(
-			const typename NFAStructure<Tin, Tout, Tdep>::NFAStructurePtr& str) {
+			const typename NFAStructure<TinPtr, ToutPtr, TdepPtr>::NFAStructurePtr& str) {
 		return str->getSequence();
 	}
 	/**

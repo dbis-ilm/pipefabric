@@ -34,8 +34,7 @@ typedef TuplePtr<RelatedTuple> RelatedTuplePtr;
 
 TEST_CASE("Verifying the correct behavior of the CEP operator", "[CEP]") {
 
-	typedef typename RelatedStateValue<InTuplePtr, int, int, 0>::RelatedStateValuePtr Related;
-	typedef TuplePtr<Related> RelatedTuplePtr;
+	typedef typename RelatedStateValue<InTuplePtr, int, int, 0>::RelatedStateValuePtr RelatedTuplePtr;
 
 	// input: cep_test.in; output: cep_test.res
 	std::ifstream input("cep_test.in");

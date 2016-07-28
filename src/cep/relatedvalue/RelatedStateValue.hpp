@@ -25,14 +25,13 @@
 #include "core/Tuple.hpp"
 
 namespace pfabric {
-template <class Tin, class StorageType, class Type, int Index>
+template <class TinPtr, class StorageType, class Type, int Index>
 class RelatedStateValue {
 protected:
 
 	mutable boost::atomic<short> refCount;
 public:
-	typedef boost::intrusive_ptr<RelatedStateValue<Tin, StorageType, Type, Index>> RelatedStateValuePtr;
-	typedef boost::intrusive_ptr<Tin> TinPtr;
+	typedef boost::intrusive_ptr<RelatedStateValue<TinPtr, StorageType, Type, Index>> RelatedStateValuePtr;
 	/**
 	 * gets the current related value
 	 * @return the current value

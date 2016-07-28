@@ -34,17 +34,16 @@
  * The main engine to process CEP
  */
 namespace pfabric {
-template<class Tin, class Tout, class Tdep>
+template<class TinPtr, class ToutPtr, class TdepPtr>
 class Matcher;
 //class GCStructures;
-template<class Tin, class Tout, class Tdep>
+template<class TinPtr, class ToutPtr, class TdepPtr>
 class CEPEngine {
-	typedef boost::intrusive_ptr<Tin> TinPtr;
 protected:
 	/**
 	 * CEP manager to notify the system with the matched events
 	 */
-	Matcher<Tin, Tout, Tdep> *manager;
+	Matcher<TinPtr, ToutPtr, TdepPtr> *manager;
 	/**
 	 * statistical counter to store  number of matches
 	 */
@@ -52,15 +51,15 @@ protected:
 	/**
 	 * a pool of structures
 	 */
-	StructurePool<Tin, Tout, Tdep>* pool;
+	StructurePool<TinPtr, ToutPtr, TdepPtr>* pool;
 	/**
 	 * to be deleted structures, these can be outputted structures or violated time constraint structures
 	 */
-	std::list<typename NFAStructure<Tin, Tout, Tdep>::NFAStructurePtr> deletedStructures;
+	std::list<typename NFAStructure<TinPtr, ToutPtr, TdepPtr>::NFAStructurePtr> deletedStructures;
 	/**
 	 * the global NFA
 	 */
-	typename NFAController<Tin, Tout, Tdep>::NFAControllerPtr  nfa;
+	typename NFAController<TinPtr, ToutPtr, TdepPtr>::NFAControllerPtr  nfa;
 	/**
 	 * create new structure, the event in the parameter will be the first matched event
 	 * @param event an event to start the structure (sequence) with it
@@ -88,24 +87,24 @@ protected:
 	 * @param str
 	 * @return
 	 */
-	bool checkWindowTime(const TinPtr& event, const typename NFAStructure<Tin, Tout, Tdep>::NFAStructurePtr& str);
+	bool checkWindowTime(const TinPtr& event, const typename NFAStructure<TinPtr, ToutPtr, TdepPtr>::NFAStructurePtr& str);
 	/**
 	 * check edge predicates
 	 * @param event
 	 * @param str
 	 * @return
 	 */
-	int checkPredicate(const TinPtr& event, const typename NFAStructure<Tin, Tout, Tdep>::NFAStructurePtr& str,
-			typename NFAState<Tin>::StateType &type);
+	int checkPredicate(const TinPtr& event, const typename NFAStructure<TinPtr, ToutPtr, TdepPtr>::NFAStructurePtr& str,
+			typename NFAState<TinPtr>::StateType &type);
 public:
 	/**
 	 * constructor to receive the CEP manager
 	 * @param manager
 	 */
-	CEPEngine(Matcher<Tin, Tout, Tdep> *manager): counter(0), cgIndicator(false) {
+	CEPEngine(Matcher<TinPtr, ToutPtr, TdepPtr> *manager): counter(0), cgIndicator(false) {
 		this->manager = manager;
-		this->nfa = typename NFAController<Tin, Tout, Tdep>::NFAControllerPtr (new NFAController<Tin, Tout, Tdep>());
-		this->pool = new StructurePool<Tin, Tout, Tdep>();
+		this->nfa = typename NFAController<TinPtr, ToutPtr, TdepPtr>::NFAControllerPtr (new NFAController<TinPtr, ToutPtr, TdepPtr>());
+		this->pool = new StructurePool<TinPtr, ToutPtr, TdepPtr>();
 		this->equalityPar = new SequencePartition<TinPtr>;
 		windowConst = new WindowStruct;
 		windowConst->window = WindowStruct::NoConstraint;
@@ -143,42 +142,42 @@ public:
 	 * get the structures pool
 	 * @return structures pool
 	 */
-	StructurePool<Tin, Tout, Tdep>* getStructurePool() const {
+	StructurePool<TinPtr, ToutPtr, TdepPtr>* getStructurePool() const {
 		return this->pool;
 	}
 	/**
 	 * set the structures pool
 	 * @param pool the structures pool
 	 */
-	void setStructurePool(StructurePool<Tin, Tout, Tdep>* pool) {
+	void setStructurePool(StructurePool<TinPtr, ToutPtr, TdepPtr>* pool) {
 		this->pool = pool ;
 	}
 	/**
 	 * get the structures to be deleted
 	 * @return the structures to be deleted
 	 */
-	std::list<typename NFAStructure<Tin, Tout, Tdep>::NFAStructurePtr> getDeletedStructures() const {
+	std::list<typename NFAStructure<TinPtr, ToutPtr, TdepPtr>::NFAStructurePtr> getDeletedStructures() const {
 		return this->deletedStructures;
 	}
 	/**
 	 *  set the structures to be deleted
 	 * @param deletedStructures the structures to be deleted
 	 */
-	void setDeletedStructures(std::list<typename NFAStructure<Tin, Tout, Tdep>::NFAStructurePtr> deletedStructures) {
+	void setDeletedStructures(std::list<typename NFAStructure<TinPtr, ToutPtr, TdepPtr>::NFAStructurePtr> deletedStructures) {
 		this->deletedStructures = deletedStructures;
 	}
 	/**
 	 * get our working NFA
 	 * @return  our working NFA
 	 */
-	const typename NFAController<Tin, Tout, Tdep>::NFAControllerPtr  getNFA() const {
+	const typename NFAController<TinPtr, ToutPtr, TdepPtr>::NFAControllerPtr  getNFA() const {
 		return this->nfa;
 	}
 	/**
 	 * set our working NFA
 	 * @param nfa our working NFA
 	 */
-	void setNFA(NFAController<Tin, Tout, Tdep>* nfa) { this->nfa = nfa; }
+	void setNFA(NFAController<TinPtr, ToutPtr, TdepPtr>* nfa) { this->nfa = nfa; }
 	/**
 	 * clean unwanted structures from current run
 	 */
@@ -222,23 +221,24 @@ protected:
 namespace pfabric {
 
 
-template<class Tin, class Tout, class Tdep>
-CEPEngine<Tin, Tout, Tdep>::~CEPEngine() {
+template<class TinPtr, class ToutPtr, class Tdep>
+CEPEngine<TinPtr, ToutPtr, Tdep>::~CEPEngine() {
 	delete this->pool;
 	delete this->equalityPar;
 	delete this->windowConst;
 }
 
-template<class Tin, class Tout, class Tdep>
-bool CEPEngine<Tin, Tout, Tdep>::checkWindowTime(const TinPtr& event,
-		const typename NFAStructure<Tin, Tout, Tdep>::NFAStructurePtr& str) {
+template<class TinPtr, class ToutPtr, class TdepPtr>
+bool CEPEngine<TinPtr, ToutPtr, TdepPtr>::checkWindowTime(const TinPtr& event,
+		const typename NFAStructure<TinPtr, ToutPtr, TdepPtr>::NFAStructurePtr& str) {
+/*
 	if (windowConst->window == WindowStruct::FirstLastEvents) {
-		if (event->getTimestamp() - str->getFirstEventTimestamp()
+		if (event->timestamp() - str->getFirstEventTimestamp()
 				<= windowConst->period) {
 			return true;
 		}
 	} else if (windowConst->window == WindowStruct::FromLastEvents) {
-		if (event->getTimestamp()
+		if (event->timestamp()
 				- str->getEventTimestamp(windowConst->eventFrom)
 				<= windowConst->period)
 			return true;
@@ -248,40 +248,41 @@ bool CEPEngine<Tin, Tout, Tdep>::checkWindowTime(const TinPtr& event,
 				<= windowConst->period)
 			return true;
 	}
-	return false;
+*/
+	return true;
 }
-template<class Tin, class Tout, class Tdep>
-int CEPEngine<Tin, Tout, Tdep>::checkPredicate(const TinPtr& event,
-		const typename NFAStructure<Tin, Tout, Tdep>::NFAStructurePtr& str, typename NFAState<Tin>::StateType &type) {
+template<class TinPtr, class ToutPtr, class TdepPtr>
+int CEPEngine<TinPtr, ToutPtr, TdepPtr>::checkPredicate(const TinPtr& event,
+		const typename NFAStructure<TinPtr, ToutPtr, TdepPtr>::NFAStructurePtr& str, typename NFAState<TinPtr>::StateType &type) {
 
-	if (str->getCurrentState()->getStateType() == NFAState<Tin>::Normal) {
+	if (str->getCurrentState()->getStateType() == NFAState<TinPtr>::Normal) {
 		//creat_new_structure(event, current_state);
-		auto current = (NormalState<Tin, Tout, Tdep>*)str->getCurrentState();
+		auto current = (NormalState<TinPtr, ToutPtr, TdepPtr>*)str->getCurrentState();
 		for (int i = 0; i < current->getNumEdges(); i++) {
 			if (current->getForwardEdgeByIndex(i)->evaluate(event, str)) {
 				return i;
 			}
 		}
 	} else if (str->getCurrentState()->getStateType()
-			== NFAState<Tin>::Kleene) {
+			== NFAState<TinPtr>::Kleene) {
 
 		//try go to the next
-		auto current = (KleeneState<Tin, Tout, Tdep>*)(
+		auto current = (KleeneState<TinPtr, ToutPtr, TdepPtr>*)(
 				str->getCurrentState());
 		bool forwardOK = false;
 		switch (current->getSpecification()) {
-		case KleeneState<Tin, Tout, Tdep>::Star:
-		case KleeneState<Tin, Tout, Tdep>::Question: {
+		case KleeneState<TinPtr, ToutPtr, TdepPtr>::Star:
+		case KleeneState<TinPtr, ToutPtr, TdepPtr>::Question: {
 			forwardOK = true;
 			break;
 		}
-		case KleeneState<Tin, Tout, Tdep>::Plus: {
+		case KleeneState<TinPtr, ToutPtr, TdepPtr>::Plus: {
 			if (str->getCurrentKleene(current) == 1) {
 				forwardOK = true;
 			}
 			break;
 		}
-		case KleeneState<Tin, Tout, Tdep>::Restricted:
+		case KleeneState<TinPtr, ToutPtr, TdepPtr>::Restricted:
 			if (str->getCurrentKleene(current)
 					>= current->getLoopEdge()->getNumOfLoop()) {
 				forwardOK = true;
@@ -299,18 +300,18 @@ int CEPEngine<Tin, Tout, Tdep>::checkPredicate(const TinPtr& event,
 		auto loop = current->getLoopEdge();
 		if (loop->evaluate(event, str)) {
 			switch (current->getSpecification()) {
-			case KleeneState<Tin, Tout, Tdep>::Star:
-			case KleeneState<Tin, Tout, Tdep>::Question: {
+			case KleeneState<TinPtr, ToutPtr, TdepPtr>::Star:
+			case KleeneState<TinPtr, ToutPtr, TdepPtr>::Question: {
 				str->addEvent(event, loop);
 				break;
 			}
-			case KleeneState<Tin, Tout, Tdep>::Plus: {
+			case KleeneState<TinPtr, ToutPtr, TdepPtr>::Plus: {
 				if (str->getCurrentKleene(current) == 0) {
 					str->addEvent(event, loop);
 				}
 				break;
 			}
-			case KleeneState<Tin, Tout, Tdep>::Restricted: {
+			case KleeneState<TinPtr, ToutPtr, TdepPtr>::Restricted: {
 				if (str->getCurrentKleene(current)
 						< current->getLoopEdge()->getNumOfLoop()) {
 					str->addEvent(event, loop);
@@ -320,20 +321,20 @@ int CEPEngine<Tin, Tout, Tdep>::checkPredicate(const TinPtr& event,
 			}
 		}
 	} else if (str->getCurrentState()->getStateType()
-			== NFAState<Tin>::Negation) {
-		auto current = (NormalState<Tin, Tout, Tdep>*)str->getCurrentState();
+			== NFAState<TinPtr>::Negation) {
+		auto current = (NormalState<TinPtr, ToutPtr, TdepPtr>*)str->getCurrentState();
 		do {
 			for (int i = 0; i < current->getNumEdges(); i++) {
 				if (current->getForwardEdgeByIndex(i)->evaluate(event,
 						str)) {
-					type = NFAState<Tin>::Negation;
+					type = NFAState<TinPtr>::Negation;
 					return -1;
 				}
 			}
-			current = (NormalState<Tin, Tout, Tdep>*)(
+			current = (NormalState<TinPtr, ToutPtr, TdepPtr>*)(
 					current->getForwardEdgeByIndex(0)->getDestState());
-		} while (current->getStateType() == NFAState<Tin>::Negation);
-		if (current->getStateType() == NFAState<Tin>::Final)
+		} while (current->getStateType() == NFAState<TinPtr>::Negation);
+		if (current->getStateType() == NFAState<TinPtr>::Final)
 			return 0;
 		for (int i = 0; i < current->getNumEdges(); i++) {
 			if (current->getForwardEdgeByIndex(i)->evaluate(event, str)) {
@@ -345,15 +346,15 @@ int CEPEngine<Tin, Tout, Tdep>::checkPredicate(const TinPtr& event,
 	return -1;
 }
 
-template<class Tin, class Tout, class Tdep>
-void CEPEngine<Tin, Tout, Tdep>:: runGCstructures() {
+template<class TinPtr, class ToutPtr, class Tdep>
+void CEPEngine<TinPtr, ToutPtr, Tdep>:: runGCstructures() {
 	for (int i = 0; i < this->deletedStructures.size(); i++) {
-		const typename NFAStructure<Tin, Tout, Tdep>::NFAStructurePtr& str = this->deletedStructures.front();
+		const typename NFAStructure<TinPtr, ToutPtr, Tdep>::NFAStructurePtr& str = this->deletedStructures.front();
 		auto par = str->getEqualityValue();
-		typename ValueIDMultimap<typename NFAStructure<Tin, Tout, Tdep>::NFAStructurePtr, TinPtr>::MultimapPair iterPair =
+		typename ValueIDMultimap<typename NFAStructure<TinPtr, ToutPtr, Tdep>::NFAStructurePtr, TinPtr>::MultimapPair iterPair =
 				this->pool->getValue(par);
 
-		typename ValueIDMultimap<typename NFAStructure<Tin, Tout, Tdep>::NFAStructurePtr, TinPtr>::MultimapConstIterator it = iterPair.first;
+		typename ValueIDMultimap<typename NFAStructure<TinPtr, ToutPtr, Tdep>::NFAStructurePtr, TinPtr>::MultimapConstIterator it = iterPair.first;
 		for (; it != iterPair.second; ++it) {
 			if (it->second == str) {
 				pool->removeValue(it);
@@ -363,8 +364,8 @@ void CEPEngine<Tin, Tout, Tdep>:: runGCstructures() {
 		this->deletedStructures.pop_front();
 	}
 }
-template<class Tin, class Tout, class Tdep>
-void CEPEngine<Tin, Tout, Tdep>::createStartStructure(const TinPtr& event) {
+template<class TinPtr, class ToutPtr, class Tdep>
+void CEPEngine<TinPtr, ToutPtr, Tdep>::createStartStructure(const TinPtr& event) {
 	auto start = this->nfa->getStartState();
 	for (int i = 0; i < start->getNumEdges(); i++) {
 		if (start->getForwardEdgeByIndex(i)->evaluate(event, NULL)) {
@@ -379,8 +380,8 @@ void CEPEngine<Tin, Tout, Tdep>::createStartStructure(const TinPtr& event) {
 }
 
 
-template<class Tin, class Tout, class Tdep>
-void CEPEngine<Tin, Tout, Tdep>::setWindowConstraint(long period, int fromEvent,
+template<class TinPtr, class ToutPtr, class Tdep>
+void CEPEngine<TinPtr, ToutPtr, Tdep>::setWindowConstraint(long period, int fromEvent,
 		int toEvent) {
 	windowConst->eventFrom = fromEvent;
 	windowConst->eventTo = toEvent;

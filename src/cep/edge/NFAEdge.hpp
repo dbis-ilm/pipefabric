@@ -34,9 +34,9 @@ namespace pfabric {
  * Each edge has associated predicate to evaluate an incoming tuple against a condition. According to the result
  * of this condition, the engine will decide to jump to the next state or not.
  */
-template<class Tin, class Tout, class Tdep>
+template<class TinPtr, class ToutPtr, class TdepPtr>
 class NFAStructure;
-template<class Tin, class Tout, class Tdep>
+template<class TinPtr, class ToutPtr, class TdepPtr>
 class NFAEdge {
 
 public:
@@ -47,9 +47,8 @@ public:
 	 * that satisfied this condition.It takes two parameters. First, incoming tuples to evaluate
 	 * and second, some related values from other edges or previous stored tuples.
 	 */
-	typedef boost::intrusive_ptr<Tin> TinPtr;
-	typedef boost::function<bool(const TinPtr&, const Tdep&)> EdgePredicate;
-	typedef ns_types::SharedPtr<NFAEdge<Tin, Tout, Tdep>> NFAEdgePtr; //class NFAEdge
+	typedef boost::function<bool(const TinPtr&, const TdepPtr&)> EdgePredicate;
+	typedef ns_types::SharedPtr<NFAEdge<TinPtr, ToutPtr, TdepPtr>> NFAEdgePtr; //class NFAEdge
 	enum EdgeType {
 		Loop, Forward
 	};
@@ -143,7 +142,7 @@ public:
 	 * @param str the CEP structure to get some related values from other edges
 	 */
 	bool evaluate(const TinPtr& tup,
-			const boost::intrusive_ptr<NFAStructure<Tin, Tout, Tdep>>& str);
+			const boost::intrusive_ptr<NFAStructure<TinPtr, ToutPtr, TdepPtr>>& str);
 
 protected:
 
@@ -163,10 +162,10 @@ protected:
 
 namespace pfabric {
 
-template<class Tin, class Tout, class Tdep>
-bool NFAEdge<Tin, Tout, Tdep>::evaluate(
-		const NFAEdge<Tin, Tout, Tdep>::TinPtr& tup,
-		const boost::intrusive_ptr<NFAStructure<Tin, Tout, Tdep>>& str) {
+template<class TinPtr, class ToutPtr, class TdepPtr>
+bool NFAEdge<TinPtr, ToutPtr, TdepPtr>::evaluate(
+		const TinPtr& tup,
+		const boost::intrusive_ptr<NFAStructure<TinPtr, ToutPtr, TdepPtr>>& str) {
 	if (predicate(tup, (str == NULL ? NULL : str->getRelatedValue()))) {
 		return true;
 	}

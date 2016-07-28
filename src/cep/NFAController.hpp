@@ -29,39 +29,40 @@
 #include "edge/NFAEdge.hpp"
 #include <iostream>
 
+
 namespace pfabric {
 /*
  * A controller class to construct the NFA for detecting the complex event, the user
  * should create the states, edges and transitions by calling particular methods
  */
-template<class Tin, class Tout, class Tdep>
+template<class TinPtr, class ToutPtr, class TdepPtr>
 class NFAController {
 private:
 	/**
 	 * a vector to store all states except final, kleene and negated states and start state
 	 */
-	std::vector<typename NormalState<Tin, Tout, Tdep>::NormalStatePtr> normalStates;
+	std::vector<typename NormalState<TinPtr, ToutPtr, TdepPtr>::NormalStatePtr> normalStates;
 	/**
 	 * a vector to store all kleene states
 	 */
-	std::vector<typename KleeneState<Tin, Tout, Tdep>::KleeneStatePtr> kleeneStates;
+	std::vector<typename KleeneState<TinPtr, ToutPtr, TdepPtr>::KleeneStatePtr> kleeneStates;
 	/**
 	 * a vector to store all negated states
 	 */
-	std::vector<typename NegationState<Tin, Tout, Tdep>::NegationStatePtr> negatedStates;
+	std::vector<typename NegationState<TinPtr, ToutPtr, TdepPtr>::NegationStatePtr> negatedStates;
 	/**
 	 * the start state
 	 */
-	typename StartState<Tin, Tout, Tdep>::StartStatePtr start;
+	typename StartState<TinPtr, ToutPtr, TdepPtr>::StartStatePtr start;
 	/**
 	 * a vector to store the final states, in any NFA we have multiple states from this kind
 	 */
-	std::vector<typename FinalState<Tin, Tout, Tdep>::FinalStatePtr> finalStates;
+	std::vector<typename FinalState<TinPtr, ToutPtr, TdepPtr>::FinalStatePtr> finalStates;
 	/**
 	 * a vector to store the transitions between the states, each transition must contain an edge which has
 	 * a predicate to evaluate
 	 */
-	std::vector<typename NFAEdge<Tin, Tout, Tdep>::NFAEdgePtr> transitions;
+	std::vector<typename NFAEdge<TinPtr, ToutPtr, TdepPtr>::NFAEdgePtr> transitions;
 	/**
 	 * a state counter to assign a particular id for each state
 	 */
@@ -75,20 +76,19 @@ private:
 	 * @param id the id of the state
 	 * @return as above
 	 */
-	typename NFAState<Tin>::StatePtr getState(int id);
+	typename NFAState<TinPtr>::StatePtr getState(int id);
 	/**
 	 * get a pointer for an edge  with a given id
 	 * @param the id of the edge
 	 * @return as above
 	 */
-	typename NFAEdge<Tin, Tout, Tdep>::NFAEdgePtr getEdge(int id);
+	typename NFAEdge<TinPtr, ToutPtr, TdepPtr>::NFAEdgePtr getEdge(int id);
 
 
 public:
-	typedef boost::intrusive_ptr<Tin> TinPtr;
-	typedef boost::shared_ptr<NFAController<Tin, Tout, Tdep>> NFAControllerPtr;
-	typedef boost::function<Tdep()> initDependency;
-	typedef boost::function<void(const Tdep&, int, const TinPtr&  )> updateDependency;
+	typedef boost::shared_ptr<NFAController<TinPtr, ToutPtr, TdepPtr>> NFAControllerPtr;
+	typedef boost::function<TdepPtr()> initDependency;
+	typedef boost::function<void(const TdepPtr&, int, const TinPtr&  )> updateDependency;
 	/**
 	 * controller constructor, nothing to do
 	 */
@@ -98,7 +98,7 @@ public:
 		init = [&]() {
 			return nullptr;
 		};
-		update = [&](const Tdep& tp, int id, const TinPtr& event ) {};
+		update = [&](const TdepPtr& tp, int id, const TinPtr& event ) {};
 	}
 	/**
 	 * a destructor, nothing to do
@@ -110,8 +110,8 @@ public:
 	 * @param name the name of the start state
 	 * @return a pointer to start state
 	 */
-	typename StartState<Tin, Tout, Tdep>::StartStatePtr createStartState(string name) {
-		start.reset(new StartState<Tin, Tout, Tdep>(stateCountID++, name));
+	typename StartState<TinPtr, ToutPtr, TdepPtr>::StartStatePtr createStartState(string name) {
+		start.reset(new StartState<TinPtr, ToutPtr, TdepPtr>(stateCountID++, name));
 		return start;
 	}
 	/**
@@ -120,9 +120,9 @@ public:
 	 * @param name the name of this normal state
 	 * @return a pointer to a normal state
 	 */
-	typename NormalState<Tin, Tout, Tdep>::NormalStatePtr createNormalState(string name) {
-		typename NormalState<Tin, Tout, Tdep>::NormalStatePtr state(
-				new NormalState<Tin, Tout, Tdep>(stateCountID++, name));
+	typename NormalState<TinPtr, ToutPtr, TdepPtr>::NormalStatePtr createNormalState(string name) {
+		typename NormalState<TinPtr, ToutPtr, TdepPtr>::NormalStatePtr state(
+				new NormalState<TinPtr, ToutPtr, TdepPtr>(stateCountID++, name));
 		normalStates.push_back(state);
 		return state;
 	}
@@ -132,11 +132,11 @@ public:
 	 * @param spec the specification of this state (whether kleene star, kleene plus and so on)
 	 * @return a pointer to a kleene state
 	 */
-	typename KleeneState<Tin, Tout, Tdep>::KleeneStatePtr createKleeneState(string name,
-			typename KleeneState<Tin, Tout, Tdep>::KleeneSpecification spec = KleeneState<
-					Tin, Tout, Tdep>::Star) {
-		typename KleeneState<Tin, Tout, Tdep>::KleeneStatePtr state(
-				new KleeneState<Tin, Tout, Tdep>(stateCountID++, name, spec));
+	typename KleeneState<TinPtr, ToutPtr, TdepPtr>::KleeneStatePtr createKleeneState(string name,
+			typename KleeneState<TinPtr, ToutPtr, TdepPtr>::KleeneSpecification spec = KleeneState<
+					TinPtr, ToutPtr, TdepPtr>::Star) {
+		typename KleeneState<TinPtr, ToutPtr, TdepPtr>::KleeneStatePtr state(
+				new KleeneState<TinPtr, ToutPtr, TdepPtr>(stateCountID++, name, spec));
 		kleeneStates.push_back(state);
 		return state;
 	}
@@ -145,9 +145,9 @@ public:
 	 * @param name the name of the final state
 	 * @return a pointer to a final state
 	 */
-	typename FinalState<Tin, Tout, Tdep>::FinalStatePtr createFinalState(string name) {
-		typename FinalState<Tin, Tout, Tdep>::FinalStatePtr final(
-				new FinalState<Tin, Tout, Tdep>(stateCountID++, name));
+	typename FinalState<TinPtr, ToutPtr, TdepPtr>::FinalStatePtr createFinalState(string name) {
+		typename FinalState<TinPtr, ToutPtr, TdepPtr>::FinalStatePtr final(
+				new FinalState<TinPtr, ToutPtr, TdepPtr>(stateCountID++, name));
 		finalStates.push_back(final);
 		return final;
 	}
@@ -156,10 +156,10 @@ public:
 	 * @param name the name of the negated state
 	 * @return a pointer to a negated state
 	 */
-	typename NegationState<Tin, Tout, Tdep>::NegationStatePtr createNegationState(
+	typename NegationState<TinPtr, ToutPtr, TdepPtr>::NegationStatePtr createNegationState(
 			string name) {
-		typename NegationState<Tin, Tout, Tdep>::NegationStatePtr state(
-				new NegationState<Tin, Tout, Tdep>(stateCountID++, name));
+		typename NegationState<TinPtr, ToutPtr, TdepPtr>::NegationStatePtr state(
+				new NegationState<TinPtr, ToutPtr, TdepPtr>(stateCountID++, name));
 		negatedStates.push_back(state);
 		return state;
 	}
@@ -168,10 +168,10 @@ public:
 	 * @param predicate the predicate of this edge
 	 * @return a pointer to a forward edge
 	 */
-	typename ForwardEdge<Tin,Tout, Tdep>::ForwardEdgePtr createForwardEdge(
-			typename NFAEdge<Tin, Tout, Tdep>::EdgePredicate predicate) {
-		typename ForwardEdge<Tin,Tout, Tdep>::ForwardEdgePtr edge(
-				new ForwardEdge<Tin,Tout, Tdep>(edgeCountID++, predicate));
+	typename ForwardEdge<TinPtr, ToutPtr, TdepPtr>::ForwardEdgePtr createForwardEdge(
+			typename NFAEdge<TinPtr, ToutPtr, TdepPtr>::EdgePredicate predicate) {
+		typename ForwardEdge<TinPtr, ToutPtr, TdepPtr>::ForwardEdgePtr edge(
+				new ForwardEdge<TinPtr, ToutPtr, TdepPtr>(edgeCountID++, predicate));
 		transitions.push_back(edge);
 		return edge;
 	}
@@ -180,10 +180,10 @@ public:
 	 * @param predicate the predicate of this edge
 	 * @return a pointer to a loop edge
 	 */
-	typename LoopEdge<Tin, Tout, Tdep>::LoopEdgePtr createLoopEdge(
-			typename NFAEdge<Tin, Tout, Tdep>::EdgePredicate predicate) {
-		typename LoopEdge<Tin,Tout, Tdep>::LoopEdgePtr edge(
-				new LoopEdge<Tin, Tout, Tdep>(edgeCountID++, predicate));
+	typename LoopEdge<TinPtr, ToutPtr, TdepPtr>::LoopEdgePtr createLoopEdge(
+			typename NFAEdge<TinPtr, ToutPtr, TdepPtr>::EdgePredicate predicate) {
+		typename LoopEdge<TinPtr, ToutPtr, TdepPtr>::LoopEdgePtr edge(
+				new LoopEdge<TinPtr, ToutPtr, TdepPtr>(edgeCountID++, predicate));
 		transitions.push_back(edge);
 		return edge;
 	}
@@ -193,14 +193,14 @@ public:
 	 * @param dest the destination state of this transition
 	 * @param edge an edge to connect both the source and destination nodes
 	 */
-	void createForwardTransition(typename NFAState<Tin>::StatePtr src,
-			typename NFAEdge<Tin, Tout, Tdep>::NFAEdgePtr edge,
-			typename NFAState<Tin>::StatePtr dest) {
-		if (edge->getEdgeType() == NFAEdge<Tin, Tout, Tdep>::Forward) {
-			typename ForwardEdge<Tin,Tout, Tdep>::ForwardEdgePtr forward =
-					boost::static_pointer_cast<ForwardEdge<Tin,Tout, Tdep>>(edge);
+	void createForwardTransition(typename NFAState<TinPtr>::StatePtr src,
+			typename NFAEdge<TinPtr, ToutPtr, TdepPtr>::NFAEdgePtr edge,
+			typename NFAState<TinPtr>::StatePtr dest) {
+		if (edge->getEdgeType() == NFAEdge<TinPtr, ToutPtr, TdepPtr>::Forward) {
+			typename ForwardEdge<TinPtr, ToutPtr, TdepPtr>::ForwardEdgePtr forward =
+					std::static_pointer_cast<ForwardEdge<TinPtr, ToutPtr, TdepPtr>>(edge);
 			forward->setDestState(dest.get());
-			boost::static_pointer_cast<NormalState<Tin, Tout, Tdep>>(src)->addEdge(forward);
+			std::static_pointer_cast<NormalState<TinPtr, ToutPtr, TdepPtr>>(src)->addEdge(forward);
 		} else
 			assert(false);
 	}
@@ -230,8 +230,8 @@ public:
 	 * @param source the source state of this transition
 	 * @param edge a loop edge to connect the source with itself
 	 */
-	void createLoopTransition(typename NFAState<Tin>::StatePtr source,
-			typename NFAEdge<Tin, Tout, Tdep>::NFAEdgePtr edge);
+	void createLoopTransition(typename NFAState<TinPtr>::StatePtr source,
+			typename NFAEdge<TinPtr, ToutPtr, TdepPtr>::NFAEdgePtr edge);
 	/**
 	 * add a loop edge predicate to a given state id, this state must be kleene state which has always
 	 * loop edge
@@ -239,7 +239,7 @@ public:
 	 * @param predicate the predicate of the kleene state to be assigned to the loop edge
 	 */
 	void addLoopEdgeToState(int state,
-			typename NFAEdge<Tin, Tout, Tdep>::EdgePredicate predicate);
+			typename NFAEdge<TinPtr, ToutPtr, TdepPtr>::EdgePredicate predicate);
 	/**
 	 * get the id of the start state
 	 * @return as above
@@ -254,14 +254,14 @@ public:
 	 * get a pointer to the start state
 	 * @return as above
 	 */
-	StartState<Tin, Tout, Tdep>* getStartState() const {
+	StartState<TinPtr, ToutPtr, TdepPtr>* getStartState() const {
 		return start.get();
 	}
 	/**
 	 * get a vector of final states in the NFA
 	 * @return as above
 	 */
-	const std::vector<typename FinalState<Tin, Tout, Tdep>::FinalStatePtr>& getFinalStates() const {
+	const std::vector<typename FinalState<TinPtr, ToutPtr, TdepPtr>::FinalStatePtr>& getFinalStates() const {
 		return this->finalStates;
 	}
 
@@ -270,7 +270,7 @@ public:
 	 * @param a vector of final states
 	 */
 	void setFinalStates(
-			std::vector<typename FinalState<Tin, Tout, Tdep>::FinalStatePtr> finalStates) {
+			std::vector<typename FinalState<TinPtr, ToutPtr, TdepPtr>::FinalStatePtr> finalStates) {
 		for (int i = 0; i < finalStates.size(); i++) {
 			addFinalState(finalStates[i]);
 		}
@@ -279,14 +279,14 @@ public:
 	 * add a final state to this NFA
 	 * @param a final state to be added to this NFA
 	 */
-	void addFinalState(typename FinalState<Tin, Tout, Tdep>::FinalStatePtr final);
+	void addFinalState(typename FinalState<TinPtr, ToutPtr, TdepPtr>::FinalStatePtr final);
 
 	/**
 	 * set the kleene states states of this NFA
 	 * @param KleeneStates the kleene states to set
 	 */
 	void setKleeneStates(
-			std::vector<typename KleeneState<Tin, Tout, Tdep>::KleeneStatePtr> kleeneStates) {
+			std::vector<typename KleeneState<TinPtr, ToutPtr, TdepPtr>::KleeneStatePtr> kleeneStates) {
 		for (int i = 0; i < kleeneStates.size(); i++) {
 			addKleeneState(kleeneStates[i]);
 		}
@@ -295,14 +295,14 @@ public:
 	 * get a vector of kleene states in the NFA
 	 * @return as above
 	 */
-	const std::vector<typename KleeneState<Tin, Tout, Tdep>::KleeneStatePtr>& getKleeneStates() const {
+	const std::vector<typename KleeneState<TinPtr, ToutPtr, TdepPtr>::KleeneStatePtr>& getKleeneStates() const {
 		return this->kleeneStates;
 	}
 	/**
 	 * add a kleene state to this NFA
 	 * @param a kleene state to be added to this NFA
 	 */
-	void addKleeneState(typename KleeneState<Tin, Tout, Tdep>::KleeneStatePtr kleeneState) {
+	void addKleeneState(typename KleeneState<TinPtr, ToutPtr, TdepPtr>::KleeneStatePtr kleeneState) {
 		if (std::find(kleeneStates.begin(), kleeneStates.end(), kleeneState)
 				== kleeneStates.end()) {
 			kleeneStates.push_back(kleeneState);
@@ -314,7 +314,7 @@ public:
 	 * @param negated_states the negated states to set
 	 */
 	void setNegatedStates(
-			std::vector<typename NegationState<Tin, Tout, Tdep>::NegationStatePtr> negatedStates) {
+			std::vector<typename NegationState<TinPtr, ToutPtr, TdepPtr>::NegationStatePtr> negatedStates) {
 		for (int i = 0; i < negatedStates.size(); i++) {
 			addNegatedState(negatedStates[i]);
 		}
@@ -323,7 +323,7 @@ public:
 	 * get a vector of negated states in the NFA
 	 * @return as above
 	 */
-	const std::vector<typename NegationState<Tin, Tout, Tdep>::NegationStatePtr>& getNegatedStates() const {
+	const std::vector<typename NegationState<TinPtr, ToutPtr, TdepPtr>::NegationStatePtr>& getNegatedStates() const {
 		return negatedStates;
 	}
 	/**
@@ -331,7 +331,7 @@ public:
 	 * @param a negated state to be added to this NFA
 	 */
 	void addNegatedState(
-			typename NegationState<Tin, Tout, Tdep>::NegationStatePtr negatedState) {
+			typename NegationState<TinPtr, ToutPtr, TdepPtr>::NegationStatePtr negatedState) {
 		if (std::find(negatedStates.begin(), negatedStates.end(), negatedState)
 				== negatedStates.end()) {
 			negatedStates.push_back(negatedState);
@@ -343,7 +343,7 @@ public:
 	 * @param NormalStates the normal states to set
 	 */
 	void setNormalStates(
-			std::vector<typename NormalState<Tin, Tout, Tdep>::NormalStatePtr> normalStates) {
+			std::vector<typename NormalState<TinPtr, ToutPtr, TdepPtr>::NormalStatePtr> normalStates) {
 		for (int i = 0; i < normalStates.size(); i++) {
 			addNormalState(normalStates[i]);
 		}
@@ -352,20 +352,20 @@ public:
 	 * get a vector of normal states in the NFA
 	 * @return as above
 	 */
-	const std::vector<typename NormalState<Tin, Tout, Tdep>::NormalStatePtr>& getNormalStates() const {
+	const std::vector<typename NormalState<TinPtr, ToutPtr, TdepPtr>::NormalStatePtr>& getNormalStates() const {
 		return normalStates;
 	}
 	/**
 	 * add a normal state to this NFA
 	 * @param negated_state a negated state to be added to this NFA
 	 */
-	void addNormalState(typename NormalState<Tin, Tout, Tdep>::NormalStatePtr NormalState);
+	void addNormalState(typename NormalState<TinPtr, ToutPtr, TdepPtr>::NormalStatePtr NormalState);
 
 	/**
 	 * get a vector of intermediate states including negated, kleene and normal states in the NFA
 	 * @return as above
 	 */
-	std::vector<typename NormalState<Tin, Tout, Tdep>::NormalStatePtr> getInterStates() const;
+	std::vector<typename NormalState<TinPtr, ToutPtr, TdepPtr>::NormalStatePtr> getInterStates() const;
 
 	/**
 	 * add forward edges for a particular state, this state can be start, normal, negated and kleene states
@@ -374,16 +374,16 @@ public:
 	 * @param edges a vector of forward edges to be assigned to a state
 	 */
 
-	void addForwardEdges(typename NFAState<Tin>::StatePtr state,
-			std::vector<typename ForwardEdge<Tin,Tout, Tdep>::ForwardEdgePtr> edges);
+	void addForwardEdges(typename NFAState<TinPtr>::StatePtr state,
+			std::vector<typename ForwardEdge<TinPtr, ToutPtr, TdepPtr>::ForwardEdgePtr> edges);
 	/**
 	 * add a forward edge for a particular state, this state can be start, normal, negated and kleene states
 	 * each states in our system has multiple forward edges except the final states
 	 * @param state a state to assign this forward edge to it
 	 * @param edge an edge to be assigned to a state
 	 */
-	void addForwardEdge(typename NFAState<Tin>::StatePtr state,
-			typename ForwardEdge<Tin,Tout, Tdep>::ForwardEdgePtr edge);
+	void addForwardEdge(typename NFAState<TinPtr>::StatePtr state,
+			typename ForwardEdge<TinPtr, ToutPtr, TdepPtr>::ForwardEdgePtr edge);
 	/**
 	 * add forward edges by their ids to a particular state given its id, this state can be start, normal, negated and kleene states
 	 * each states in our system has multiple forward edges except the final states
@@ -403,11 +403,11 @@ public:
 	 * get a vector of the transitions in the NFA
 	 * @return as above
 	 */
-	const std::vector<typename NFAEdge<Tin, Tout, Tdep>::NFAEdgePtr>& getTransitions() const {
+	const std::vector<typename NFAEdge<TinPtr, ToutPtr, TdepPtr>::NFAEdgePtr>& getTransitions() const {
 		return transitions;
 	}
 	/*
-	 void addDependencyEdges(typename NFAEdge<Tin, Tout, Tdep>::NFAEdgePtr edgeSource, typename NFAEdge<Tin, Tout, Tdep>::NFAEdgePtr edgeDepend,
+	 void addDependencyEdges(typename NFAEdge<TinPtr, ToutPtr, TdepPtr>::NFAEdgePtr edgeSource, typename NFAEdge<TinPtr, ToutPtr, TdepPtr>::NFAEdgePtr edgeDepend,
 	 int attrIdx, StateDependency::OperationDependency op, StateDependency::OperationType type = StateDependency::Double );
 	 vector<StateDependencyPtr> getSourceOf() const;
 	 void setSourceOf(vector<StateDependencyPtr> sourceOf);*/
@@ -441,17 +441,17 @@ public:
 
 namespace pfabric {
 
-template <class Tin, class Tout, class Tdep>
-std::vector<typename NormalState<Tin, Tout, Tdep>::NormalStatePtr> NFAController<Tin, Tout, Tdep>::getInterStates() const {
-	std::vector<typename NormalState<Tin, Tout, Tdep>::NormalStatePtr> result;
+template <class TinPtr, class ToutPtr, class TdepPtr>
+std::vector<typename NormalState<TinPtr, ToutPtr, TdepPtr>::NormalStatePtr> NFAController<TinPtr, ToutPtr, TdepPtr>::getInterStates() const {
+	std::vector<typename NormalState<TinPtr, ToutPtr, TdepPtr>::NormalStatePtr> result;
 	copy(normalStates.begin(), normalStates.end(), back_inserter(result));
 	copy(kleeneStates.begin(), kleeneStates.end(), back_inserter(result));
 	copy(negatedStates.begin(), negatedStates.end(), back_inserter(result));
 	return result;
 }
 
-template <class Tin, class Tout, class Tdep>
-void NFAController<Tin, Tout, Tdep>::addFinalState(typename FinalState<Tin, Tout, Tdep>::FinalStatePtr final) {
+template <class TinPtr, class ToutPtr, class TdepPtr>
+void NFAController<TinPtr, ToutPtr, TdepPtr>::addFinalState(typename FinalState<TinPtr, ToutPtr, TdepPtr>::FinalStatePtr final) {
 	if (std::find(finalStates.begin(), finalStates.end(), final)
 			== finalStates.end()) {
 		finalStates.push_back(final);
@@ -473,20 +473,20 @@ void NFAController::addDependencyEdges(NFAEdgePtr edgeSource,
 
 
 
-template <class Tin, class Tout, class Tdep>
-void NFAController<Tin, Tout, Tdep>::addForwardEdges(typename NFAState<Tin>::StatePtr state,
-		std::vector<typename ForwardEdge<Tin,Tout, Tdep>::ForwardEdgePtr> edges) {
-	if (state->getStateType() == NFAState<Tin>::Normal)
-		boost::static_pointer_cast<NormalState<Tin, Tout, Tdep>>(state)->setForwardEdges(
+template <class TinPtr, class ToutPtr, class TdepPtr>
+void NFAController<TinPtr, ToutPtr, TdepPtr>::addForwardEdges(typename NFAState<TinPtr>::StatePtr state,
+		std::vector<typename ForwardEdge<TinPtr, ToutPtr, TdepPtr>::ForwardEdgePtr> edges) {
+	if (state->getStateType() == NFAState<TinPtr>::Normal)
+		boost::static_pointer_cast<NormalState<TinPtr, ToutPtr, TdepPtr>>(state)->setForwardEdges(
 				edges);
 	else
 		assert(false);
 }
 
-template <class Tin, class Tout, class Tdep>
-void NFAController<Tin, Tout, Tdep>::addForwardEdge(typename NFAState<Tin>::StatePtr state, typename ForwardEdge<Tin,Tout, Tdep>::ForwardEdgePtr edge) {
-	if (state->getStateType() == NFAState<Tin>::Normal)
-		boost::static_pointer_cast<NormalState<Tin, Tout, Tdep>>(state)->addEdge(edge);
+template <class TinPtr, class ToutPtr, class TdepPtr>
+void NFAController<TinPtr, ToutPtr, TdepPtr>::addForwardEdge(typename NFAState<TinPtr>::StatePtr state, typename ForwardEdge<TinPtr, ToutPtr, TdepPtr>::ForwardEdgePtr edge) {
+	if (state->getStateType() == NFAState<TinPtr>::Normal)
+		boost::static_pointer_cast<NormalState<TinPtr, ToutPtr, TdepPtr>>(state)->addEdge(edge);
 	else
 		assert(false);
 }
@@ -501,14 +501,14 @@ void NFAController<Tin, Tout, Tdep>::addForwardEdge(typename NFAState<Tin>::Stat
  add_ForwardEdges(getState(state), f_edges);
  }
  */
-template <class Tin, class Tout, class Tdep>
-void NFAController<Tin, Tout, Tdep>::addForwardEdge(int state, int edge) {
+template <class TinPtr, class ToutPtr, class TdepPtr>
+void NFAController<TinPtr, ToutPtr, TdepPtr>::addForwardEdge(int state, int edge) {
 	addForwardEdge(getState(state),
-			boost::static_pointer_cast<ForwardEdge<Tin,Tout, Tdep>>(getEdge(edge)));
+			boost::static_pointer_cast<ForwardEdge<TinPtr, ToutPtr, TdepPtr>>(getEdge(edge)));
 }
 
-template <class Tin, class Tout, class Tdep>
-typename NFAState<Tin>::StatePtr NFAController<Tin, Tout, Tdep>::getState(int id) {
+template <class TinPtr, class ToutPtr, class TdepPtr>
+typename NFAState<TinPtr>::StatePtr NFAController<TinPtr, ToutPtr, TdepPtr>::getState(int id) {
 	if (start->getStateID() == id)
 		return start;
 	for (int i = 0; i < negatedStates.size(); i++) {
@@ -528,31 +528,31 @@ typename NFAState<Tin>::StatePtr NFAController<Tin, Tout, Tdep>::getState(int id
 			return finalStates[i];
 		}
 	}
-	return NFAState<Tin>::StatePtr();
+	return NFAState<TinPtr>::StatePtr();
 }
 
-template <class Tin, class Tout, class Tdep>
-typename NFAEdge<Tin, Tout, Tdep>::NFAEdgePtr NFAController<Tin, Tout, Tdep>::getEdge(int id) {
+template <class TinPtr, class ToutPtr, class TdepPtr>
+typename NFAEdge<TinPtr, ToutPtr, TdepPtr>::NFAEdgePtr NFAController<TinPtr, ToutPtr, TdepPtr>::getEdge(int id) {
 	for (int i = 0; i < transitions.size(); i++) {
 		if (transitions[i]->getID() == id) {
 			return transitions[i];
 		}
 	}
-	return NFAEdge<Tin, Tout, Tdep>::NFAEdgePtr();
+	return NFAEdge<TinPtr, ToutPtr, TdepPtr>::NFAEdgePtr();
 }
 
 
 
-template <class Tin, class Tout, class Tdep>
-void NFAController<Tin, Tout, Tdep>::addNormalState(typename NormalState<Tin, Tout, Tdep>::NormalStatePtr normalState) {
+template <class TinPtr, class ToutPtr, class TdepPtr>
+void NFAController<TinPtr, ToutPtr, TdepPtr>::addNormalState(typename NormalState<TinPtr, ToutPtr, TdepPtr>::NormalStatePtr normalState) {
 	if (std::find(normalStates.begin(), normalStates.end(), normalState)
 			== normalStates.end()) {
 		normalStates.push_back(normalState);
 	}
 }
 
-template <class Tin, class Tout, class Tdep>
-void NFAController<Tin, Tout, Tdep>::print (ostream& out) {
+template <class TinPtr, class ToutPtr, class TdepPtr>
+void NFAController<TinPtr, ToutPtr, TdepPtr>::print (ostream& out) {
 	out << this->start->getStateName() << std::endl;
 }
 

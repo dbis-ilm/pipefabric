@@ -37,10 +37,8 @@ namespace pfabric {
  * Sequence is necessary to mark the order of this event in the complex event.
  */
 //class Instance;
-template<class Tin, class Tout>
+template<class TinPtr, class ToutPtr>
 class Instance {
-	typedef boost::intrusive_ptr<Tin> TinPtr;
-	typedef boost::intrusive_ptr<Tout> ToutPtr;
 	typedef pfabric::Tuple<std::string, int> FooterTuple;
 	typedef boost::intrusive_ptr<FooterTuple> FooterTuplePtr;
 private:
@@ -64,7 +62,7 @@ private:
 
 public:
 
-	typedef boost::intrusive_ptr<Instance<Tin, Tout>> InstancePtr;
+	typedef boost::intrusive_ptr<Instance<TinPtr, ToutPtr>> InstancePtr;
 	/**
 	 * A constructor: receive the original CEP event and map it to an instance
 	 * @param event the original CEP event
@@ -129,16 +127,16 @@ public:
 	 * not events.
 	 * @return tuple construction
 	 */
-	ToutPtr convertInstanceToTuple() {
+	TinPtr convertInstanceToTuple() {
 		/**
 		 * A tuple contains the sate name and the sequence should be combined with the original
 		 * event data. The timestamp of this instance is the timestamp of the original event
 		 */
 		FooterTuplePtr foot = makeTuplePtr(state, sequenceInComplex);
-		ToutPtr res(
-				new Tout(std::tuple_cat(originalEvent->data(), foot->data())));
-		res->setTimestamp(originalEvent->getTimestamp());
-		return res;
+		//ToutPtr res(
+			//	new Tout(std::tuple_cat(originalEvent->data(), foot->data())));
+		//res->setTimestamp(originalEvent->getTimestamp());
+		return originalEvent;
 	}
 
 	/**
