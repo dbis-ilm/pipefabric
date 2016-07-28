@@ -31,6 +31,8 @@ set (CTEST_ENVIRONMENT
 )
 
 #=============================================
+# define the test data directory for the input and output 
+add_definitions( -DTEST_DATA_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/test_data/")
 
 do_test(FlowTest)
 do_test(TupleTest)

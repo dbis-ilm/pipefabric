@@ -268,7 +268,7 @@ else {
 			EventDependency>::matchConstIterator i = list.begin();
 			i != list.end(); i++) {
 		//std::cout << (*i)->convertInstanceToTuple() << std::endl;
-		//this->getOutputDataChannel().publish( (*i)->convertInstanceToTuple(), false);
+		this->getOutputDataChannel().publish( (*i)->convertInstanceToTuple(), false);
 	}
 }
 }

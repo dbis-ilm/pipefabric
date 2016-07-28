@@ -24,7 +24,7 @@ using namespace pfabric;
 
 typedef Tuple<int, int, int> InTuple;
 typedef TuplePtr<InTuple> InTuplePtr;
-typedef Tuple<int, int, int, std::string, unsigned long> OutTuple;
+typedef Tuple<int, int, int> OutTuple;
 typedef TuplePtr<OutTuple> OutTuplePtr;
 
 /*
@@ -36,14 +36,7 @@ TEST_CASE("Verifying the correct behavior of the CEP operator", "[CEP]") {
 
 	typedef typename RelatedStateValue<InTuplePtr, int, int, 0>::RelatedStateValuePtr RelatedTuplePtr;
 
-	// input: cep_test.in; output: cep_test.res
-	std::ifstream input("cep_test.in");
-	REQUIRE(input.is_open());
-
-	std::ifstream expected("cep_test.res");
-	REQUIRE(expected.is_open());
-
-	auto mockup = std::make_shared< StreamMockup<InTuplePtr, OutTuplePtr> >(input, expected);
+	auto mockup = std::make_shared< StreamMockup<InTuplePtr, OutTuplePtr> >("cep_test.in", "cep_test.res");
 
 	auto stateAFilter = [&](const InTuplePtr& tp, const RelatedTuplePtr& rt ) -> bool {
 		return getAttribute<0>(*tp) == 1; };

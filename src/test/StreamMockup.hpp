@@ -60,11 +60,18 @@ public:
 		expectedTuples(expected),
 		tuplesProcessed(0) {}
 
-	StreamMockup(std::ifstream& inputStream, std::ifstream& expectedStream)
+	StreamMockup(const std::string& inputStream, const std::string& expectedStream)
 	: tuplesProcessed(0) {
-		// TODO
-		MockupHelper::readTuplesFromStream<InputStreamElement>(inputStream, inputTuples);
-		MockupHelper::readTuplesFromStream<OutputStreamElement>(expectedStream, expectedTuples);
+		auto inputFile = std::string(TEST_DATA_DIRECTORY) + inputStream;
+		std::ifstream input(inputFile);
+		REQUIRE(input.is_open());
+
+		auto expectedFile = TEST_DATA_DIRECTORY + expectedStream;
+		std::ifstream expected(expectedFile);
+		REQUIRE(expected.is_open());
+
+		MockupHelper::readTuplesFromStream<InputStreamElement>(input, inputTuples);
+		MockupHelper::readTuplesFromStream<OutputStreamElement>(expected, expectedTuples);
 	}
 
 	void start() {
