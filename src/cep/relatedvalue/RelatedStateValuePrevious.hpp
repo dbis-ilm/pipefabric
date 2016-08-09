@@ -24,8 +24,8 @@
 
 #include "RelatedStateValue.hpp"
 namespace pfabric {
-template <class Tin, class StorageType, class ResultType, int Index>
-class RelatedStateValuePrevious: public RelatedStateValue<Tin, StorageType, ResultType,Index> {
+template <class TinPtr, class StorageType, class ResultType, int Index>
+class RelatedStateValuePrevious: public RelatedStateValue<TinPtr, StorageType, ResultType,Index> {
 private:
 	StorageType previousValue;
 public:
@@ -41,14 +41,14 @@ public:
 	 * Updates the value
 	 * @param e the newly selected event
 	 */
-	void updateValue(const typename RelatedStateValue<Tin, StorageType, ResultType,Index>::TinPtr& e) {
+	void updateValue(const TinPtr& e) {
 		previousValue = std::get<Index>(*e);
 	}
 	/**
 	 * initializes the value by an event
 	 * @param e
 	 */
-	void initValue(const typename RelatedStateValue<Tin, StorageType, ResultType,Index>::TinPtr& e) {
+	void initValue(const TinPtr& e) {
 		updateValue(e);
 	}
 	/**
