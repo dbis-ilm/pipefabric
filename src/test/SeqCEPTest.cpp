@@ -63,21 +63,13 @@ TEST_CASE("Verifying the correct behavior of the CEP operator", "[CEP]") {
 	mockup->start();
 }
 
-#if 1
 TEST_CASE("Verifying the correct behavior of the CEP operator with related values", "[CEP]") {
 	typedef typename RelatedStateValue<InTuplePtr, int, int, 0>::RelatedStateValuePtr RelatedTuplePtr1;
 	typedef typename RelatedStateValue<InTuplePtr, int, int, 0>::RelatedStateValuePtr RelatedTuplePtr2;
 	typedef TuplePtr<Tuple<RelatedTuplePtr1, RelatedTuplePtr2>> RelatedTuplePtr;
 
 	auto mockup = std::make_shared< StreamMockup<InTuplePtr, OutTuplePtr> >("cep_test.in", "cep_test.res");
-	/*
-	auto op1_ = std::make_shared<TupleGenerator<OutTuple>>(
-			"../../src/test/data/cep_test.in");
-	//	qctx.registerOperator("op1", op1_);
-	typedef typename RelatedStateValue<InTuple, int, int, 0>::RelatedStateValuePtr Related0;
-	typedef typename RelatedStateValue<InTuple, int, int, 0>::RelatedStateValuePtr Related1;
-	typedef boost::intrusive_ptr<pfabric::Tuple<Related0, Related1> > RelatedTuple;
-	*/
+
 	auto matcher = new Matcher<InTuplePtr, OutTuplePtr, RelatedTuplePtr>(
 			Matcher<InTuplePtr, OutTuplePtr, RelatedTuplePtr>::FirstMatch);
 	auto nfa = matcher->getNFAController();
@@ -129,4 +121,3 @@ TEST_CASE("Verifying the correct behavior of the CEP operator with related value
 
 	mockup->start();
 }
-#endif

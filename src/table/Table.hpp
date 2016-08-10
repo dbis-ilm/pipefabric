@@ -50,7 +50,7 @@ public:
 
   Table() {}
 
-    ~Table() { std::cout << "deallocate table" << std::endl; }
+  ~Table() { std::cout << "deallocate table" << std::endl; }
 
   void insert(KeyType key, const RecordType& rec) throw (TableException) {
     mDataTable.insert({key, rec});
@@ -81,11 +81,28 @@ public:
   }
 
   unsigned long updateByKey(KeyType key, UpdaterFunc ufunc) {
-    return 0;
+    auto res = mDataTable.find(key);
+    if (res != mDataTable.end()) {
+      auto rec = ufunc(res->second);
+      mDataTable[key] = rec;
+      notifyObservers(rec, TableParams::Update, TableParams::Immediate);
+      return 1;
+    }
+    else
+      throw TableException();
   }
 
   unsigned long updateWhere(Predicate pfunc, UpdaterFunc ufunc) {
-    return 0;
+    unsigned long num = 0;
+    for(auto it = mDataTable.begin(); it != mDataTable.end(); it++) {
+      if (pfunc(it->second)) {
+        auto rec = ufunc(it->second);
+        mDataTable[it->first] = rec;
+        notifyObservers(rec, TableParams::Update, TableParams::Immediate);
+        num++;
+      }
+    }
+    return num;
   }
 
   const RecordType& getByKey(KeyType key) throw (TableException) {
