@@ -86,9 +86,9 @@ private:
 
 
 public:
-	typedef boost::shared_ptr<NFAController<TinPtr, ToutPtr, TdepPtr>> NFAControllerPtr;
-	typedef boost::function<TdepPtr()> initDependency;
-	typedef boost::function<void(const TdepPtr&, int, const TinPtr&  )> updateDependency;
+	typedef std::shared_ptr<NFAController<TinPtr, ToutPtr, TdepPtr>> NFAControllerPtr;
+	typedef std::function<TdepPtr()> initDependency;
+	typedef std::function<void(const TdepPtr&, int, const TinPtr&  )> updateDependency;
 	/**
 	 * controller constructor, nothing to do
 	 */

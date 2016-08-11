@@ -198,6 +198,7 @@ public:
 	 *  Since our systems depends on NFA concept. This methods return a pointer to NFA builder or controller
 	 *  @return return our main NFA
 	 */
+	void setNFAController(typename NFAController<InputStreamElement, OutputStreamElement, EventDependency>::NFAControllerPtr nfa)  { engine->setNFA(nfa);}
 	const typename NFAController<InputStreamElement, OutputStreamElement, EventDependency>::NFAControllerPtr getNFAController() const {return engine->getNFA();}
 	/**
 	 * set the window constraint parameters by the CEP engine which implemented by within cluase
