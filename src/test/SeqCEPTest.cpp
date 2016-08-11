@@ -125,7 +125,6 @@ TEST_CASE("Verifying the correct behavior of the CEP operator with related value
 	mockup->start();
 }
 
-
 TEST_CASE("Verifying the correct behavior of the CEP operator using Topology", "[CEP]") {
 	typedef typename RelatedStateValue<InTuplePtr, int, int, 0>::RelatedStateValuePtr RelatedTuplePtr;
 
