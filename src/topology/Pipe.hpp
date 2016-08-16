@@ -345,7 +345,7 @@ namespace pfabric {
      *
      * Creates a queue operator which allows to decouple two operators in the
      * dataflow. The upstream part inserts tuples into the queue which is
-     * processed by a seperate thread to retrieve tuples from the queue and sent
+     * processed by a separate thread to retrieve tuples from the queue and sent
      * them downstream. In this way, the upstream part is not blocked anymore.
      *
      * @tparam T
