@@ -16,6 +16,9 @@
 #include "cep/Matcher.hpp"
 #include "cep/NFAController.hpp"
 
+#include "topology/Topology.hpp"
+#include "topology/Pipe.hpp"
+
 #include "StreamMockup.hpp"
 
 using namespace std;
@@ -70,8 +73,8 @@ TEST_CASE("Verifying the correct behavior of the CEP operator with related value
 
 	auto mockup = std::make_shared< StreamMockup<InTuplePtr, OutTuplePtr> >("cep_test.in", "cep_test.res");
 
-	auto matcher = new Matcher<InTuplePtr, OutTuplePtr, RelatedTuplePtr>(
-			Matcher<InTuplePtr, OutTuplePtr, RelatedTuplePtr>::FirstMatch);
+	auto matcher = std::make_shared<Matcher<InTuplePtr, OutTuplePtr, RelatedTuplePtr>>(
+				Matcher<InTuplePtr, OutTuplePtr, RelatedTuplePtr>::FirstMatch);
 	auto nfa = matcher->getNFAController();
 	auto initState = nfa->createStartState("A");
 	auto stateA = nfa->createNormalState("B");
@@ -121,3 +124,43 @@ TEST_CASE("Verifying the correct behavior of the CEP operator with related value
 
 	mockup->start();
 }
+
+TEST_CASE("Verifying the correct behavior of the CEP operator using Topology", "[CEP]") {
+	typedef typename RelatedStateValue<InTuplePtr, int, int, 0>::RelatedStateValuePtr RelatedTuplePtr;
+
+	std::string expected = "1,71,421\n2,76,390\n3,97,467\n1,71,52\n2,76,942\n3,97,639\n1,71,242\n2,76,901\n3,97,868\n";
+	auto nfa = std::make_shared<NFAController<InTuplePtr, OutTuplePtr, RelatedTuplePtr>>();
+
+	auto stateAFilter = [&](const InTuplePtr& tp, const RelatedTuplePtr& rt ) -> bool {
+		return getAttribute<0>(*tp) == 1 && getAttribute<1>(*tp) == 71; };
+	auto stateBFilter = [&](const InTuplePtr& tp, const RelatedTuplePtr& rt ) -> bool {
+		return getAttribute<0>(*tp) == 2 && getAttribute<1>(*tp) == 76; };
+	auto stateCFilter = [&](const InTuplePtr& tp, const RelatedTuplePtr& rt ) -> bool {
+		return getAttribute<0>(*tp) == 3 && getAttribute<1>(*tp) == 97; };
+
+	auto edgeAState = nfa->createForwardEdge(stateAFilter);
+	auto edgeBState = nfa->createForwardEdge(stateBFilter);
+	auto edgeCState = nfa->createForwardEdge(stateCFilter);
+
+	auto startStateA = nfa->createStartState("A");
+	auto stateB = nfa->createNormalState("B");
+	auto stateC = nfa->createNormalState("C");
+	auto stateD = nfa->createFinalState("D");
+
+	nfa->createForwardTransition(startStateA, edgeAState, stateB);
+	nfa->createForwardTransition(stateB, edgeBState, stateC);
+	nfa->createForwardTransition(stateC, edgeCState, stateD);
+
+	std::stringstream strm;
+
+	auto inputFile = std::string(TEST_DATA_DIRECTORY) + "cep_test.in";
+	Topology t;
+	auto s = t.newStreamFromFile(inputFile)
+	    		.extract<InTuplePtr>(',')
+				.matchByNFA<InTuplePtr, OutTuplePtr, RelatedTuplePtr>(nfa)
+				.print<OutTuplePtr>(strm);
+
+	t.start(false);
+	REQUIRE(strm.str() == expected);
+}
+

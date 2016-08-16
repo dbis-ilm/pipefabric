@@ -177,7 +177,7 @@ public:
 	 * set our working NFA
 	 * @param nfa our working NFA
 	 */
-	void setNFA(NFAController<TinPtr, ToutPtr, TdepPtr>* nfa) { this->nfa = nfa; }
+	void setNFA(typename NFAController<TinPtr, ToutPtr, TdepPtr>::NFAControllerPtr nfa) { this->nfa = nfa; }
 	/**
 	 * clean unwanted structures from current run
 	 */

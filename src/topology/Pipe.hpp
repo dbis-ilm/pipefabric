@@ -45,6 +45,8 @@
 #include "qop/GroupedAggregation.hpp"
 #include "qop/SHJoin.hpp"
 #include "qop/ToTable.hpp"
+#include "cep/Matcher.hpp"
+
 
 namespace pfabric {
 
@@ -498,6 +500,38 @@ namespace pfabric {
       return *this;
     }
 
+    /**
+     * @brief Creates an operator for pattern detection over the stream
+     * using NFA concept.
+     *
+     * Creates an operator implementing the matcher operator to
+     * detect complex events and patterns over the stream. The operator
+     * uses the NFA concept to carry out its task.
+     *
+     * @tparam Tin
+     *      the input tuple type (usually a TuplePtr) for the operator.
+     * @tparam Tout
+     *      the result tuple type (usually a TuplePtr) for the operator.
+     *      the type of representing the matcher result
+     * @tparam Dependency
+     *      the type of related values
+     * @param[in] aggrStatePtr
+     *      an instance of our working NFA
+     * @return a reference to the pipe
+     * TODO: make better
+     */
+    template <typename Tin, typename Tout, typename RelatedValueType>
+    Pipe& matchByNFA(typename NFAController<Tin, Tout, RelatedValueType>::NFAControllerPtr nfa) {
+    	auto op = std::make_shared<Matcher<Tin, Tout, RelatedValueType>>(
+				Matcher<Tin, Tout, RelatedValueType>::FirstMatch);
+    	op->setNFAController(nfa);
+    	auto pOp = dynamic_cast<DataSource<Tin>*>(getPublisher().get());
+    	BOOST_ASSERT_MSG(pOp != nullptr,
+    			"Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
+    	CREATE_LINK(pOp, op);
+    	publishers.push_back(op);
+    	return *this;
+    }
     /**
      * @brief Creates an operator for joining two streams represented by pipes.
      *
