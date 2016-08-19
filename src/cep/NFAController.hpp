@@ -21,12 +21,14 @@
 
 #ifndef NFAController_hpp_
 #define NFAController_hpp_
+
 #include "state/NormalState.hpp"
 #include "state/StartState.hpp"
 #include "state/FinalState.hpp"
 #include "state/KleeneState.hpp"
 #include "state/NegationState.hpp"
 #include "edge/NFAEdge.hpp"
+
 #include <iostream>
 
 
@@ -555,7 +557,6 @@ template <class TinPtr, class ToutPtr, class TdepPtr>
 void NFAController<TinPtr, ToutPtr, TdepPtr>::print (ostream& out) {
 	out << this->start->getStateName() << std::endl;
 }
-
 
 
 }

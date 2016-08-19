@@ -81,7 +81,7 @@ void NextMatchEngine<TinPtr, ToutPtr, TdepPtr>::engineProcess(const TinPtr& even
 				str->addEvent(event,
 						( (NormalState<TinPtr, ToutPtr, TdepPtr>*)(str->getCurrentState()))->getForwardEdgeByIndex(result));
 				if (str->isComplete()) { //final state
-					this->manager->publishResulMatches(str);
+					this->manager->publishResultMatches(str);
 					this->counter++;
 					this->deletedStructures.push_back(str);
 

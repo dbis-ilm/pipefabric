@@ -82,7 +82,7 @@ void FirstMatchEngine<TinPtr, ToutPtr, TdepPtr>::engineProcess(const TinPtr& eve
 					((NormalState<TinPtr, ToutPtr, TdepPtr>*)(str->getCurrentState()))->getForwardEdgeByIndex(result));
 
 			if (str->isComplete()) { //final state
-				this->manager->publishResulMatches(str);
+				this->manager->publishResultMatches(str);
 				this->counter++;
 				this->pool->clear();
 

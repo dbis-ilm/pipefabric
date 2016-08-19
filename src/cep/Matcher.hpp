@@ -28,6 +28,9 @@
 #include "qop/UnaryTransform.hpp"
 #include "MatchProducer.hpp"
 #include "util/Partition.hpp"
+#include "edge/NFAEdge.hpp"
+
+#include "dsl/CEPExpr.hpp"
 
 /**
  * @brief The matcher operator for detecting complex events.
@@ -67,6 +70,8 @@ public:
 		OneByOne, Combined
 	};
 
+	typedef std::map<std::string, typename NFAEdge<InputStreamElement, OutputStreamElement,
+	 			EventDependency>::EdgePredicate> PredicateMap;
 private:
 	/**
 	 * The current working engine
@@ -99,6 +104,11 @@ private:
 	 * @brief Bind the callback for the punctuation channel.
 	 */
 	BIND_INPUT_CHANNEL_DEFAULT( InputPunctuationChannel, Matcher, processPunctuation );
+
+	void constructSubNFA(CEPExprPtr expr,
+		const PredicateMap& predicates,
+		typename NFAState<InputStreamElement>::StatePtr inState,
+		typename NFAState<InputStreamElement>::StatePtr outState) throw (InvalidCEPException);
 public:
 
 	/**
@@ -120,6 +130,10 @@ public:
 	 * A destructor to release the resources and clean-up
 	 */
 	virtual ~Matcher() {delete engine;}
+
+	void constructNFA(CEPExprPtr expr, const PredicateMap& predicates) throw (InvalidCEPException);
+
+
 	/**
 	 * Get the current running engine according to the selected strategy
 	 * @return the current running engine
@@ -229,7 +243,7 @@ public:
 	 * The matches are exist in structurePtr object which responsible for storing the matches
 	 * @param matches the matches object
 	 */
-	void publishResulMatches(const typename NFAStructure<InputStreamElement, OutputStreamElement, EventDependency>::NFAStructurePtr& matches);
+	void publishResultMatches(const typename NFAStructure<InputStreamElement, OutputStreamElement, EventDependency>::NFAStructurePtr& matches);
 };
 }
 
@@ -255,7 +269,7 @@ else if (strategy == Matcher::NextMatches) {
 
 template<class InputStreamElement, class OutputStreamElement,
 	class EventDependency>
-void Matcher<InputStreamElement, OutputStreamElement, EventDependency>::publishResulMatches(
+void Matcher<InputStreamElement, OutputStreamElement, EventDependency>::publishResultMatches(
 	const typename NFAStructure<InputStreamElement, OutputStreamElement,
 			EventDependency>::NFAStructurePtr& matches) {
 
@@ -273,6 +287,78 @@ else {
 	}
 }
 }
+
+template<class InputStreamElement, class OutputStreamElement, class EventDependency>
+void Matcher<InputStreamElement,
+	OutputStreamElement,
+	EventDependency>::constructNFA(CEPExprPtr expr, const PredicateMap& predicates) throw (InvalidCEPException) {
+		auto nfa = getNFAController();
+
+		if (expr->tag() != CEPExpr::Seq)
+	    throw InvalidCEPException("SEQ expression expected.");
+
+	  auto seq = std::dynamic_pointer_cast<SEQExpr>(expr);
+	  auto s0 = seq->sequence.front();
+	  auto sn = seq->sequence.back();
+
+		if (s0->tag() != CEPExpr::State)
+	    throw InvalidCEPException("Init state expected.");
+	  if (sn->tag() != CEPExpr::State)
+	    throw InvalidCEPException("Final state expected.");
+
+	  auto initStateId = std::dynamic_pointer_cast<CEPState>(s0);
+	  auto finalStateId = std::dynamic_pointer_cast<CEPState>(sn);
+
+		auto initState = nfa->createStartState(initStateId->id);
+		auto finalState = nfa->createFinalState(finalStateId->id);
+
+	  for (int i = 1; i < seq->sequence.size() - 1; i++) {
+	    auto s = seq->sequence[i];
+	    constructSubNFA(s, predicates, initState, finalState);
+	  }
+	}
+
+	template<class InputStreamElement, class OutputStreamElement, class EventDependency>
+	void Matcher<InputStreamElement,
+		OutputStreamElement,
+		EventDependency>::constructSubNFA(CEPExprPtr expr,
+			const PredicateMap& predicates,
+			typename NFAState<InputStreamElement>::StatePtr inState,
+			typename NFAState<InputStreamElement>::StatePtr outState) throw (InvalidCEPException) {
+
+		switch(expr->tag()) {
+		  case CEPExpr::State:
+		    std::cout << "state: ";
+		    {
+		      auto s = std::dynamic_pointer_cast<CEPState>(expr);
+		      std::cout << s->id << std::endl;
+		    }
+		    break;
+		  case CEPExpr::Seq:
+		    std::cout << "seq - ";
+		    {
+		      auto seq = std::dynamic_pointer_cast<SEQExpr>(expr);
+		      for (auto s : seq->sequence) {
+		        // constructNFA(s, level + 1);
+		      }
+		    }
+		    std::cout << std::endl;
+		    break;
+		  case CEPExpr::Or:
+		    std::cout << "or - ";
+		    {
+		    	auto seq = std::dynamic_pointer_cast<ORExpr>(expr);
+		      for (auto s : seq->sequence) {
+		        // constructNFA(s);
+		      }
+		      std::cout << std::endl;
+		    }
+		    break;
+		  default:
+		    std::cout << "unknown" << std::endl;
+		    break;
+		}
+	}
 
 }
 #endif /*  Matcher_hpp_ */
