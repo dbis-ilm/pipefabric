@@ -2,7 +2,7 @@
 # We download some 3rdparty modules from github.com via DownloadProject
 include(DownloadProject)
 
-set(THIRD_PARTY_DIR "${PROJECT_BINARY_DIR}/4thparty")
+set(THIRD_PARTY_DIR "${PROJECT_BINARY_DIR}/3rdparty")
 
 # the JSON library
 download_project(PROJ               json
