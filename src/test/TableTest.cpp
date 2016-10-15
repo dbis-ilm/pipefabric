@@ -6,7 +6,7 @@
 
 #include "core/Tuple.hpp"
 #include "table/Table.hpp"
-#include "format/format.hpp"
+#include "fmt/format.h"
 
 using namespace pfabric;
 

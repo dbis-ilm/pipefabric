@@ -23,7 +23,7 @@
 
 #include "qop/DataSink.hpp"
 #include "qop/OperatorMacros.hpp"
-#include "3rdparty/format/format.hpp"
+#include "fmt/format.h"
 
 #include <iostream>
 #include <boost/core/ignore_unused.hpp>

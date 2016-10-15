@@ -8,7 +8,7 @@
 #include <exception>
 
 #include <boost/signals2.hpp>
-#include "format/format.hpp"
+#include "fmt/format.h"
 
 namespace pfabric {
 

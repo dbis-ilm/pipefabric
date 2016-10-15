@@ -11,6 +11,8 @@
 
 #include "StreamMockup.hpp"
 
+#include "fmt/format.h"
+
 using namespace pfabric;
 
 typedef Tuple< int, int, int > MyTuple;

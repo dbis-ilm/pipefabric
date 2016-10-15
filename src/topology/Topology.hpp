@@ -64,7 +64,7 @@ namespace pfabric {
    *            })
    *           .print<T2>(strm);
    * // now, let's start the processing
-   * t.start();
+   * t->start();
    * @endcode
    */
   class Topology {

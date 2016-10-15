@@ -6,7 +6,7 @@
 
 #include <boost/filesystem.hpp>
 
-#include "format/format.hpp"
+#include "fmt/format.h"
 
 namespace pfabric {
 

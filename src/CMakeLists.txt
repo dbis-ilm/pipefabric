@@ -8,21 +8,37 @@ set (PipeFabric_VERSION_MINOR 1)
 
 include(CTest)
 
+# Add our CMake directory to CMake's module path
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/")
+
+# We download some 3rdparty modules from github.com before building
+# the project.
+include(Download3rdParty)
+
 #############################
 # customization section
 #############################
 #
-# Add our CMake directory to CMake's module path
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/")
 
+# Installation path
+set(PIPEFABRIC_DIR "/usr/local/pfabric")
+
+# Use the boost::spirit parser for converting strings to numbers
 option( USE_BOOST_SPIRIT_PARSER
     "use the boost::spirit::qi parsers for converting strings to tuple attributes"
     ON
 )
 
+# C++ compiler flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated -Wno-unused-local-typedefs -g -O3")
+if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-#pragma-messages")
+endif()
+
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused -Wno-uninitialized")
 
+# End of customization section
+#---------------------------------------------------------------------------
 if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread")
@@ -82,7 +98,7 @@ set(BOOST_LIBRARIES
 		${Boost_LOG_LIBRARY}
 		${Boost_COROUTINE_LIBRARY}
 		${Boost_IOSTREAMS_LIBRARY}
-    		${Boost_FILESYSTEM_LIBRARY}
+    ${Boost_FILESYSTEM_LIBRARY}
 		${Boost_SYSTEM_LIBRARY}
 		${Boost_CHRONO_LIBRARY}
 		${Boost_TIMER_LIBRARY}
@@ -109,7 +125,9 @@ endif(ZEROMQ_FOUND)
 
 include_directories("${PROJECT_SOURCE_DIR}")
 include_directories("${PROJECT_SOURCE_DIR}/pubsub")
-include_directories("${PROJECT_SOURCE_DIR}/3rdparty")
+
+# because we have downloaded external projects into build we have to add them here
+include_directories("${THIRD_PARTY_DIR}")
 
 if (ZEROMQ_FOUND)
 set (ZEROMQ_SOURCES
@@ -128,8 +146,11 @@ add_library(pfabric_core SHARED
   qop/TriggerNotifier.cpp
   topology/Topology.cpp
   topology/PFabricContext.cpp
-  3rdparty/format/format.cpp
   ${ZEROMQ_SOURCES}
+  # we need this as dependency to download the sources from github
+  ${THIRD_PARTY_DIR}/json
+  ${THIRD_PARTY_DIR}/fmt
+  ${THIRD_PARTY_DIR}/SimpleWeb
 )
 
 
@@ -144,6 +165,8 @@ target_link_libraries(pfabric_core
 #
 add_library(pfabric_cep SHARED
                   cep/Matcher.cpp
+                  # we need this as dependency to download the sources from github
+                  ${THIRD_PARTY_DIR}/fmt
 )
 
 target_link_libraries(pfabric_cep
@@ -161,5 +184,24 @@ enable_testing()
 add_subdirectory(test)
 
 #-----------------------------------------------------------------------------------------
+#
+# Installation
+#
+set(PIPEFABRIC_LIBS pfabric_core pfabric_cep)
+set(PIPEFABRIC_LIB_DIR "${PIPEFABRIC_DIR}/lib")
+set(PIPEFABRIC_INCLUDE_DIR "${PIPEFABRIC_DIR}/include")
 
-# add_subdirectory(debs2016)
+foreach(LIB ${PIPEFABRIC_LIBS})
+install(TARGETS ${LIB} DESTINATION ${PIPEFABRIC_LIB_DIR})
+endforeach(LIB)
+
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/"
+   DESTINATION ${PIPEFABRIC_INCLUDE_DIR}
+   FILES_MATCHING
+   PATTERN "*.hpp"
+   PATTERN "*.h"
+)
+
+#-----------------------------------------------------------------------------------------
+#
+add_subdirectory(demo)

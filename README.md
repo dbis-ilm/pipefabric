@@ -14,6 +14,9 @@ PipeFabric relies on several open source components which have to be installed b
  + ZeroMQ socket library (including zmq.hpp from https://github.com/zeromq/cppzmq/blob/master/zmq.hpp)
  + JeMalloc or TCMalloc library (optional)
 
+There are some additional 3rd party libraries such as SimpleWeb, Format, and JSON but
+they are downloaded during the build.
+
 After cloning the repository, compile everything:
 
 ```
@@ -95,3 +98,72 @@ t.start();
 | `groupBy<>` | |
 | `join<>` | |
 | `toTable<T,K>(tbl, auto)` |  stores tuples from the input stream of type `T` with key type `K` into the table `tbl` and forwards them to its subscribers. Outdated tuples are handled as deletes, non-outdated tuples either as insert (if the key does not exist yet) or update (otherwise). The parameter `auto` determines the autocommit mode.|
+
+### How to write a query ###
+
+Queries are defined in PipeFabric as dataflow programs in C++, but we provide a DSL simplyfing the formulation.
+As an example we want to implement a simple dataflow receiving data via REST, calculating a moving average over the last 10 values, and sending the results to tne console. Let's look at the C++ program.
+
+First, we need to include the PipeFabric header file and should use the namespace.
+
+```
+include "pfabric.hpp"
+
+using namespace pfabric;
+```
+
+Next, we define the schema: the tuple types for representing input and output data:
+
+```
+// the structure of tuples we receive via REST
+typedef TuplePtr<Tuple<int, double> > InTuple;
+
+// the structure of our output (aggregate) tuples
+typedef TuplePtr<Tuple<double> > ResultTuple;
+```
+
+And for the aggregation we have to define a type the captures the aggregation state.
+
+```
+// the aggregate operator needs a state object that is defined here:
+// template parameters are:
+//     * the input type,
+//     * the aggregate function (in our case Avg on double values),
+//     * the column of the input tuple on which we calculate the aggregate (in
+//       our case column #1)
+typedef Aggregator1<InTuple, AggrAvg<double, double>, 1> MyAggrState;
+```
+
+In the main function we first create a `PFabricContext` object which is needed
+to create a new topology. A topology represents a dataflow (i.e. a query) and is
+used to add operators. In our example, we start with a REST source for producing
+a stream of tuples. In the next step, we extract the `key`and `data` fields and
+produce instances of `InTuplePtr`. Then, we add a sliding window and an aggregate
+operator with the state class defined before. Finally, we add the print operator
+for sending results to `std::cout` and start the topology.
+
+```
+int main(int argc, char **argv) {
+  PFabricContext ctx;
+
+  auto t = ctx.createTopology();
+
+  auto s = t->newStreamFromREST(8099, "^/publish$", RESTSource::POST_METHOD)
+    .extractJson<InTuplePtr>({"key", "data"})
+    .slidingWindow<InTuplePtr>(WindowParams::RowWindow, 10)
+    .aggregate<InTuplePtr, ResultTuplePtr, MyAggrState> ()
+    .print<ResultTuplePtr>(std::cout);
+
+  t->start();
+}
+```
+
+After starting the program with `./RestDemo` we can send some data via `curl`:
+
+```
+curl -H "Content-Type: application/json" \
+     -X POST -d '{"key": "xyz", "data": "1.0"}' \
+     http://localhost:8099/publish
+```
+
+and will receive the output from our stream query.

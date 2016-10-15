@@ -36,6 +36,7 @@
 #include "qop/Queue.hpp"
 #include "qop/Map.hpp"
 #include "qop/TupleExtractor.hpp"
+#include "qop/JsonExtractor.hpp"
 #include "qop/TupleDeserializer.hpp"
 #include "qop/ConsoleWriter.hpp"
 #include "qop/FileWriter.hpp"
@@ -304,6 +305,28 @@ namespace pfabric {
     }
 
     /**
+     * @brief Creates an data extraction operator.
+     *
+     * Creates an operator for extracting typed fields from a JSON string tuple
+     * as the next operator on the pipe.
+     *
+     * @tparam T
+     *      the input tuple type (usually a TuplePtr) for the operator.
+     * @param[in] keys
+     * @return a reference to the pipe
+     */
+    template <class T>
+    Pipe& extractJson(const std::initializer_list<std::string>& keys) {
+      std::vector<std::string> keyList(keys);
+      auto op = std::make_shared<JsonExtractor<T> >(keyList);
+      auto pOp = dynamic_cast<DataSource<TStringPtr>*>(getPublisher().get());
+      BOOST_ASSERT_MSG(pOp != nullptr, "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
+      CREATE_LINK(pOp, op);
+      publishers.push_back(op);
+      return *this;
+    }
+
+    /**
      * @brief
      *
      * @tparam T
@@ -401,13 +424,10 @@ namespace pfabric {
      * @code
      * // calculate the sum of column #0
      * typedef Aggregator1<T1, AggrSum<double>, 0> MyAggrState;
-     * typedef std::shared_ptr<MyAggrState> MyAggrStatePtr;
      *
      * // Aggregator1 defines already functions for finalize and iterate
      * t->newStreamFrom...
-     *    .aggregate<T1, T2, MyAggrState> (std::make_shared<MyAggrState>(),
-     *                                    MyAggrState::finalize,
-     *                                    MyAggrState::iterate)
+     *    .aggregate<T1, T2, MyAggrState> ()
      * @endcode
      *
      * @tparam Tin
@@ -418,27 +438,17 @@ namespace pfabric {
      *      the type of representing the aggregation state as a subclass of
      *      @c AggregationStateBase. There are predefined template classes
      *      @c Aggregator1 ... @c AggregatorN which can be used directly here.
-     * @param[in] aggrStatePtr
-     *      an instance of the AggrState class which is used as prototype
-     * @param[in] finalFun
-     *    a function pointer for constructing the aggregation tuple
-     * @param[in] iterFun
-     *    a function pointer for increment/decrement (in case of outdated tuple)
-     *    the aggregate values.
      * @param[in] tType
      *    the mode for triggering the calculation of the aggregate (TriggerAll,
-          TriggerByCount, TriggerByTime, TriggerByTimestamp)
+     *    TriggerByCount, TriggerByTime, TriggerByTimestamp)
      * @param[in] tInterval
      *    the interval for producing aggregate tuples
      * @return a reference to the pipe
      */
     template <typename Tin, typename Tout, typename AggrState>
-    Pipe& aggregate(std::shared_ptr<AggrState> aggrStatePtr,
-                    typename Aggregation<Tin, Tout, AggrState>::FinalFunc finalFun,
-                    typename Aggregation<Tin, Tout, AggrState>::IterateFunc iterFun,
-                    AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0) {
-      auto op = std::make_shared<Aggregation<Tin, Tout, AggrState> >(aggrStatePtr,
-          finalFun, iterFun, tType, tInterval);
+    Pipe& aggregate(AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0) {
+      auto op = std::make_shared<Aggregation<Tin, Tout, AggrState> >(std::make_shared<AggrState>(),
+          AggrState::finalize, AggrState::iterate, tType, tInterval);
       auto pOp = dynamic_cast<DataSource<Tin>*>(getPublisher().get());
       BOOST_ASSERT_MSG(pOp != nullptr,
         "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");

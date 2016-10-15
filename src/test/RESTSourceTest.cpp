@@ -8,7 +8,7 @@
 
 #include "catch.hpp"
 
-#include "format/format.hpp"
+#include "fmt/format.h"
 #include "SimpleWeb/client_http.hpp"
 
 #include "core/Tuple.hpp"

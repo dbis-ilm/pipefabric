@@ -7,7 +7,7 @@
 
 #include "catch.hpp"
 
-#include "format/format.hpp"
+#include "fmt/format.h"
 
 #include "core/Tuple.hpp"
 #include "qop/TextFileSource.hpp"

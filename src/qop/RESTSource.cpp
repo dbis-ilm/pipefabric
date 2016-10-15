@@ -51,19 +51,19 @@ void RESTSource::createHttpServer(unsigned int port, unsigned short numThreads) 
   std::call_once( RESTSource::onlyOne,
                  [] (int p, unsigned short nt) {
                    RESTSource::server.reset(new HttpServer(p, nt));
-                   std::cout << "RESTSource:: HTTPServer created for port " << p << std::endl;
+                   std::cout << "RESTSource: HTTPServer created for port " << p << std::endl;
                  }, port, numThreads);
 }
 
 void RESTSource::addRessource(const std::string& path, RESTMethod method) {
   BOOST_ASSERT(server.get() != nullptr);
   std::string methodString[] = { "GET", "POST", "PUT", "DELETE" };
-  server->resource[path][methodString[method]] = [this](HttpServer::Response& response,
-                                                        std::shared_ptr<HttpServer::Request> request) {
+  server->resource[path][methodString[method]] = [this](std::shared_ptr<HttpServer::Response> response,
+                                                  std::shared_ptr<HttpServer::Request> request) {
     //Retrieve string:
     auto content = request->content.string();
     produceTuple(StringRef(content.c_str(), content.size()));
-    response << "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK";
+    *response << "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK";
   };
 }
 
