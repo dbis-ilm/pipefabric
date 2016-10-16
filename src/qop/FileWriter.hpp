@@ -32,17 +32,17 @@
 
 namespace pfabric {
 
-/**
- * @brief TODO Doc
- *
- * TODO separate console writer from file writer!
- *      (+common factory interface if required by PipeFlow)
- * TODO extract formatter into separate functor classes (CSV, XML, binary, ...)
- *      and pass as template argument if static / constructor arg if dynamic
- *
- * @tparam StreamElement
- *    the data stream element type consumed by the sink
- */
+	/**
+	 * @brief FileWriter is an operator for writing stream elements to
+	 * a file.
+	 *
+	 * FileWriter is an operator for writing stream elements to a file specified
+	 * by a filename. In addition, an optional formatter function can be specified
+	 * that is used to format the output of each stream element.
+	 *
+	 * @tparam StreamElement
+	 *    the data stream element type consumed by the sink
+	 */
 template<
 	typename StreamElement
 >
@@ -51,15 +51,19 @@ class FileWriter :
 	public SynchronizedDataSink< StreamElement >
 {
 private:
-PFABRIC_SYNC_SINK_TYPEDEFS(StreamElement)
+	PFABRIC_SYNC_SINK_TYPEDEFS(StreamElement)
 
-	/// TODO Doc
+	/// typedef for the formatter function
 	typedef std::function< void (std::ostream&, const StreamElement&) > FormatterFunc;
 
 	/**
-	 * TODO Doc
-	 * @param os
-	 * @param streamElement
+	 * @brief The default formatter function.
+	 *
+	 * @c defaultFormatter is the default formatter function for @c FileWriter
+	 * which simply prints the stream element.
+	 *
+	 * @param os the output stream
+	 * @param streamElement the stream element to be printed
 	 */
 	static void defaultFormatter( std::ostream& os, const StreamElement& streamElement ) {
 		// TODO access via element traits
@@ -70,16 +74,21 @@ PFABRIC_SYNC_SINK_TYPEDEFS(StreamElement)
 public:
 
 	/**
-	 * TODO Doc
+	 * @brief Create a new instance of the FileWriter operator.
 	 *
-	 * @param fname
-	 * @param ffun
+	 * Create a new instance of the FileWriter operator which writes all
+	 * incoming and not outdated tuples to the given file.
+	 * Optionally, a formatter function can be specified.
+	 *
+	 * @param fname the name of the file to which the stream elements are written
+	 	 * @param ffun pointer to the formatter function, if no function is given, the
+	 *        default formatter simply prints the stream element.
 	 */
 	FileWriter( const std::string& fname, FormatterFunc ffun = defaultFormatter ) :
 		mStream(fname.c_str(), std::ofstream::out), mFormatterFunc(ffun) {}
 
 	/**
-	 * TODO Doc
+	 * Close the file associated with the FileReader.
 	 */
 	virtual ~FileWriter() {
 		if (mStream.is_open())
@@ -132,13 +141,11 @@ private:
 		boost::ignore_unused( punctuation );
 	}
 
-
-	// TODO Doc
-	std::ofstream mStream;
-	FormatterFunc mFormatterFunc;
+	std::ofstream mStream;        //< the file stream for outputting the stream elements
+	FormatterFunc mFormatterFunc; //< the formatter function
 };
 
-} /* end namespace pquery*/
+}
 
 
 #endif

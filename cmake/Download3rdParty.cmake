@@ -9,7 +9,7 @@ download_project(PROJ               json
                 GIT_REPOSITORY      https://github.com/nlohmann/json.git
                 GIT_TAG             master
                 UPDATE_DISCONNECTED 1
-#                QUIET
+                QUIET
 )
 add_custom_command(
         OUTPUT ${THIRD_PARTY_DIR}/json
@@ -23,7 +23,7 @@ download_project(PROJ               Format
                 GIT_REPOSITORY      https://github.com/fmtlib/fmt.git
                 GIT_TAG             master
                 UPDATE_DISCONNECTED 1
-#                QUIET
+                QUIET
 )
 add_custom_command(
         OUTPUT ${THIRD_PARTY_DIR}/fmt
@@ -43,7 +43,7 @@ download_project(PROJ               SimpleWeb
                 GIT_REPOSITORY      https://github.com/eidheim/Simple-Web-Server.git
                 GIT_TAG             master
                 UPDATE_DISCONNECTED 1
-#                QUIET
+                QUIET
 )
 add_custom_command(
         OUTPUT ${THIRD_PARTY_DIR}/SimpleWeb
@@ -51,3 +51,10 @@ add_custom_command(
         COMMAND ${CMAKE_COMMAND} -E copy_directory
                 ${SimpleWeb_SOURCE_DIR}
                 ${THIRD_PARTY_DIR}/SimpleWeb)
+
+download_project(PROJ               benchmark
+                GIT_REPOSITORY      https://github.com/google/benchmark.git
+                GIT_TAG             master
+                UPDATE_DISCONNECTED 1
+#                QUIET
+)

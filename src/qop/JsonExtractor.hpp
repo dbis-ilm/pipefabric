@@ -58,7 +58,8 @@ namespace pfabric {
      * Create a new projection operator for evaluating the projection function
      * on each incoming tuple.
      *
-     * \param pfun function pointer to a projection function
+     * @param keys a list of keys for which values extracted from the JSON string
+     *             and used to construct the tuple
      */
     JsonExtractor(const std::vector<std::string>& keys) : mKeys(keys) {
         BOOST_ASSERT_MSG(mKeys.size() == OutputDataElementTraits::NUM_ATTRIBUTES,
@@ -66,8 +67,8 @@ namespace pfabric {
         mData.resize(OutputDataElementTraits::NUM_ATTRIBUTES);
       }
 
-    ~JsonExtractor() {
-    }
+    ~JsonExtractor() {}
+
     /**
      * @brief Bind the callback for the data channel.
      */
@@ -96,10 +97,11 @@ namespace pfabric {
     /**
      * This method is invoked when a data stream element arrives.
      *
-     * It performas the actual extraction andforwards the element to its subscribers.
+     * It performs the actual extraction from the JSON string and
+     * forwards the constructed tuple to its subscribers.
      *
-     * @param[in] data
-     *    the incoming stream element
+     * @param[in] line
+     *    the incoming stream element (a TStringPtr)
      * @param[in] outdated
      *    flag indicating whether the tuple is new or invalidated now
      */

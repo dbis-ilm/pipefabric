@@ -51,6 +51,8 @@ namespace pfabric {
     typedef std::function<void(const StreamElement&, bool)> CallbackFunc;
 
     /**
+     * @brief Construct a new instance of the notify operator.
+     * 
      * Create a new notify operator invoking the given callback
      * on each incoming tuple.
      *

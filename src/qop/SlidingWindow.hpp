@@ -29,7 +29,7 @@
 namespace pfabric {
 
   /**
-   * \brief  SlidingWindow implements a sliding window operator.
+   * @brief  SlidingWindow implements a sliding window operator.
    *
    * SlidingWindow represents a sliding window operator which invalidates tuples based on a given time interval.
    * Each incoming tuple is forwarded to the output pipe and after the specified time interval (the window size)

@@ -32,10 +32,8 @@ namespace pfabric {
    *
    * A projection operator produces tuples according to a given projection function.
    *
-   * @tparam InputStreamElement
-   *    the data stream element type consumed by the projection
    * @tparam OutputStreamElement
-   *    the data stream element type produced by the projection
+   *    the data stream element type produced by the extractor
    */
   template<
   typename OutputStreamElement
@@ -100,6 +98,8 @@ namespace pfabric {
       while (*s) {
         char* item = (char *)s;
         while (*s && *s != ifs) s++;
+        // TODO: don't use BOOST_ASSERT here - try to continue, e.g. by
+        // setting null values
         BOOST_ASSERT(i < OutputDataElementTraits::NUM_ATTRIBUTES);
         data[i++].setValues(item, s - item);
         if (*s && !*(++s)) {

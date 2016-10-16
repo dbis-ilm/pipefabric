@@ -74,7 +74,6 @@ template<
 	template<typename...> class SlotImpl = DefaultSlotFunction
 >
 class BinaryTransform :
-	// public BaseOp, // inherit common runtime operator interface
 	public Sink<   // generate input channels
 		InputChannelParameters< // IN ID 0 - left data channel
 			synchronized, SlotImpl, LeftInputStreamElement, bool
@@ -87,16 +86,6 @@ class BinaryTransform :
 		>
 	>,
 	public DataSource<OutputStreamElement, SignalImpl>
-	/*
-	public Source< // generate output channels
-		OutputChannelParameters< // OUT ID 0 - data channel
-			SignalImpl, OutputStreamElement, bool
-		>,
-		OutputChannelParameters< // OUT ID 1 - punctuation channel
-			SignalImpl, PunctuationPtr
-		>
-	>
-	*/
 {
 private:
 
@@ -107,13 +96,6 @@ private:
 		InputChannelParameters<	synchronized, SlotImpl, PunctuationPtr >
 	> SinkBase;
 
-	/// the base source type providing the output channels
-	/*
-	typedef Source< // generate output channels
-		OutputChannelParameters< SignalImpl, OutputStreamElement, bool >,
-		OutputChannelParameters< SignalImpl, PunctuationPtr	>
-	> SourceBase;
-*/
 public:
 
 	BinaryTransform( std::string name = "" ) :
@@ -138,13 +120,6 @@ public:
 
 	/// the input channel type for incoming punctuation tuples
 	IMPORT_INPUT_CHANNEL_TYPE( SinkBase, 2, InputPunctuationChannel );
-
-	/// the output channel type for outgoing data elements
-	// IMPORT_OUTPUT_CHANNEL_TYPE( SourceBase, 0, OutputDataChannel );
-
-	/// the output channel type for outgoing punctuation tuples
-	// IMPORT_OUTPUT_CHANNEL_TYPE( SourceBase, 1, OutputPunctuationChannel );
-
 
 	/**
 	 * @brief Get a reference to the operator's input data channel from the left source.
@@ -172,27 +147,6 @@ public:
 	InputPunctuationChannel& getInputPunctuationChannel() {
 		return SinkBase::template getInputChannelByID< 2 >();
 	}
-
-	/**
-	 * @brief Get a reference to the operator's outgoing data channel.
-	 *
-	 * @return a reference to the outgoing data channel
-	 */
-	 /*
-	OutputDataChannel& getOutputDataChannel() {
-		return SourceBase::template getOutputChannelByID< 0 >();
-	}
-*/
-	/**
-	 * @brief Get a reference to the operator's outgoing punctuation channel.
-	 *
-	 * @return a reference to the outgoing punctuation channel
-	 */
-	 /*
-	OutputPunctuationChannel& getOutputPunctuationChannel() {
-		return SourceBase::template getOutputChannelByID< 1 >();
-	}
-	*/
 };
 
 } /* end namespace pfabric */

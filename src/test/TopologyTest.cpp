@@ -44,6 +44,7 @@ TEST_CASE("Building and running a simple topology", "[Topology]") {
     .print<T2>(strm);
 
   t.start();
+  t.wait();
   REQUIRE(strm.str() == expected);
 }
 

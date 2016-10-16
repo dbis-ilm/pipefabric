@@ -25,7 +25,7 @@
 namespace pfabric {
 
 /**
- * \brief BaseOp represents a common base class for all parameterizable query operators.
+ * @brief BaseOp represents a common base class for all parameterizable query operators.
  *
  * The only purpose of this class is to provide a common interface for query operators
  * which allow to change parameters at runtime.

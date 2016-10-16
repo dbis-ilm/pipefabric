@@ -24,6 +24,8 @@
 #include <string>
 #include <list>
 #include <vector>
+#include <future>
+#include <mutex>
 
 #include "core/Tuple.hpp"
 
@@ -74,6 +76,9 @@ namespace pfabric {
 
     std::list<Pipe*> pipes;               //< the list of pipes created for this topology
     std::vector<StartupFunc> startupList; //< the list of functions to be called for startup
+    bool asyncStarted;                    //< true if we started asynchronously
+    std::vector<std::future<unsigned long> > startupFutures; //< futures for the startup functions
+    std::mutex mMutex;                    //< mutex for accessing startupFutures
 
     /**
      * @brief Registers a startup function for initiating the processing.
@@ -97,7 +102,7 @@ namespace pfabric {
     /**
      * @brief Constructs a new empty topology.
      */
-    Topology() {}
+    Topology() : asyncStarted(false) {}
 
     /**
      * @brief Destructor for topology.
@@ -118,6 +123,14 @@ namespace pfabric {
      *   determines if the start functions should be invoked asynchronously
      */
     void start(bool async = true);
+
+    /**
+     * @brief Waits until the execution of the topology stopped.
+     *
+     * If the topology was started asynchronously the call of wait()
+     * blocks until the execution stopped.
+     */
+    void wait();
 
     /**
      * @brief Creates a pipe from a TextFileSource as input.

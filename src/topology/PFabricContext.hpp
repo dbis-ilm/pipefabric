@@ -79,8 +79,9 @@ public:
    * @tparam KeyType
    *    the data type of the key of the table
    * @param[in] tblName
-  *     the name of the table to be created
+   *     the name of the table to be created
    * @return
+         a pointer to the newly created table
    */
   template <typename RecordType, typename KeyType = DefaultKeyType>
   std::shared_ptr<Table<RecordType, KeyType>> createTable(const std::string& tblName) throw (TableException) {
@@ -109,6 +110,7 @@ public:
    * @param[in] tblName
    *    the name of the table
    * @return
+   *   a pointer to the table with the given or an empty table
    */
   template <typename RecordType, typename KeyType = DefaultKeyType>
   std::shared_ptr<Table<RecordType, KeyType>> getTable(const std::string& tblName) {
@@ -120,6 +122,7 @@ public:
     }
     else
       // otherwise we just return an empty pointer
+      // TODO: shouldn't we throw an exception here???
       return std::shared_ptr<Table<RecordType, KeyType>>();
   }
 

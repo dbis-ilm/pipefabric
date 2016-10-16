@@ -40,9 +40,7 @@ EvictionNotifier::~EvictionNotifier() {
     // inform the thread about stopping
     *mInterrupted = true;
     // and wait until it has stopped
-    std::cout << "joining" << std::endl;
     mThread->join();
-    std::cout << "joined" << std::endl;
   }
 }
 

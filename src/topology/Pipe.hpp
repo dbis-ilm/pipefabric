@@ -33,6 +33,7 @@
 #include "qop/OperatorMacros.hpp"
 #include "qop/TextFileSource.hpp"
 #include "qop/Where.hpp"
+#include "qop/Notify.hpp"
 #include "qop/Queue.hpp"
 #include "qop/Map.hpp"
 #include "qop/TupleExtractor.hpp"
@@ -366,6 +367,29 @@ namespace pfabric {
     }
 
     /**
+      * @brief Creates a notify operator for passing stream tuples to a callback function.
+      *
+      * Creates a notify operator for triggering a callback on each input tuple and
+      * forwarding the tuples to the next operator on the pipe.
+      *
+      * @tparam T
+      *      the input tuple type (usually a TuplePtr) for the operator.
+      * @param[in] func
+      *      a function pointer or lambda function representing the callback
+      *      that is invoked for each input tuple
+      * @return a reference to the pipe
+      */
+     template <typename T>
+     Pipe& notify(typename Notify<T>::CallbackFunc func) {
+       auto op = std::make_shared<Notify<T> >(func);
+       auto pOp = dynamic_cast<DataSource<T>*>(getPublisher().get());
+       BOOST_ASSERT_MSG(pOp != nullptr, "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
+       CREATE_LINK(pOp, op);
+       publishers.push_back(op);
+       return *this;
+     }
+
+    /**
      * @brief Creates a queue operator for decoupling operators.
      *
      * Creates a queue operator which allows to decouple two operators in the
@@ -456,6 +480,67 @@ namespace pfabric {
       publishers.push_back(op);
       return *this;
     }
+
+    /**
+      * @brief Creates an operator for calculating aggregates over the entire stream.
+      *
+      * Creates an operator for calculating a set of aggregates over the stream,
+      * possibly supported by a window. Depending on the parameters each input
+      * tuple triggers the calculating and produces a new aggregate value which
+      * is forwarded as a result tuple. The difference to the other aggregate
+      * function is that this method allows to specify the finalize and iterate
+      * method.
+      *
+      * The following example illustrates the usage of this method with the
+      * helper template classes Aggregator1:
+      * @code
+      * // calculate the sum of column #0
+      * typedef Aggregator1<T1, AggrSum<double>, 0> MyAggrState;
+      * typedef std::shared_ptr<MyAggrState> MyAggrStatePtr;
+      *
+      * // Aggregator1 defines already functions for finalize and iterate
+      * t->newStreamFrom...
+      *    .aggregate<T1, T2, MyAggrState> (std::make_shared<MyAggrState>(),
+      *                                    MyAggrState::finalize,
+      *                                    MyAggrState::iterate)
+      * @endcode
+      *
+      * @tparam Tin
+      *      the input tuple type (usually a TuplePtr) for the operator.
+      * @tparam Tout
+      *      the result tuple type (usually a TuplePtr) for the operator.
+      * @tparam AggrState
+      *      the type of representing the aggregation state as a subclass of
+      *      @c AggregationStateBase. There are predefined template classes
+      *      @c Aggregator1 ... @c AggregatorN which can be used directly here.
+      * @param[in] aggrStatePtr
+      *      an instance of the AggrState class which is used as prototype
+      * @param[in] finalFun
+      *    a function pointer for constructing the aggregation tuple
+      * @param[in] iterFun
+      *    a function pointer for increment/decrement (in case of outdated tuple)
+      *    the aggregate values.
+      * @param[in] tType
+      *    the mode for triggering the calculation of the aggregate (TriggerAll,
+      *    TriggerByCount, TriggerByTime, TriggerByTimestamp)
+      * @param[in] tInterval
+      *    the interval for producing aggregate tuples
+      * @return a reference to the pipe
+      */
+      template <typename Tin, typename Tout, typename AggrState>
+      Pipe& aggregate(std::shared_ptr<AggrState> aggrStatePtr,
+                     typename Aggregation<Tin, Tout, AggrState>::FinalFunc finalFun,
+                     typename Aggregation<Tin, Tout, AggrState>::IterateFunc iterFun,
+                     AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0) {
+       auto op = std::make_shared<Aggregation<Tin, Tout, AggrState> >(aggrStatePtr,
+             finalFun, iterFun, tType, tInterval);
+       auto pOp = dynamic_cast<DataSource<Tin>*>(getPublisher().get());
+       BOOST_ASSERT_MSG(pOp != nullptr,
+           "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
+       CREATE_LINK(pOp, op);
+       publishers.push_back(op);
+       return *this;
+     }
 
     /**
      * @brief Creates an operator for calculating grouped aggregates over the entire stream.

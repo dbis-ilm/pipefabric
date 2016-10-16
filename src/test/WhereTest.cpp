@@ -19,7 +19,7 @@ typedef Tuple< int, int, int > MyTuple;
 typedef TuplePtr< MyTuple > MyTuplePtr;
 
 /**
- * A simple test of the projection operator.
+ * A simple test of the filter operator.
  */
 TEST_CASE("Applying a filter to a tuple stream", "[Where]") {
 	std::vector<MyTuplePtr> input = {

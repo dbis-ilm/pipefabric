@@ -48,7 +48,7 @@ namespace pfabric {
 		/**
 		 * Creates a new notifier object.
 		 *
-		 * \param cb the callback which is invoked periodically.
+		 * @param cb the callback which is invoked periodically.
 		 */
 		DequeueNotifier(DequeueSignal::slot_type const& cb) : mInterrupted(new bool(false)) {
 			mDequeueCallback.connect(cb);
@@ -70,7 +70,7 @@ namespace pfabric {
 		/**
 		 * Checks the interrupted flag.
 		 *
-		 * \return true if the notifier is interrupted.
+		 * @return true if the notifier is interrupted.
 		 */
 		bool isInterrupted() { return *mInterrupted; }
 
@@ -85,10 +85,11 @@ namespace pfabric {
 		}
 
 	private:
-		std::unique_ptr<std::thread> mThread;              //< the notifier thread
-		std::shared_ptr<bool> mInterrupted;  //< flag for cancelling the thread (true if the thread can be stopped)
-		                                     //< note it has to be a shared pointer, because the object is copied during creating the thread.
-		DequeueSignal mDequeueCallback;      //< the callback which is invoked
+		std::unique_ptr<std::thread> mThread;  //< the notifier thread
+		std::shared_ptr<bool> mInterrupted;    //< flag for cancelling the thread (true if the thread can be stopped)
+		                                       //< note it has to be a shared pointer, because the object is
+																					 //< copied during creating the thread.
+		DequeueSignal mDequeueCallback;        //< the callback which is invoked
 	};
 
 	/**
@@ -97,6 +98,9 @@ namespace pfabric {
 	 * The Queue operator is used for decoupling tuple producer and consumer by inserting a tuple queue
 	 * between two operators and creating a separate consumer thread that waits for incoming tuples and forwards
 	 * them to the subscriber.
+	 *
+	 * @tparam StreamElement
+   *    the data stream element type which is processed
 	 */
 	template<class StreamElement>
 	class Queue : public UnaryTransform<StreamElement, StreamElement> { // use default unary transform
@@ -112,9 +116,7 @@ namespace pfabric {
 		/**
 		 * Frees all allocated resources, i.e. deletes the notifier thread.
 		 */
-		~Queue() {
-			// delete mNotifier;
-		}
+		~Queue() {}
 
 		/**
 		 * @brief Bind the callback for the data channel.
@@ -130,23 +132,22 @@ namespace pfabric {
 		 * This method is invoked when a punctuation arrives. It simply forwards the punctuation
 		 * to the subscribers as soon as the queue is empty.
 		 *
-		 * \param punctuation the incoming punctuation tuple
+		 * @param punctuation the incoming punctuation tuple
 		 */
 		void processPunctuation( const PunctuationPtr& punctuation ) {
 			while (!mQueue.empty()) ;
 			this->getOutputPunctuationChannel().publish(punctuation);
 		}
+
 		/**
 		 * Implements the callback invoked by the notifier thread. It reads the next tuple from the queue and
 		 * sends it to the publishers.
 		 *
-		 * \param sender a reference to the notifier object
+		 * @param sender a reference to the notifier object
 		 */
 		void dequeueTuple(DequeueNotifier& sender) {
 			StreamElement tp;
 			while (!mQueue.pop(tp) && !sender.isInterrupted()) ;
-			// TODO: is this still necessary??
-		//	StreamElement newTp(tp);
 			this->getOutputDataChannel().publish(tp, false);
 		}
 
@@ -154,18 +155,18 @@ namespace pfabric {
 	 * This method is invoked when a tuple arrives from the publisher. It inserts the incoming tuple
 	 * into the queue.
 	 *
-	 * \param data the incoming tuple
-	 * \param outdated indicates whether the tuple is new or invalidated now (outdated == true)
+	 * @param data the incoming tuple
+	 * @param outdated indicates whether the tuple is new or invalidated now (outdated == true)
 	 */
 	void processDataElement( const StreamElement& data, const bool outdated ) {
 		while (!mQueue.push(data));
 	}
 
 private:
-		boost::lockfree::spsc_queue<StreamElement, boost::lockfree::capacity<65535> > mQueue; //< a queue acting as concurrent buffer for tuples
-		std::unique_ptr<DequeueNotifier> mNotifier;    //< the notifier object which triggers the computation of aggregates periodically
-
-};
+		boost::lockfree::spsc_queue<StreamElement,
+		     boost::lockfree::capacity<65535> > mQueue; //< a queue acting as concurrent buffer for tuples
+		std::unique_ptr<DequeueNotifier> mNotifier;     //< the notifier object which triggers the dequeing
+		};
 }
 
 #endif

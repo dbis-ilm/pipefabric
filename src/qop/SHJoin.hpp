@@ -32,7 +32,7 @@
 
 
 namespace pfabric {
-  
+
   /**
    * \brief An operator implementing a symmetric hash join for computing equi-joins.
    *
@@ -58,19 +58,19 @@ namespace pfabric {
   typename ElementJoinTraits< ElementJoinImpl >::ResultElement>{
     private:
       PFABRIC_BINARY_TRANSFORM_TYPEDEFS(LeftInputStreamElement, RightInputStreamElement, typename ElementJoinTraits< ElementJoinImpl >::ResultElement);
-      
+
     public:
       /**
        * Typedef for the key extractor functions.
        */
       typedef std::function<KeyType(const LeftInputStreamElement&)> LKeyExtractorFunc;
       typedef std::function<KeyType(const RightInputStreamElement&)> RKeyExtractorFunc;
-      
+
       /**
        * Typedef for the pointer to a function implementing the join predicate.
        */
       typedef std::function< bool(const LeftInputStreamElement&, const RightInputStreamElement&) > JoinPredicateFunc;
-      
+
     private:
       /**
        * The type definition for our hash tables: we use the native Boost implementation.
@@ -78,23 +78,23 @@ namespace pfabric {
        */
       typedef boost::unordered_multimap< KeyType, LeftInputStreamElement > LHashTable;
       typedef boost::unordered_multimap< KeyType, RightInputStreamElement > RHashTable;
-      
+
       /// the join algorithm to be used for concatenating the input elements
       typedef ElementJoinTraits< ElementJoinImpl > ElementJoin;
-      
+
       /// a mutex for protecting join processing from concurrent sources
       typedef boost::mutex JoinMutex;
-      
+
       /// a scoped lock for the mutex
       typedef boost::lock_guard< JoinMutex > Lock;
-      
-      
+
+
     public:
-      
+
       /// the join result for two input elements
       typedef typename ElementJoin::ResultElement ResultElement;
-      
-      
+
+
       /**
        * Constructs a new hash join operator subscribing to two source operators producing the
        * left and right hand-side input data streams. The operator implements a symmetric hash join.
@@ -106,27 +106,27 @@ namespace pfabric {
       SHJoin( LKeyExtractorFunc lKeyFunc, RKeyExtractorFunc rKeyFunc, JoinPredicateFunc joinPred) :
       mJoinPredicate(joinPred), mLKeyExtractor(lKeyFunc), mRKeyExtractor(rKeyFunc) {
       }
-      
+
       /**
        * @brief Bind the callback for the left handside data channel.
        */
       BIND_INPUT_CHANNEL_DEFAULT( LeftInputChannel, SHJoin, processLeftDataElement );
-      
+
       /**
        * @brief Bind the callback for the data channel.
        */
       BIND_INPUT_CHANNEL_DEFAULT( RightInputChannel, SHJoin, processRightDataElement );
-      
+
       /**
        * @brief Bind the callback for the punctuation channel.
        */
       BIND_INPUT_CHANNEL_DEFAULT( InputPunctuationChannel, SHJoin, processPunctuation );
-      
-      
+
+
     private:
-      
+
       ////////////   channel callbacks   ////////////
-      
+
       /**
        * @brief This method is invoked when a data stream element arrives from the left input channel.
        *
@@ -140,11 +140,11 @@ namespace pfabric {
        */
       void processLeftDataElement( const LeftInputStreamElement& left, const bool outdated ) {
         Lock lock( mMtx );
-        
+
         // 1. insert the tuple in the corresponding hash table or remove it if outdated
         auto keyval = mLKeyExtractor( left );
         updateHashTable( mLTable, keyval, left, outdated, lock );
-        
+
         // 2. find join partners in the other hash table
         auto rightEqualElements = mRTable.equal_range(keyval);
         for (auto rightElementEntry = rightEqualElements.first; rightElementEntry != rightEqualElements.second; rightElementEntry++) {
@@ -152,7 +152,7 @@ namespace pfabric {
           joinTuples( left, rightElementEntry->second, outdated);
         }
       }
-      
+
       /**
        * @brief This method is invoked when a data stream element arrives from the right input channel.
        *
@@ -166,11 +166,11 @@ namespace pfabric {
        */
       void processRightDataElement( const RightInputStreamElement& right, const bool outdated ) {
         Lock lock( mMtx );
-        
+
         // 1. insert the tuple in the corresponding hash table or remove it if outdated
         auto keyval = mRKeyExtractor( right );
         updateHashTable( mRTable, keyval, right, outdated, lock );
-        
+
         // 2. find join partners in the other hash table
         auto leftEqualElements = mLTable.equal_range( keyval );
         for (auto leftElementEntry = leftEqualElements.first; leftElementEntry != leftEqualElements.second; leftElementEntry++) {
@@ -178,7 +178,7 @@ namespace pfabric {
           joinTuples( leftElementEntry->second, right, outdated);
         }
       }
-      
+
       /**
        * @brief This method is invoked when a punctuation arrives.
        *
@@ -190,10 +190,10 @@ namespace pfabric {
       void processPunctuation( const PunctuationPtr& punctuation ) {
         this->getOutputPunctuationChannel().publish( punctuation );
       }
-      
-      
+
+
       ////////////   helper methods   ////////////
-      
+
       /**
        * @brief Update a hash table for a new input element.
        *
@@ -217,7 +217,7 @@ namespace pfabric {
       static void updateHashTable( HashTable& hashTable, const key_t& key,
                                   const StreamElement& newElement, const bool outdated, const Lock& lock ) {
         boost::ignore_unused( lock );
-        
+
         if( !outdated ) {
           hashTable.insert( std::make_pair( key, newElement ) );
         }
@@ -226,7 +226,7 @@ namespace pfabric {
           auto equalElementEntry = equalElements.first;
           while (equalElementEntry != equalElements.second) {
             const auto& equalElement = equalElementEntry->second;
-            
+
             /*
              * TODO Question: Does one outdated tuple remove all equal ones?
              *                Equality check needed here? -> Doesn't the hash imply this?
@@ -240,7 +240,7 @@ namespace pfabric {
           }
         }
       }
-      
+
       /**
        * @brief Join two tuples and publish the result.
        *
@@ -261,8 +261,8 @@ namespace pfabric {
           this->getOutputDataChannel().publish( joinedTuple, outdated );
         }
       }
-      
-      
+
+
       LHashTable mLTable;               //< hash table for the lhs stream
       RHashTable mRTable;               //< hash table for the rhs stream
       JoinPredicateFunc mJoinPredicate; //< a pointer to the function implementing the join predicate
@@ -270,7 +270,7 @@ namespace pfabric {
       RKeyExtractorFunc mRKeyExtractor;         //< hash function for the rhs stream
       mutable JoinMutex mMtx;           //< mutex for synchronizing access to the hash tables
     };
-  
+
 } /* end namespace pfabric */
 
 

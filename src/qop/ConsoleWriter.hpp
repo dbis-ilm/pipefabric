@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2014 The PipeFabric team,
- *                    All Rights Reserved.
+ * Copyright (c) 2014-16 The PipeFabric team,
+ *                       All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -32,12 +32,14 @@
 namespace pfabric {
 
 /**
- * @brief TODO Doc
+ * @brief ConsoleWriter is an operator for printing stream elements to
+ * an output stream such as std::cout.
  *
- * TODO separate console writer from file writer!
- *      (+common factory interface if required by PipeFlow)
- * TODO extract formatter into separate functor classes (CSV, XML, binary, ...)
- *      and pass as template argument if static / constructor arg if dynamic
+ * ConsoleWriter is an operator for printing stream elements to
+ * an output stream. The output stream has to be a subclass of std::ostream
+ * (such as cout or cerr) and is assumed to be already opened. In addition
+ * to the output stream an optional formatter function can be specified that
+ * is used to format the output of each stream element.
  *
  * @tparam StreamElement
  *    the data stream element type consumed by the sink
@@ -53,13 +55,17 @@ private:
 PFABRIC_SYNC_SINK_TYPEDEFS(StreamElement)
 
 public:
-  /// TODO Doc
+  /// typedef for the formatter function
   typedef std::function< void (std::ostream&, const StreamElement&) > FormatterFunc;
 
   /**
-   * TODO Doc
-   * @param os
-   * @param streamElement
+   * @brief The default formatter function.
+	 *
+	 * @c defaultFormatter is the default formatter function for @c ConsoleWriter
+	 * which simply prints the stream element
+	 *
+   * @param os the output stream
+   * @param streamElement the stream element to be printed
    */
   static void defaultFormatter(std::ostream& os, const StreamElement& streamElement ) {
     // TODO access via element traits
@@ -68,10 +74,15 @@ public:
 
 
 	/**
-	 * TODO Doc
+	 * @brief Create a new instance of the ConsoleWriter operator.
 	 *
-	 * @param src
-	 * @param os
+	 * Create a new instance of the ConsoleWriter operator which sends all
+	 * incoming and not outdated tuples to the output stream (default std::cout).
+	 * Optionally, a formatter function can be specified.
+	 *
+	 * @param os the output stream (default: std::cout)
+	 * @param ffun pointer to the formatter function, if no function is given, the
+	 *        default formatter simply prints the stream element.
 	 */
 	ConsoleWriter(std::ostream& os = std::cout, FormatterFunc ffun = defaultFormatter ) :
 		mStream(os), mFormatterFunc(ffun) {
@@ -123,11 +134,11 @@ private:
 		boost::ignore_unused( punctuation );
 	}
 
-	std::ostream& mStream;
-	FormatterFunc mFormatterFunc;
+	std::ostream& mStream;         //< the stream for outputting the stream elements
+	FormatterFunc mFormatterFunc;  //< the formatter function
 };
 
-} /* end namespace pquery*/
+}
 
 
 #endif

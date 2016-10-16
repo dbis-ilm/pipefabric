@@ -50,7 +50,7 @@ namespace pfabric {
   };
 
   /**
-   * \brief An operator implementing a sliding or tumbling window on the
+   * @brief An operator implementing a sliding or tumbling window on the
    * input data stream.
    *
    * The window operator keeps a portion of the stream on which other
@@ -75,9 +75,10 @@ namespace pfabric {
     /**
      * Creates a new window operator instance with the given parameters.
      *
-     * \param wt the type of the window (range or row)
-     * \param sz the window size (seconds or number of tuples)
-     * \param ei the eviction interval, i.e., time for triggering the eviction (in milliseconds)
+     * @param func
+     * @param wt the type of the window (range or row)
+     * @param sz the window size (seconds or number of tuples)
+     * @param ei the eviction interval, i.e., time for triggering the eviction (in milliseconds)
      */
     Window(TimestampExtractorFunc func, const WindowParams::WinType& wt,
            const unsigned int sz, const unsigned int ei = 0) :

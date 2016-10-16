@@ -28,7 +28,7 @@
 namespace pfabric {
 
 /**
- * \brief An operator implementing the relational projection.
+ * @brief An operator implementing the relational projection.
  *
  * A projection operator produces tuples according to a given projection function.
  *
@@ -55,10 +55,12 @@ public:
 	typedef std::function< OutputStreamElement (const InputStreamElement&) > MapFunc;
 
 	/**
+	 * @brief Construct a new instance of the map (projection) operator.
+	 *
 	 * Create a new projection operator for evaluating the projection function
 	 * on each incoming tuple.
 	 *
-	 * \param pfun function pointer to a projection function
+	 * @param pfun function pointer to a projection function
 	 */
 	Map(MapFunc f) : mFunc(f) {}
 
@@ -106,6 +108,6 @@ private:
 	MapFunc mFunc;  //< function pointer to the projection function
 };
 
-} // namespace pquery
+} // namespace pfabric
 
 #endif

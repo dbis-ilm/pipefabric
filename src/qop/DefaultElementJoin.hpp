@@ -1,12 +1,26 @@
 /*
- * DefaultElementJoin.hpp
+ * Copyright (c) 2014-16 The PipeFabric team,
+ *                       All Rights Reserved.
  *
- *  Created on: Mar 15, 2015
- *      Author: fbeier
+ * This file is part of the PipeFabric package.
+ *
+ * PipeFabric is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License (GPL) as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; see the file LICENSE.
+ * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
  */
 
-#ifndef DEFAULTELEMENTJOIN_HPP_
-#define DEFAULTELEMENTJOIN_HPP_
+#ifndef DefaultElementJoin_hpp_
+#define DefaultElementJoin_hpp_
 
 
 #ifdef USE_LAZY_ELEMENT_JOIN
@@ -56,8 +70,8 @@ template<
 >
 using DefaultElementJoin = EagerElementJoin< LeftStreamElement, RightStreamElement, StreamElementFactory >;
 
-} /* end namespace pquery */
+}
 
 #endif
 
-#endif /* DEFAULTELEMENTJOIN_HPP_ */
+#endif /* DefaultElementJoin_hpp_ */

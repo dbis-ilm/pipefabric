@@ -18,8 +18,7 @@
  * along with this program; see the file LICENSE.
  * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
  */
-#include <vector>
-#include <future>
+
 
 #include "Topology.hpp"
 #include "qop/ZMQSource.hpp"
@@ -40,14 +39,13 @@ void Topology::registerStartupFunction(StartupFunc func) {
 void Topology::startAsync() {
   // create futures for waiting for the results
   // of the start functions
-  std::vector<std::future<unsigned long> > results;
+  std::lock_guard<std::mutex> guard(mMutex);
   for (auto sFunc : startupList) {
     // make sure the function is launched asynchronously in a separate thread
-    results.push_back(std::async(std::launch::async, sFunc));
+    startupFutures.push_back(std::async(std::launch::async, sFunc));
   }
-  // let's wait until the function finished
-  for(auto &f : results)
-    f.get();
+  asyncStarted = true;
+
 }
 
 void Topology::start(bool async) {
@@ -57,6 +55,16 @@ void Topology::start(bool async) {
     for (auto sFunc : startupList) {
       (sFunc)();
     }
+}
+
+void Topology::wait() {
+    if (!asyncStarted)
+      return;
+
+    std::lock_guard<std::mutex> guard(mMutex);
+    // let's wait until the function finished
+    for(auto &f : startupFutures)
+      f.get();
 }
 
 Pipe& Topology::newStreamFromFile(const std::string& fname) {

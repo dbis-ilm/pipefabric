@@ -26,7 +26,7 @@
 #include "qop/OperatorMacros.hpp"
 
 namespace pfabric {
-  
+
   /**
    * @brief A filter is a selection operator in a data stream.
    *
@@ -42,37 +42,37 @@ namespace pfabric {
   class Where : public UnaryTransform<StreamElement, StreamElement> {
   private:
     PFABRIC_UNARY_TRANSFORM_TYPEDEFS(StreamElement, StreamElement);
-    
+
   public:
-    
+
     /**
      * Typedef for a function pointer to a filter predicates.
      *
      * TODO make this a template argument for something more efficient like lambda type?
      */
     typedef std::function<bool(const StreamElement&, bool)> PredicateFunc;
-    
+
     /**
      * Create a new filter operator evaluating the given predicate
      * on each incoming tuple.
      *
-     * \param f function pointer to a filter predicate
+     * @param f function pointer to a filter predicate
      */
     Where(PredicateFunc f) : mFunc(f) {}
-    
+
     /**
      * @brief Bind the callback for the data channel.
      */
     BIND_INPUT_CHANNEL_DEFAULT(InputDataChannel, Where, processDataElement);
-    
+
     /**
      * @brief Bind the callback for the punctuation channel.
      */
     BIND_INPUT_CHANNEL_DEFAULT(InputPunctuationChannel, Where, processPunctuation);
-    
-    
+
+
   private:
-    
+
     /**
      * @brief This method is invoked when a punctuation arrives.
      *
@@ -84,7 +84,7 @@ namespace pfabric {
     void processPunctuation(const PunctuationPtr& punctuation) {
       this->getOutputPunctuationChannel().publish(punctuation);
     }
-    
+
     /**
      * @brief This method is invoked when a stream element arrives from the publisher.
      *
@@ -100,11 +100,11 @@ namespace pfabric {
         this->getOutputDataChannel().publish(data, outdated);
       }
     }
-    
-    
+
+
     PredicateFunc mFunc; //< function pointer to the filter predicate
   };
-  
+
 } // namespace pfabric
 
 #endif

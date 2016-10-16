@@ -1,12 +1,26 @@
 /*
- * DataSource.hpp
+ * Copyright (c) 2014-16 The PipeFabric team,
+ *                       All Rights Reserved.
  *
- *  Created on: Feb 13, 2015
- *      Author: fbeier
+ * This file is part of the PipeFabric package.
+ *
+ * PipeFabric is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License (GPL) as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; see the file LICENSE.
+ * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
  */
 
-#ifndef DATASOURCE_HPP_
-#define DATASOURCE_HPP_
+#ifndef DataSource_hpp_
+#define DataSource_hpp_
 
 #include "qop/BaseOp.hpp"
 #include "core/StreamElementTraits.hpp"
@@ -30,8 +44,6 @@ namespace pfabric {
  * @tparam SignalImpl
  *    the signal implementation for publishing produced data elements
  *    (default @c DefaultSourceSignal)
- *
- * @author Felix Beier <felix.beier@tu-ilmenau.de>
  */
 template<
 	typename StreamElement,
@@ -95,4 +107,4 @@ public:
 } /* end namespace pquery */
 
 
-#endif /* DATASOURCE_HPP_ */
+#endif /* DataSource_hpp_ */
