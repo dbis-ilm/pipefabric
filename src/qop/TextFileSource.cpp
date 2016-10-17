@@ -1,11 +1,9 @@
-// #include <boost/algorithm/string/find_iterator.hpp>
-// #include <boost/algorithm/string.hpp>
-
 #include <iostream>
 
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
 #include <boost/iostreams/filter/bzip2.hpp>
+#include <boost/algorithm/string.hpp>
 #include <boost/log/trivial.hpp>
 
 #include <fcntl.h>
@@ -142,7 +140,6 @@ for (p = (char*) f; (pch = (char*) strchr(p, '\n')); ++p) {
 	return ntuples;
 
 }
-/*
 unsigned long TextFileSource::readCompressedFile() {
 	std::string line;
 	unsigned long ntuples = 0;
@@ -163,12 +160,12 @@ unsigned long TextFileSource::readCompressedFile() {
 
 		in.push(file);
 
-		StringRef* data = new StringRef[nfields];
+		StringRef data;
 		while (getline(in, line)) {
-			parser((char*)line.c_str(), data);
+			data.setValues( const_cast<char *> (line.c_str()), line.size());
+			produceTuple(data);
 			ntuples++;
 		}
-    delete [] data;
 		file.close();
 
 	} catch (std::ifstream::failure e) {
@@ -176,18 +173,15 @@ unsigned long TextFileSource::readCompressedFile() {
 	}
 	return ntuples;
 }
-*/
+
 unsigned long TextFileSource::start() {
 	unsigned long ntuples = 0;
-/*
+
 	if (boost::algorithm::iends_with(fileName, ".gz")
 			|| boost::algorithm::iends_with(fileName, ".bz2"))
 		ntuples = readCompressedFile();
 	else
-		// ntuples = readMemoryMappedFile();
-		*/
-  // ntuples = readRawFile();
-  ntuples = readMemoryMappedFile();
+  	ntuples = readMemoryMappedFile();
 	// publish punctuation
 	producePunctuation(PunctuationPtr(new Punctuation(Punctuation::EndOfStream)));
 	return ntuples;

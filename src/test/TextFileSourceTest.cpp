@@ -55,3 +55,17 @@ TEST_CASE("Reading a file", "[TextFileSource]" ) {
   CREATE_LINK(fileSource, consumer);
   fileSource->start();
 }
+
+TEST_CASE("Reading a compressed file", "[TextFileSource]" ) {
+  // create a file of 1000 tuples (one tuple per line)
+  TestDataGenerator tData("test.csv");
+  tData.writeData(10000, true);
+  
+  auto fileSource = std::make_shared<TextFileSource>("test.csv.gz");
+  auto ntuples = fileSource->start();
+  REQUIRE(ntuples == 10000);
+
+  auto consumer = std::make_shared<TestConsumer>();
+  CREATE_LINK(fileSource, consumer);
+  fileSource->start();
+}

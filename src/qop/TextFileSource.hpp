@@ -82,7 +82,7 @@ protected:
 	 *
 	 * @return the number of tuples produced
 	 */
-	//unsigned long readCompressedFile();
+	unsigned long readCompressedFile();
 
 	/**
 	 * Read the tuples from a memory mapped file.
