@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2014 The PipeFabric team,
- *                    All Rights Reserved.
+ * Copyright (c) 2014-16 The PipeFabric team,
+ *                       All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -34,14 +34,16 @@
 
 namespace pfabric {
 
-	typedef Tuple<StringRef> TString;
-	typedef TuplePtr<TString> TStringPtr;
+	typedef Tuple<StringRef> TString;      //< a tuple containing a line of text
+	typedef TuplePtr<TString> TStringPtr;  //< tuple pointer
 
 /**
- * \brief a class encapsulating the implementation details of a FileSource, i.e. reading tuple data from a file.
+ * @brief TextFileSource is a source operator for reading a text file line by
+ *        line and producing a stream of tuples.
  *
- * FileSourceImpl encapsulates the implementation of the FileSource operator by doing all the file-related and
- * type-agnostic work and using callbacks of the actual FileSource template.
+ * A FileSource is an operator producing a stream of tuples which are extracted from a file.
+ * We assume a simple text file where a record is represented by a separate
+ * line. The operator produces a stream of @c TStringPtr elements.
  */
 class TextFileSource : public DataSource<TStringPtr> {
 public:
@@ -50,11 +52,7 @@ public:
 	/**
 	 * Creates a new FileSource implementation object for reading data from a file and producing tuples.
 	 *
-	 * \param fname the name of the file we read the data from
-	 * \param num_fields the number of fields to be read
-	 * \param sep the field separator
-	 * \param tcb a callback ( which is invoked for each read tuple
-	 * \param pcb a callback for punctuation
+	 * @param fname the name of the file we read the data from
 	 */
 	TextFileSource(const std::string& fname);
 
@@ -67,31 +65,48 @@ public:
 	 * Performs the actual processing by reading the file, parsing the input tuples and send
 	 * the to the subscribers. This method has to be invoked explicitly.
 	 *
-	 * \return the number of tuples produced
+	 * @return the number of tuples produced
 	 */
 	unsigned long start();
 
 protected:
+	/**
+	 * Read the tuples from a file using standard IO functions.
+
+	 * @return the number of tuples produced
+	 */
 	unsigned long readRawFile();
+
+	/**
+	 * Read the tuples from a compressed file.
+	 *
+	 * @return the number of tuples produced
+	 */
 	//unsigned long readCompressedFile();
+
+	/**
+	 * Read the tuples from a memory mapped file.
+	 *
+	 * @return the number of tuples produced
+	 */
 	unsigned long readMemoryMappedFile();
 
+	/**
+	 * Produce a tuple from the textline and send it to the subscribers.
+	 *
+	 * @param data the string representing the text line
+	 */
 	void produceTuple(const StringRef& data);
+
+	/**
+	 * Produce a punctuation tuple.
+	 *
+	 * @param pp the punctuation
+	 */
 	void producePunctuation(PunctuationPtr pp);
 
 	std::string fileName;        //< the name of the file we read the data from
 };
-
-/**
- * @brief an operator for reading tuples from a file.
- *
- * A FileSource is an operator producing a stream of tuples which are extracted from a file.
- * We assume a record-oriented file, i.e. each line represented a record where the fields are
- * separated by a delimiter string. The operator can also read compressed files (gzip or bzip2),
- * which is detected by appropriate file extensions (gz or bz2).
- * Note, that we assume that the template parameter is of type TuplePtr<T>.
- */
-
 
 }
 
