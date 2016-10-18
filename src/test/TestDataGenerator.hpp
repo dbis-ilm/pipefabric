@@ -7,8 +7,10 @@
 #include <boost/filesystem.hpp>
 #include <boost/iostreams/device/file.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
+#ifdef COMPRESSED_FILE_SOURCE
 #include <boost/iostreams/filter/gzip.hpp>
 #include <boost/iostreams/filter/bzip2.hpp>
+#endif
 #include <boost/iostreams/copy.hpp>
 #include <boost/algorithm/string.hpp>
  #include <boost/iostreams/stream.hpp>
@@ -31,6 +33,7 @@ public:
         // i << "," << "This is a string field" << "," << i * 100 + 0.5 << '\n';
     }
     ofs.close();
+#ifdef COMPRESSED_FILE_SOURCE
     if (compressed) {
       namespace io = boost::iostreams;
 
@@ -45,12 +48,15 @@ public:
       io::stream<io::file_sink> os(outfile);
       io::copy(fis, os);
     }
+#endif
   }
 
   void cleanup() {
     boost::filesystem::remove(fileName);
+#ifdef COMPRESSED_FILE_SOURCE
     if (isCompressed)
       boost::filesystem::remove(fileName + std::string(".gz"));
+#endif
   }
 
   private:

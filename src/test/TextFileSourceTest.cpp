@@ -56,6 +56,7 @@ TEST_CASE("Reading a file", "[TextFileSource]" ) {
   fileSource->start();
 }
 
+#ifdef COMPRESSED_FILE_SOURCE
 TEST_CASE("Reading a compressed file", "[TextFileSource]" ) {
   // create a file of 1000 tuples (one tuple per line)
   TestDataGenerator tData("test.csv");
@@ -69,3 +70,4 @@ TEST_CASE("Reading a compressed file", "[TextFileSource]" ) {
   CREATE_LINK(fileSource, consumer);
   fileSource->start();
 }
+#endif
