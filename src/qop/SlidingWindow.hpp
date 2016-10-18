@@ -31,10 +31,12 @@ namespace pfabric {
   /**
    * @brief  SlidingWindow implements a sliding window operator.
    *
-   * SlidingWindow represents a sliding window operator which invalidates tuples based on a given time interval.
-   * Each incoming tuple is forwarded to the output pipe and after the specified time interval (the window size)
-   * a corresponding outdated tuple is produced indicating the invalidation of the original tuple.
-   * Specifying an eviction interval != 0 allows the check the window periodically instead of evicting tuples only if
+   * SlidingWindow represents a sliding window operator which invalidates tuples
+   * based on a given time interval. Each incoming tuple is forwarded to the
+   * output pipe and after the specified time interval (the window size)
+   * a corresponding outdated tuple is produced indicating the invalidation of
+   * the original tuple. Specifying an eviction interval != 0 allows the
+   * check the window periodically instead of evicting tuples only if
    * new tuples arrive.
    */
   template<
@@ -46,21 +48,29 @@ namespace pfabric {
     /// the window base class
     typedef Window< StreamElement > WindowBase;
 
+    PFABRIC_BASE_TYPEDEFS(WindowBase, StreamElement);
+/*
     typedef typename WindowBase::InputDataChannel InputDataChannel;
     typedef typename WindowBase::InputPunctuationChannel InputPunctuationChannel;
     typedef typename WindowBase::InputDataElementTraits InputDataElementTraits;
-
+*/
 
   public:
 
     /**
-     * Creates a new sliding window operator instance with the given parameters.
+     * @brief Create a new sliding window operator instance with the given parameters.
      *
-     * \param wt the type of the window (range or row)
-     * \param sz the window size (seconds or number of tuples)
-     * \param ei ei the eviction interval, i.e., time for triggering the eviction (in milliseconds)
+     * Create a new sliding window operator of a given window type with a timestamp
+     * extractor function. This constructor should be mainly used with time-based
+     * windows (WindowParams::RangeWindow).
+     *
+     * @param func a function for extracting the timestamp value from the stream element
+     * @param wt the type of the window (range or row)
+     * @param sz the window size (seconds or number of tuples)
+     * @param ei ei the eviction interval, i.e., time for triggering the eviction (in milliseconds)
      */
-    SlidingWindow(typename Window<StreamElement>::TimestampExtractorFunc func, const WindowParams::WinType& wt,
+    SlidingWindow(typename Window<StreamElement>::TimestampExtractorFunc func,
+                  const WindowParams::WinType& wt,
                   const unsigned int sz, const unsigned int ei = 0) :
     WindowBase(func, wt, sz, ei ) {
       if (ei == 0) {
@@ -76,6 +86,16 @@ namespace pfabric {
       }
     }
 
+    /**
+     * @brief Create a new sliding window operator instance with the given parameters.
+     *
+     * Create a new sliding window operator of a given window . This constructor
+     * should be mainly used with row-based windows (WindowParams::RowWindow).
+     *
+     * @param wt the type of the window (range or row)
+     * @param sz the window size (seconds or number of tuples)
+     * @param ei ei the eviction interval, i.e., time for triggering the eviction (in milliseconds)
+     */
     SlidingWindow(const WindowParams::WinType& wt,
                   const unsigned int sz, const unsigned int ei = 0) :
     WindowBase(wt, sz, ei ) {
@@ -203,7 +223,6 @@ namespace pfabric {
     }
   };
 
-} /* end namespace pquery */
-
+}
 
 #endif

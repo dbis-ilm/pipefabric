@@ -22,30 +22,54 @@
 #ifndef OperatorMacros_hpp_
 #define OperatorMacros_hpp_
 
+#include <boost/preprocessor/cat.hpp>
+
 #include "core/StreamElementTraits.hpp"
 #include "pubsub/channels/ConnectChannels.hpp"
 
-// TODO put helper macros here
-
+/**
+ * Typedefs for an operator class which does not transform tuples (i.e. changing
+ * the tuple type) and is directly derived from DataSource.
+ */
 #define PFABRIC_SOURCE_TYPEDEFS(StreamElement) \
 typedef DataSource<StreamElement> SourceBase; \
 typedef typename SourceBase::OutputDataChannel OutputDataChannel; \
 typedef typename SourceBase::OutputPunctuationChannel OutputPunctuationChannel; \
 typedef typename SourceBase::OutputDataElementTraits OutputDataElementTraits;
 
-
+/**
+ * Typedefs for an operator class which does not transform tuples (i.e. changing
+ * the tuple type) and is directly derived from SynchronizedDataSink.
+ */
 #define PFABRIC_SYNC_SINK_TYPEDEFS(StreamElement) \
 typedef SynchronizedDataSink< StreamElement > SinkBase; \
 typedef typename SinkBase::InputDataChannel InputDataChannel; \
 typedef typename SinkBase::InputPunctuationChannel InputPunctuationChannel; \
 typedef typename SinkBase::InputDataElementTraits InputDataElementTraits;
 
+/**
+ * Typedefs for an operator class which does not transform tuples (i.e. changing
+ * the tuple type) and is directly derived from dDataSink.
+ */
 #define PFABRIC_SINK_TYPEDEFS(StreamElement) \
 typedef DataSink< StreamElement > SinkBase; \
 typedef typename SinkBase::InputDataChannel InputDataChannel; \
 typedef typename SinkBase::InputPunctuationChannel InputPunctuationChannel; \
 typedef typename SinkBase::InputDataElementTraits InputDataElementTraits;
 
+/**
+ * Typedefs for an operator class which does not transform tuples (i.e. changing
+ * the tuple type) and is  derived from a given BaseClass.
+ */
+#define PFABRIC_BASE_TYPEDEFS(BaseClass, StreamElement) \
+typedef typename BaseClass ::InputDataChannel InputDataChannel; \
+typedef typename BaseClass ::InputPunctuationChannel InputPunctuationChannel; \
+typedef typename BaseClass ::InputDataElementTraits InputDataElementTraits;
+
+/**
+ * Typedefs for an operator class which transforms tuples (i.e. changing
+ * the tuple type) and is derived from the @ UnaryTransform base class.
+ */
 #define PFABRIC_UNARY_TRANSFORM_TYPEDEFS(InputStreamElement, OutputStreamElement) \
 typedef UnaryTransform< InputStreamElement, OutputStreamElement > TransformBase; \
 typedef typename TransformBase::InputDataChannel InputDataChannel; \
@@ -55,6 +79,11 @@ typedef typename TransformBase::OutputDataChannel OutputDataChannel; \
 typedef typename TransformBase::OutputPunctuationChannel OutputPunctuationChannel; \
 typedef typename TransformBase::OutputDataElementTraits OutputDataElementTraits;
 
+/**
+ * Typedefs for an operator class which combines and transforms two input tuples
+ * into a single tuple of a new tuple type and is derived from
+ * the @ BinaryTransform base class.
+ */
 #define PFABRIC_BINARY_TRANSFORM_TYPEDEFS(LeftInputStreamElement, RightInputStreamElement, OutputStreamElement) \
 typedef BinaryTransform< LeftInputStreamElement, RightInputStreamElement, OutputStreamElement> TransformBase; \
 typedef typename TransformBase::LeftInputDataChannel LeftInputChannel; \
@@ -63,10 +92,17 @@ typedef typename TransformBase::InputPunctuationChannel InputPunctuationChannel;
 typedef typename TransformBase::OutputDataChannel OutputDataChannel; \
 typedef typename TransformBase::OutputPunctuationChannel OutputPunctuationChannel;
 
+/**
+ * Connects two operators with a publisher-subscriber link. Both the data and
+ * the punctuation channels are connected.
+ */
 #define CREATE_LINK(Publisher, Subscriber) \
 connectChannels(Publisher->getOutputDataChannel(), Subscriber->getInputDataChannel()); \
 connectChannels(Publisher->getOutputPunctuationChannel(), Subscriber->getInputPunctuationChannel());
 
+/**
+ * Connects two operators with a publisher-subscriber link. Only the data is used.
+ */
 #define CREATE_DATA_LINK(Publisher, Subscriber) \
 connectChannels(Publisher->getOutputDataChannel(), Subscriber->getInputDataChannel());
 
