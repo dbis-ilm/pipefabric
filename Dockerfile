@@ -50,6 +50,9 @@ RUN wget https://sourceforge.net/projects/boost/files/boost/1.62.0/boost_1_62_0.
 rm boost_1_62_0.tar.gz;
 RUN cd boost_1_62_0 && ./bootstrap.sh --prefix=/usr/local/boost && mkdir /usr/local/boost && ./b2 install
 
+# Cleanup
+RUN rm -fr /boost_1_62_0 zeromq-4.1.5 cmake-3.6.2
+
 # Add non-root user for container but give it sudo access.
 # Password is the same as the username
 RUN useradd -m ${CONTAINER_USER} && \
