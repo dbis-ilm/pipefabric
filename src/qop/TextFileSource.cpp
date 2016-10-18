@@ -1,8 +1,10 @@
 #include <iostream>
 
 #include <boost/iostreams/filtering_stream.hpp>
+#ifdef COMPRESSED_FILE_SOURCE
 #include <boost/iostreams/filter/gzip.hpp>
 #include <boost/iostreams/filter/bzip2.hpp>
+#endif
 #include <boost/algorithm/string.hpp>
 #include <boost/log/trivial.hpp>
 
@@ -146,6 +148,7 @@ unsigned long TextFileSource::readCompressedFile() {
 	std::ifstream file;
 	boost::iostreams::filtering_istream in;
 
+#ifdef COMPRESSED_FILE_SOURCE
 	try {
 		if (boost::algorithm::iends_with(fileName, ".gz")) {
 			file.open(fileName.c_str(),
@@ -171,6 +174,7 @@ unsigned long TextFileSource::readCompressedFile() {
 	} catch (std::ifstream::failure e) {
 		std::cerr << "exception opening/reading file" << std::endl;
 	}
+#endif
 	return ntuples;
 }
 

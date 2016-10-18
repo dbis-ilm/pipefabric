@@ -9,7 +9,7 @@ macro( build_executable arg )
     target_link_libraries( ${arg}
       pfabric_core
       ${Boost_SYSTEM_LIBRARY}
-       ${MALLOC_LIB}
+      ${MALLOC_LIB}
     )
 endmacro( build_executable )
 
