@@ -8,9 +8,11 @@ macro( build_executable arg )
     add_executable( ${arg} "${arg}.cpp" )
     target_link_libraries( ${arg}
       pfabric_core
+      ${Boost_IOSTREAMS_LIBRARY}
+      ${Boost_FILESYSTEM_LIBRARY}
       ${Boost_SYSTEM_LIBRARY}
       ${ZLIBS}
-       ${MALLOC_LIB}
+      ${MALLOC_LIB}
     )
 endmacro( build_executable )
 
