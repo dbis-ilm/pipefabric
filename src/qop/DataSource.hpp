@@ -104,7 +104,7 @@ public:
 };
 
 
-} /* end namespace pquery */
+} /* end namespace pfabric */
 
 
 #endif /* DataSource_hpp_ */

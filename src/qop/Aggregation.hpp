@@ -46,10 +46,11 @@ namespace pfabric {
    * interval is derived from the timestamps of the incoming tuples instead of the realtime clock.
    *
    * @tparam InputStreamElement
-   *    the data stream element type consumed by the projection
+   *    the data stream element type consumed by the aggregation
    * @tparam OutputStreamElement
-   *    the data stream element type produced by the projection
+   *    the data stream element type produced by the aggregation
    * @tparam AggregateState
+   *   the type of the aggregation state object
    */
   template<
     typename InputStreamElement,

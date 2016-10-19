@@ -1,12 +1,26 @@
 /*
- * UnaryTransform.hpp
+ * Copyright (c) 2014-16 The PipeFabric team,
+ *                       All Rights Reserved.
  *
- *  Created on: Feb 15, 2015
- *      Author: fbeier
+ * This file is part of the PipeFabric package.
+ *
+ * PipeFabric is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License (GPL) as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; see the file LICENSE.
+ * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
  */
 
-#ifndef UNARYTRANSFORM_HPP_
-#define UNARYTRANSFORM_HPP_
+#ifndef UnaryTransform_hpp_
+#define UnaryTransform_hpp_
 
 #include "qop/BaseOp.hpp"
 #include "qop/DataSource.hpp"
@@ -43,8 +57,6 @@ namespace pfabric {
  * @tparam SlotImpl
  *    the slot implementation for handling incoming data elements
  *    (default @c DefaultSlotFunction)
- *
- * @author Felix Beier <felix.beier@tu-ilmenau.de>
  */
 template<
 	typename InputStreamElement,
@@ -54,7 +66,6 @@ template<
 	template<typename...> class SlotImpl = DefaultSlotFunction
 >
 class UnaryTransform :
-	// public BaseOp, // inherit common runtime operator interface
 	public Sink<   // generate input channels
 		InputChannelParameters< // IN ID 0 - data channel
 			synchronized, SlotImpl, InputStreamElement, bool
@@ -64,34 +75,16 @@ class UnaryTransform :
 		>
 	>,
 	public DataSource<OutputStreamElement, SignalImpl>
-	/*
-	public Source< // generate output channels
-		OutputChannelParameters< // OUT ID 0 - data channel
-			SignalImpl, OutputStreamElement, bool
-		>,
-		OutputChannelParameters< // OUT ID 1 - punctuation channel
-			SignalImpl, PunctuationPtr
-		>
-	>
-	*/
 {
 private:
 
-	/// the base sink type providing the input channels
+	//< the base sink type providing the input channels
 
 	typedef Sink<
 		InputChannelParameters< synchronized, SlotImpl, InputStreamElement, bool >,
 		InputChannelParameters<	synchronized, SlotImpl, PunctuationPtr >
 	> SinkBase;
 
-
-	/// the base source type providing the output channels
-	/*
-	typedef Source< // generate output channels
-		OutputChannelParameters< SignalImpl, OutputStreamElement, bool >,
-		OutputChannelParameters< SignalImpl, PunctuationPtr	>
-	> SourceBase;
-*/
 public:
 
 	UnaryTransform( std::string name = "" ) :
@@ -99,23 +92,14 @@ public:
 	}
 
 
-	/// the common interface for all incoming data stream elements
+	//< the common interface for all incoming data stream elements
 	typedef StreamElementTraits< InputStreamElement > InputDataElementTraits;
 
-	/// the common interface for all outgoing data stream elements
-	// typedef StreamElementTraits< OutputStreamElement > OutputDataElementTraits;
-
-	/// the input channel type for incoming data elements
+	//< the input channel type for incoming data elements
 	IMPORT_INPUT_CHANNEL_TYPE( SinkBase, 0, InputDataChannel );
 
-	/// the input channel type for incoming punctuation tuples
+	//< the input channel type for incoming punctuation tuples
 	IMPORT_INPUT_CHANNEL_TYPE( SinkBase, 1, InputPunctuationChannel );
-
-	/// the output channel type for outgoing data elements
-	//IMPORT_OUTPUT_CHANNEL_TYPE( SourceBase, 0, OutputDataChannel );
-
-	/// the output channel type for outgoing punctuation tuples
-	//IMPORT_OUTPUT_CHANNEL_TYPE( SourceBase, 1, OutputPunctuationChannel );
 
 
 	/**
@@ -136,30 +120,9 @@ public:
 		return SinkBase::template getInputChannelByID< 1 >();
 	}
 
-
-	/**
-	 * @brief Get a reference to the operator's outgoing data channel.
-	 *
-	 * @return a reference to the outgoing data channel
-	 */
-	/*
-	OutputDataChannel& getOutputDataChannel() {
-		return SourceBase::template getOutputChannelByID< 0 >();
-	}
-*/
-	/**
-	 * @brief Get a reference to the operator's outgoing punctuation channel.
-	 *
-	 * @return a reference to the outgoing punctuation channel
-	 */
-	 /*
-	OutputPunctuationChannel& getOutputPunctuationChannel() {
-		return SourceBase::template getOutputChannelByID< 1 >();
-	}
-	*/
 };
 
-} /* end namespace pquery */
+}
 
 
-#endif /* UNARYTRANSFORM_HPP_ */
+#endif /* UnaryTransform_hpp_ */
