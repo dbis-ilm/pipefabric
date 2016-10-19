@@ -29,15 +29,17 @@
 namespace pfabric {
 
   /**
-   * @brief A filter is a selection operator in a data stream.
+   * @brief A ToTable operator stores stream elements in a given relational table.
    *
-   * A filter is a selection operator in a data stream. It forwards all tuples
-   * to its subscribers satisfying the given filter predicate.
-   * Because a filter does not modify the tuple structure, the template is parameterized
-   * only by one tuple type representing both input and output.
+   * The ToTable operator is a stream operator which stores tuples arriving
+   * from a stream in a given relational table. Depending on the existence
+   * of the key value, the tuple is newly inserted or an existing tuple is
+   * updated.
    *
    * @tparam StreamElement
-   *    the data stream element type which shall be filtered
+   *    the data stream element type which shall be stored in the table
+   * @tparam KeyType
+   *    the data type of the key for identifying tuples in the table
    */
   template<
     typename StreamElement,
@@ -48,16 +50,19 @@ namespace pfabric {
     PFABRIC_UNARY_TRANSFORM_TYPEDEFS(StreamElement, StreamElement);
 
   public:
+    //< Typedef for a pointer to the table.
     typedef std::shared_ptr<Table<StreamElement, KeyType>> TablePtr;
 
-    /// the function for calculating a grouping key for an incoming stream element
+    //< the function for deriving the key for an incoming stream element
   	typedef std::function< KeyType(const StreamElement&) > KeyFunc;
 
     /**
-     * Create a new filter operator evaluating the given predicate
-     * on each incoming tuple.
+     * Create a new ToTable operator to store incoming tuples in the
+     * given table.
      *
-     * \param f function pointer to a filter predicate
+     * @param tbl pointer to the table object
+     * @param func function pointer for deriving the key of the tuple
+     * @param autoCommit auto-commit mode
      */
     ToTable(TablePtr tbl, KeyFunc func, bool autoCommit = true) :
       mTable(tbl), mKeyFunc(func), mAutoCommit(autoCommit) {}
@@ -90,7 +95,8 @@ namespace pfabric {
     /**
      * @brief This method is invoked when a stream element arrives from the publisher.
      *
-     * It forwards the incoming stream element if it satisfies the filter predicate.
+     * It inserts or updates the tuple in the table. If the tuple is outdated
+     * it will be removed instead.
      *
      * @param[in] data
      *    the incoming stream element
@@ -109,9 +115,9 @@ namespace pfabric {
       this->getOutputDataChannel().publish(data, outdated);
     }
 
-    TablePtr mTable; //< function pointer to the filter predicate
-    KeyFunc mKeyFunc;
-    bool mAutoCommit;
+    TablePtr mTable;  //< function pointer to the table where tuples will be stored
+    KeyFunc mKeyFunc; //< pointer to the key extractor function
+    bool mAutoCommit; //< auto-commit mode
   };
 
 } // namespace pfabric

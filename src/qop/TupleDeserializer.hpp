@@ -29,14 +29,15 @@
 namespace pfabric {
 
   /**
-   * \brief An operator implementing the relational projection.
+   * @brief An operator for deserializing tuples from a byte array.
    *
-   * A projection operator produces tuples according to a given projection function.
+   * A TupleDeserializer takes in stream element that contains a byte array
+   * storing a serialized tuple and extracts the original tuple. This is mainly
+   * used for sending tuples via ZMQSink/ZMQSource or writing them to external
+   * storage.
    *
-   * @tparam InputStreamElement
-   *    the data stream element type consumed by the projection
    * @tparam OutputStreamElement
-   *    the data stream element type produced by the projection
+   *    the data stream element type produced by the deserializer
    */
   template<
   typename OutputStreamElement
@@ -49,10 +50,7 @@ namespace pfabric {
   public:
 
     /**
-     * Create a new projection operator for evaluating the projection function
-     * on each incoming tuple.
-     *
-     * \param pfun function pointer to a projection function
+     * Create a new TupleDeserializer operator.
      */
     TupleDeserializer() {}
 
@@ -84,7 +82,8 @@ namespace pfabric {
     /**
      * This method is invoked when a data stream element arrives.
      *
-     * It applies the projection function and forwards the projected element to its subscribers.
+     * It deserializes the tuple from the byte array @buf and forwards 
+     * the result to the subscribers.
      *
      * @param[in] data
      *    the incoming stream element
