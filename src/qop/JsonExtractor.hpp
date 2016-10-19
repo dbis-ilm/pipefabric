@@ -132,8 +132,9 @@ namespace pfabric {
     }
 
 
-    std::vector<std::string> mKeys;
-    StringTuple mData;
+    std::vector<std::string> mKeys;   //< a list of keys used to extract JSON data
+    StringTuple mData;                //< a tuple of string values used for intermediate
+                                      //< data but created only once
   };
 
 } // namespace pfabric

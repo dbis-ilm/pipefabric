@@ -28,9 +28,11 @@
 namespace pfabric {
 
   /**
-   * \brief An operator implementing the relational projection.
+   * @brief An operator for extracting tuple fields from a single string.
    *
-   * A projection operator produces tuples according to a given projection function.
+   * A TupleExtractor operator produces structured tuples of the given template
+   * type parameter type from a tuple consisting only of a single string. The
+   * separator character can be specified in the contstructor.
    *
    * @tparam OutputStreamElement
    *    the data stream element type produced by the extractor
@@ -46,14 +48,19 @@ namespace pfabric {
   public:
 
     /**
-     * Create a new projection operator for evaluating the projection function
-     * on each incoming tuple.
+     * Create a new TupleExtractor operator for transforming a string into
+     * a structured tuple with separate fields based on the given field
+     * separator.
      *
-     * \param pfun function pointer to a projection function
+     * @param separator the character for separating fields in the input string
      */
-    TupleExtractor(char separator = ',') : ifs(separator),
-    data(new StringRef[OutputDataElementTraits::NUM_ATTRIBUTES]) {}
+    TupleExtractor(char separator = ',') :
+      ifs(separator),
+      data(new StringRef[OutputDataElementTraits::NUM_ATTRIBUTES]) {}
 
+    /**
+     * Desctructor for deallocating resources.
+     */
     ~TupleExtractor() {
       delete [] data;
     }
@@ -83,9 +90,10 @@ namespace pfabric {
     }
 
     /**
-     * This method is invoked when a data stream element arrives.
-     *
-     * It applies the projection function and forwards the projected element to its subscribers.
+     * This method is invoked when a data stream element arrives. It splits the
+     * input string based on the separator character and tries to parse the
+     * values according to the template parameter type. The resulting tuple
+     * is then forwarded  to the subscribers.
      *
      * @param[in] data
      *    the incoming stream element
@@ -111,8 +119,9 @@ namespace pfabric {
     }
 
 
-    char ifs;  //< function pointer to the projection function
-    StringRef *data;
+    char ifs;         //< the field separator
+    StringRef *data;  //< a field of strings used to parse the values which is
+                      //< reused for all tuples
   };
 
 } // namespace pfabric

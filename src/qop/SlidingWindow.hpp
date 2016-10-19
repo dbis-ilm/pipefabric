@@ -38,6 +38,9 @@ namespace pfabric {
    * the original tuple. Specifying an eviction interval != 0 allows the
    * check the window periodically instead of evicting tuples only if
    * new tuples arrive.
+   *
+   * @tparam StreamElement
+   *    the data stream element type kept in the window
    */
   template<
   typename StreamElement
@@ -49,11 +52,6 @@ namespace pfabric {
     typedef Window< StreamElement > WindowBase;
 
     PFABRIC_BASE_TYPEDEFS(WindowBase, StreamElement);
-/*
-    typedef typename WindowBase::InputDataChannel InputDataChannel;
-    typedef typename WindowBase::InputPunctuationChannel InputPunctuationChannel;
-    typedef typename WindowBase::InputDataElementTraits InputDataElementTraits;
-*/
 
   public:
 
@@ -153,7 +151,7 @@ namespace pfabric {
       else {
         // insert the tuple into buffer
         {
-          boost::lock_guard<boost::mutex> guard(this->mMtx);
+          std::lock_guard<std::mutex> guard(this->mMtx);
           this->mTupleBuf.push_back(data);
           this->mCurrSize++;
         }
@@ -175,7 +173,7 @@ namespace pfabric {
      * window exceeds the given window size.
      */
     void evictByCount() {
-      boost::lock_guard<boost::mutex> guard(this->mMtx);
+      std::lock_guard<std::mutex> guard(this->mMtx);
       // as long as we have too many tuples ...
       while (this->mCurrSize > this->mWinSize) {
         const auto tup = this->mTupleBuf.front();
@@ -193,7 +191,7 @@ namespace pfabric {
      * most recent one in the window exceeds the given window size.
      */
     void evictByTime() {
-      boost::lock_guard<boost::mutex> guard(this->mMtx);
+      std::lock_guard<std::mutex> guard(this->mMtx);
       const auto& lastWindowElement = this->mTupleBuf.back();
       const Timestamp lastTupleTime = this->mTimestampExtractor( lastWindowElement );
 

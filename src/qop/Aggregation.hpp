@@ -61,8 +61,14 @@ namespace pfabric {
     PFABRIC_UNARY_TRANSFORM_TYPEDEFS(InputStreamElement, OutputStreamElement);
 
   public:
-    	typedef std::shared_ptr<AggregateState> AggregateStatePtr;
+    /**
+     * Typedef for pointer to the aggregation state
+     */
+    typedef std::shared_ptr<AggregateState> AggregateStatePtr;
 
+    /**
+     * Typedef for a function to extract the timestamp from a tuple
+     */
     typedef std::function<Timestamp(const InputStreamElement&)> TimestampExtractorFunc;
 
     /**
@@ -81,31 +87,61 @@ namespace pfabric {
 
 
     /**
-     * Creates a new aggregation operator which receives an input stream and applies the given aggregate function.
-     * If a slide_len > 0 is specified, the aggregate values are produced periodically (every slide_len seconds),
-     * with slide_len = 0 each input element triggers the publishing of an output element for the updated aggregate,
-     * and in case of slide_len = UINT_MAX the aggregates are produced as response to punctuation tuples.
+     * Create a new aggregation operator which receives an input stream and
+     * applies the given aggregate function incrementally. The behaviour is
+     * defined by the trigger type (all, timestamp, count - see PipeFabricTypes.hpp)
+     * and the trigger interval.
      *
-     * @param aggrs the aggregate state, i.e. a pointer to a class with members for all aggregates
-     * @param final_fun a function pointer to the aggregation function
-     * @param it_fun a function pointer to an iteration function called for each incoming tuple
-     * @param slen the time interval in seconds to produce aggregation tuples
+     * @param aggrs
+     *    the aggregate state, i.e. a pointer to a class with members for all aggregates
+     * @param final_fun
+     *    a function pointer to the aggregation function
+     * @param it_fun
+     *    a function pointer to an iteration function called for each incoming tuple
+     * @param tType
+     *    the trigger type specifying when an aggregation tuple is produced
+     *    (TriggerAll = for each incoming tuple,
+     *     TriggerByCount = as soon as a number of tuples (tInterval) are processed,
+     *     TriggerByTime = after every tInterval seconds,
+     *     TriggerByTimestamp = as for TriggerByTime but based on timestamp of the tuples
+     *                          and not based on real time)
+     * @param tInterval
+     *    the time interval in seconds to produce aggregation tuples (for trigger by timestamp)
+     *    or in the number of tuples (for trigger by count)
      */
     Aggregation( AggregateStatePtr aggrs, FinalFunc final_fun, IterateFunc it_fun,
                 AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0) :
-    mAggrState( dynamic_cast<AggregateState *>(aggrs->clone()) ), mIterateFunc( it_fun ), mFinalFunc( final_fun ),
-    mNotifier(tInterval > 0 && tType == TriggerByTime ?
-             new TriggerNotifier(std::bind(&Aggregation::notificationCallback, this), tInterval) : nullptr),
-    mLastTriggerTime(0), mTriggerType(tType), mTriggerInterval( tInterval ), mCounter(0) {
+                mAggrState( dynamic_cast<AggregateState *>(aggrs->clone()) ),
+                mIterateFunc( it_fun ),
+                mFinalFunc( final_fun ),
+                mNotifier(tInterval > 0 && tType == TriggerByTime ?
+                  new TriggerNotifier(std::bind(&Aggregation::notificationCallback, this), tInterval) : nullptr),
+                mLastTriggerTime(0), mTriggerType(tType), mTriggerInterval( tInterval ), mCounter(0) {
     }
 
+    /**
+     * Create a new aggregation operator which receives an input stream and
+     * applies the given aggregate function incrementally with a TriggerByTimestamp
+     * strategy.
+     *
+     * @param aggrs
+     *    the aggregate state, i.e. a pointer to a class with members for all aggregates
+     * @param final_fun
+     *    a function pointer to the aggregation function
+     * @param it_fun
+     *    a function pointer to an iteration function called for each incoming tuple
+     * @param func
+     *    a function for extracting the timestamp value from the stream element
+     * @param tInterval
+     *    the time interval in seconds to produce aggregation tuples
+     */
     Aggregation( AggregateStatePtr aggrs, FinalFunc final_fun, IterateFunc it_fun,
                 TimestampExtractorFunc func, const unsigned int tInterval) :
-    mAggrState( dynamic_cast<AggregateState *>(aggrs->clone()) ), mIterateFunc( it_fun ), mFinalFunc( final_fun ),
-    mTimestampExtractor(func),
-    mTriggerType(TriggerByTimestamp), mTriggerInterval( tInterval ),
-    mNotifier(nullptr),
-    mLastTriggerTime(0), mCounter(0) {
+                mAggrState( dynamic_cast<AggregateState *>(aggrs->clone()) ),
+                mIterateFunc( it_fun ), mFinalFunc( final_fun ),
+                mTimestampExtractor(func),
+                mTriggerType(TriggerByTimestamp), mTriggerInterval( tInterval ),
+                mNotifier(nullptr), mLastTriggerTime(0), mCounter(0) {
     }
 
     /**
@@ -122,9 +158,9 @@ namespace pfabric {
   private:
 
     /**
-     * This method is invoked when a data stream element arrives.
-     *
-     * TODO doc
+     * This method is invoked when a data stream element arrives. It updates
+     * the aggregate value incrementally and depending on the trigger strategy
+     * published the aggregate value.
      *
      * @param[in] data
      *    the incoming stream element
@@ -178,7 +214,6 @@ namespace pfabric {
      */
     void processPunctuation( const PunctuationPtr& punctuation ) {
       // if we receive a punctuation on expired slides we produce aggregates
-      // (but only if we don't have our own slide notifier) ...
       if( punctuation->ptype() == Punctuation::EndOfStream
          || punctuation->ptype() == Punctuation::WindowExpired
          || punctuation->ptype() == Punctuation::SlideExpired ) {
@@ -191,7 +226,7 @@ namespace pfabric {
   protected:
 
     /**
-     * @brief TODO doc
+     * Calculate the aggregate using the finalFunc and publish the result.
      */
     void produceAggregates() {
       std::lock_guard<std::mutex> guard(aggrMtx);
@@ -201,7 +236,8 @@ namespace pfabric {
     }
 
     /**
-     * A function called by the slide_notifier thread.
+     * A function called by the TriggerNotifier thread which periodically produces
+     * the aggregate value and a SlideExpired punctuation.
      */
     void notificationCallback() {
       this->produceAggregates();
@@ -209,18 +245,23 @@ namespace pfabric {
       this->getOutputPunctuationChannel().publish(punctuation);
     }
 
-    TimestampExtractorFunc mTimestampExtractor; //!< a pointer to the function for extracting the timestamp from the tuple
-    AggregateStatePtr mAggrState;               //!< a pointer to the object representing the aggregation state
-    mutable std::mutex aggrMtx;               //!< a mutex for synchronizing access between the trigger notifier thread
-                                                //!< and aggregation operator
-    IterateFunc mIterateFunc;                   //!< a pointer to the iteration function called for each tuple
-    FinalFunc mFinalFunc;                       //!< a  pointer to a function computing the final (or periodical) aggregates
-   // unsigned int mSlideLen;        //< TODO doc
-    std::unique_ptr<TriggerNotifier> mNotifier; //!< the notifier object which triggers the computation of aggregates periodically
-    Timestamp mLastTriggerTime;                 //!< the timestamp of the last aggregate publishing
-    AggregationTriggerType mTriggerType;        //!< the type of trigger activating the publishing of an aggregate value
-    unsigned int mTriggerInterval;              //!< the interval (time in seconds, number of tuples) for publishing aggregates
-    unsigned int mCounter;                      //!< the number of tuples processed since the last aggregate publishing
+    TimestampExtractorFunc mTimestampExtractor; //< a pointer to the function for extracting
+                                                //< the timestamp from the tuple
+    AggregateStatePtr mAggrState;               //< a pointer to the object representing the aggregation state
+    mutable std::mutex aggrMtx;                 //< a mutex for synchronizing access between
+                                                //< the trigger notifier thread and aggregation operator
+    IterateFunc mIterateFunc;                   //< a pointer to the iteration function called for each tuple
+    FinalFunc mFinalFunc;                       //< a  pointer to a function computing the final
+                                                //< (or periodical) aggregates
+    std::unique_ptr<TriggerNotifier> mNotifier; //< the notifier object which triggers the
+                                                //< computation of aggregates periodically
+    Timestamp mLastTriggerTime;                 //< the timestamp of the last aggregate publishing
+    AggregationTriggerType mTriggerType;        //< the type of trigger activating the publishing
+                                                //< of an aggregate value
+    unsigned int mTriggerInterval;              //< the interval (time in seconds, number of tuples)
+                                                //< for publishing aggregates
+    unsigned int mCounter;                      //< the number of tuples processed since the
+                                                //< last aggregate publishing
   };
 
 }

@@ -34,8 +34,9 @@ namespace pfabric {
   /**
    * @brief Helper class for operators which produce results periodically
    *
-   * TriggerNotifier is a helper class for operators which produce results periodically, e.g. aggregations. It invokes
-   * a given callback (implemented by a boost::signal) of the associated operator periodically.
+   * TriggerNotifier is a helper class for operators which produce results
+   * periodically, e.g. aggregations. It invokes a given callback (implemented by
+   * a boost::signal) of the associated operator periodically.
    */
   class TriggerNotifier {
   public:
@@ -45,10 +46,10 @@ namespace pfabric {
     typedef boost::signals2::signal<void ()> NotifierCallback;
 
     /**
-     * Creates a new notifier object.
+     * Create a new notifier object.
      *
-     * \param cb the callback which is invoked periodically.
-     * \param slen the time interval for notifications.
+     * @param cb the callback which is invoked periodically.
+     * @param slen the time interval for notifications.
      */
     TriggerNotifier(NotifierCallback::slot_type const& cb, unsigned int slen);
 
@@ -65,11 +66,11 @@ namespace pfabric {
 
   private:
     typedef std::unique_ptr< std::thread > ThreadPtr;
-    std::shared_ptr<bool> mInterrupted; /**< flag for cancelling the thread (true if the thread can be stopped)
-                                             note it has to be a shared pointer, because the object is copied during creating the thread. */
-    ThreadPtr mThread;          /**< the notifier thread */
-    NotifierCallback mCallback;	//< the callback which is invoked
-    unsigned int mTriggerInterval;     //< the time interval for notifications
+    std::shared_ptr<bool> mInterrupted; //< flag for cancelling the thread (true if the thread can be stopped)
+                                        //<  note it has to be a shared pointer, because the object is copied //< during creating the thread.
+    ThreadPtr mThread;                  //< the notifier thread
+    NotifierCallback mCallback;	        //< the callback which is invoked
+    unsigned int mTriggerInterval;      //< the time interval for notifications
   };
 }
 

@@ -27,12 +27,14 @@
 namespace pfabric {
 
   /**
-   * \brief  TumblingWindow implements a tumbling window operator.
+   * @brief  TumblingWindow implements a tumbling window operator.
    *
-   * TumblingWindow represents a window operator with tumbling window semantics where all tuples are
-   * outdated and the window is started from scratch as soon is the window size is exceeded.
-   * Specifying a slide length != 0 allows the check the window periodically instead of evicting tuples only if
-   * new tuples arrive.
+   * TumblingWindow represents a window operator with tumbling window semantics
+   * where all tuples are outdated and the window is started from scratch as
+   * soon is the window size is exceeded.
+   *
+   * @tparam StreamElement
+   *    the data stream element type kept in the window
    */
   template<
   typename StreamElement
@@ -43,16 +45,14 @@ namespace pfabric {
     /// the window base class
     typedef Window< StreamElement > WindowBase;
 
-    typedef typename WindowBase::InputDataChannel InputDataChannel;
-    typedef typename WindowBase::InputPunctuationChannel InputPunctuationChannel;
-    typedef typename WindowBase::InputDataElementTraits InputDataElementTraits;
-
+    PFABRIC_BASE_TYPEDEFS(WindowBase, StreamElement);
 
   public:
 
     /**
-     * Creates a new tumbling window operator instance with the given parameters.
+     * Create a new tumbling window operator instance with the given parameters.
      *
+     * @param func a function for extracting the timestamp value from the stream element
      * @param wt the type of the window (range or row)
      * @param sz the window size (seconds or number of tuples)
      */
@@ -63,17 +63,23 @@ namespace pfabric {
         this->mEvictFun = std::bind(&TumblingWindow::evictByCount, this);
       }
       else {
-        this->mEvictFun = boost::bind(&TumblingWindow::evictByTime, this);
+        this->mEvictFun = std::bind(&TumblingWindow::evictByTime, this);
       }
     }
 
+    /**
+     * Create a new tumbling window operator instance with the given parameters.
+     *
+     * @param wt the type of the window (range or row)
+     * @param sz the window size (seconds or number of tuples)
+     */
     TumblingWindow(const WindowParams::WinType& wt, const unsigned int sz ) :
     WindowBase(wt, sz, sz ) {
       if( this->mWinType == WindowParams::RowWindow ) {
-        this->mEvictFun = boost::bind(&TumblingWindow::evictByCount, this);
+        this->mEvictFun = std::bind(&TumblingWindow::evictByCount, this);
       }
       else {
-        this->mEvictFun = boost::bind(&TumblingWindow::evictByTime, this);
+        this->mEvictFun = std::bind(&TumblingWindow::evictByTime, this);
       }
     }
 
@@ -122,7 +128,7 @@ namespace pfabric {
       else {
         // insert the tuple into buffer
         {
-          boost::lock_guard<boost::mutex> guard(this->mMtx);
+          std::lock_guard<std::mutex> guard(this->mMtx);
           this->mTupleBuf.push_back(data);
           this->mCurrSize++;
         }
@@ -144,7 +150,7 @@ namespace pfabric {
      * window exceeds the given window size.
      */
     void evictByCount() {
-      boost::lock_guard<boost::mutex> guard(this->mMtx);
+      std::lock_guard<std::mutex> guard(this->mMtx);
 
       if (this->mCurrSize == this->mWinSize) {
         for (auto it = this->mTupleBuf.begin(); it != this->mTupleBuf.end(); it++) {
@@ -164,7 +170,7 @@ namespace pfabric {
      * most recent one in the window exceeds the given window size.
      */
     void evictByTime() {
-      boost::lock_guard<boost::mutex> guard(this->mMtx);
+      std::lock_guard<std::mutex> guard(this->mMtx);
       const auto& lastWindowElement = this->mTupleBuf.back();
       const Timestamp lastTupleTime = this->mTimestampExtractor( lastWindowElement );
 
@@ -193,7 +199,7 @@ namespace pfabric {
     }
   };
 
-} /* end namespace pquery */
+}
 
 
 #endif

@@ -19,7 +19,7 @@
  * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
  */
 
-#include <boost/thread.hpp>
+#include <thread>
 #include <boost/version.hpp>
 
 #include "Window.hpp"
@@ -32,7 +32,7 @@ using namespace pfabric;
 
 EvictionNotifier::EvictionNotifier(unsigned int ei, WindowParams::EvictionFunc& fun) :
 mInterrupted(new bool(false)), mEvictInterval(ei), mEvictFun(fun) {
-  mThread = std::make_shared< boost::thread >( *this );
+  mThread = std::make_shared< std::thread >( *this );
 }
 
 EvictionNotifier::~EvictionNotifier() {
@@ -45,6 +45,16 @@ EvictionNotifier::~EvictionNotifier() {
 }
 
 void EvictionNotifier::operator()() {
+  // loop until the interrupted flag is set to true
+  auto seconds = std::chrono::seconds(mEvictInterval);
+
+  while(!(*mInterrupted)) {
+    // let's wait ...
+    std::this_thread::sleep_for(seconds);
+    // invoke the callback
+    mEvictFun();
+  }
+/*
   while(!(*mInterrupted)) {
     // let's wait some time
     boost::xtime xt;
@@ -56,4 +66,5 @@ void EvictionNotifier::operator()() {
 		    mEvictFun();
     }
   }
+  */
 }

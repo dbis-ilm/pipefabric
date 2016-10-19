@@ -22,7 +22,8 @@
 #define Window_hpp_
 
 #include <list>
-#include <boost/thread.hpp>
+#include <thread>
+#include <mutex>
 #include <boost/assert.hpp>
 
 #include "qop/UnaryTransform.hpp"
@@ -59,6 +60,9 @@ namespace pfabric {
    * the time interval during a tuple is valid (and kept in the window).
    * Note, that this class provides only an interface, the actual window
    * implementations are done in specific subclasses.
+   *
+   * @tparam StreamElement
+   *    the data stream element type kept in the window
    */
   template<
   typename StreamElement
@@ -75,7 +79,7 @@ namespace pfabric {
     /**
      * Creates a new window operator instance with the given parameters.
      *
-     * @param func
+     * @param func a function for extracting the timestamp value from the stream element
      * @param wt the type of the window (range or row)
      * @param sz the window size (seconds or number of tuples)
      * @param ei the eviction interval, i.e., time for triggering the eviction (in milliseconds)
@@ -88,6 +92,16 @@ namespace pfabric {
                    );
     }
 
+    /**
+     * @brief Create a new  window operator instance with the given parameters.
+     *
+     * Create a new sliding window operator of a given window . This constructor
+     * should be mainly used with row-based windows (WindowParams::RowWindow).
+     *
+     * @param wt the type of the window (range or row)
+     * @param sz the window size (seconds or number of tuples)
+     * @param ei ei the eviction interval, i.e., time for triggering the eviction (in milliseconds)
+     */
     Window(const WindowParams::WinType& wt,
            const unsigned int sz, const unsigned int ei = 0) :
     mWinType(wt), mWinSize(sz), mEvictInterval(ei), mCurrSize(0), mDiffTime(0) {
@@ -99,30 +113,35 @@ namespace pfabric {
 
     typedef std::unique_ptr< EvictionNotifier > EvictionThread;
 
-    TimestampExtractorFunc mTimestampExtractor;
-    WindowParams::WinType mWinType;           //< the type of window
-    unsigned int mWinSize;                    //< the size of window (time or number of tuples)
-    unsigned int mEvictInterval;                   //< the slide length of window (time or number of tuples)
-    TupleList mTupleBuf;                      //< the actual window buffer
-    unsigned int mCurrSize;                   //< the current number of tuples in the window
-    Timestamp mDiffTime;                      //< ????
-    WindowParams::EvictionFunc mEvictFun;     //< a function implementing the eviction policy
-    EvictionThread mEvictThread;              //< the thread for running the eviction function (in case of a slide length > 0)
-    mutable boost::mutex mMtx;                //< mutex for accessing the tuple buffer
+    TimestampExtractorFunc mTimestampExtractor; //< a function for extracting timestamps from a tuple
+    WindowParams::WinType mWinType;             //< the type of window
+    unsigned int mWinSize;                      //< the size of window (time or number of tuples)
+    unsigned int mEvictInterval;                //< the slide length of window (time or number of tuples)
+    TupleList mTupleBuf;                        //< the actual window buffer
+    unsigned int mCurrSize;                     //< the current number of tuples in the window
+    Timestamp mDiffTime;                        //< for time-based window the window size in
+                                                //< number of microseconds
+    WindowParams::EvictionFunc mEvictFun;       //< a function implementing the eviction policy
+    EvictionThread mEvictThread;                //< the thread for running the eviction function
+                                                //< (if the eviction interval > 0)
+    mutable std::mutex mMtx;                    //< mutex for accessing the tuple buffer
   };
 
   /**
-   * \brief Helper class for the window operator
+   * @brief Helper class for the window operator
    *
-   * eviction_notifier is a helper class for the window operator to invoke the eviction function periodically.
+   * EvictionNotifier is a helper class for the window operator to
+   * invoke the eviction function periodically.
+   *
+   * TODO: why not using TriggerNotifier instead???
    */
   class EvictionNotifier {
   public:
     /**
-     * Creates a new notifier object.
+     * Create a new notifier object.
      *
-     * \param ei the eviction interval, i.e., time for triggering the eviction (in milliseconds)
-     * \param fun the eviction member function
+     * @param ei the eviction interval, i.e., time for triggering the eviction (in milliseconds)
+     * @param fun the eviction member function
      */
     EvictionNotifier(unsigned int ei, WindowParams::EvictionFunc& fun);
 
@@ -138,11 +157,12 @@ namespace pfabric {
     void operator()();
 
   private:
-    typedef std::shared_ptr< boost::thread > ThreadPtr;
-    std::shared_ptr<bool> mInterrupted; /**< flag for canceling the thread (true if the thread can be stopped)
-                                             note it has to be a shared pointer, because the object is copied during creating the thread. */
-    ThreadPtr mThread;                    /**< the notifier thread */
-    unsigned int mEvictInterval;               //< the time interval for notifications
+    typedef std::shared_ptr< std::thread > ThreadPtr;
+    std::shared_ptr<bool> mInterrupted;   //< flag for canceling the thread (true if the thread can be stopped)
+                                          //< note it has to be a shared pointer, because the object is copied
+                                          //< during creating the thread.
+    ThreadPtr mThread;                    //< the notifier thread
+    unsigned int mEvictInterval;          //< the time interval for notifications
     WindowParams::EvictionFunc mEvictFun; //< the eviction function we call periodically
   };
 
