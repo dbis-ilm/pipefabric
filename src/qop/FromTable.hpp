@@ -37,6 +37,18 @@
 
 namespace pfabric {
 
+  /**
+   * @brief A FromTable operator creates a stream of elements from updates
+   * on a relational table.
+   *
+   * The FromTable operator is an operator acting like a trigger which constructs
+   * a stream of tuples from updates on a given relational table.
+   *
+   * @tparam StreamElement
+   *    the data stream element type which shall be retrieve from the table
+   * @tparam KeyType
+   *    the data type of the key for identifying tuples in the table
+   */
   template<typename StreamElement, typename KeyType = DefaultKeyType>
   class FromTable : public DataSource<StreamElement> {
   public:
@@ -45,13 +57,20 @@ namespace pfabric {
     PFABRIC_SOURCE_TYPEDEFS(StreamElement);
 
 
-    FromTable(TablePtr tbl,
-      TableParams::NotificationMode mode = TableParams::Immediate) : mInterrupted(false)  {
+    /**
+     * Create a new FromTable operator that registers with the given table @c tbl
+     * and creates a stream of tuples from updates.
+     *
+     * @param tbl the table that is monitored
+     * @param mode the notification mode for updates
+     */
+    FromTable(TablePtr tbl, TableParams::NotificationMode mode = TableParams::Immediate) :
+      mInterrupted(false)  {
         tbl->registerObserver([this](const StreamElement& data, TableParams::ModificationMode m) {
           tableCallback(data, m);
         }, mode);
         mProducerThread = std::thread(&FromTable<StreamElement, KeyType>::producer, this);
-      }
+    }
 
     /**
      * Deallocates all resources.
@@ -68,12 +87,23 @@ namespace pfabric {
     }
 
   protected:
+    /**
+     * A callback method that is registered with the table and called on
+     * each update.
+     *
+     * @param data the actual tuple from the table
+     * @param mode the modification mode of the table
+     */
     void tableCallback(const StreamElement& data, TableParams::ModificationMode mode) {
       std::unique_lock<std::mutex> lock(mMtx);
       mQueue.push_back({ data, mode == TableParams::Insert});
       mCondVar.notify_one();
     }
 
+    /**
+     * Wait for tuples in the queue, remove them, and publish them as
+     * stream element. This method is executed by a separate thread.
+     */
     void producer() {
       while (!mInterrupted) {
         std::unique_lock<std::mutex> lock(mMtx);
@@ -86,11 +116,12 @@ namespace pfabric {
       }
     }
 
-    std::list<std::pair<StreamElement, bool>> mQueue;
-    std::mutex mMtx;
-    std::condition_variable mCondVar;
-    bool mInterrupted;
-    std::thread mProducerThread;
+    std::list<std::pair<StreamElement, bool>> mQueue; //< a queue of tuples to be published
+    std::mutex mMtx;                                  //< mutex for accessing the queue
+    std::condition_variable mCondVar;                 //< condition variable for waking up the producer
+    bool mInterrupted;                                //< flag for interrupting the producer thread
+    std::thread mProducerThread;                      //< the thread running the producer method
+                                                      //< to publish tuples
   };
 
 }
