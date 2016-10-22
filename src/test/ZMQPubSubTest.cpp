@@ -29,8 +29,8 @@ typedef TuplePtr< MyTuple > MyTuplePtr;
 /**
  * A simple test of the ZMQSource/ZMQSink operators.
  */
-TEST_CASE("Transfer a binary tuple stream via ZMQ", "[ZMQSink]") {
-	int numTuples = 10000;
+TEST_CASE("Transfer a binary tuple stream via ZMQ", "[ZMQSource][ZMQSink]") {
+	const int numTuples = 10000;
 
 	std::vector<MyTuplePtr> input;
 

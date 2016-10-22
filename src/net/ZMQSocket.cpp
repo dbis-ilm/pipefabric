@@ -6,7 +6,6 @@
  */
 
 #include <iostream>
-#include <boost/thread.hpp>
 #include "ZMQSocket.hpp"
 
 #define ZERO_COPY
@@ -59,7 +58,7 @@ void ZMQSocket::configureSocket(size_t len) {
 	case ZMQ_PULL:
 	case ZMQ_PUB:
 	case ZMQ_REP:
-		// mZMQSockPtr->setsockopt(ZMQ_SNDHWM, &value, sizeof(int));
+		mZMQSockPtr->setsockopt(ZMQ_SNDHWM, &value, sizeof(int));
 		mZMQSockPtr->bind(path);
 		break;
 	case ZMQ_SUB:

@@ -83,7 +83,7 @@ public:
 	}
 
 	int numTuplesProcessed() const { return tuplesProcessed; }
-	
+
 	/**
 	 * @brief Bind the callback for the data channel.
 	 */
@@ -97,6 +97,7 @@ public:
 private:
 
 	void processDataElement( const OutputStreamElement& data, const bool outdated ) {
+		// std::cout << "StreamMockup::processDataElement: " << data << std::endl;
 		REQUIRE(unsigned(tuplesProcessed) < expectedTuples.size());
 		REQUIRE(data->data() == expectedTuples[tuplesProcessed]->data());
 		tuplesProcessed++;

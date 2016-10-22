@@ -48,7 +48,7 @@
 #include "qop/SHJoin.hpp"
 #include "qop/ToTable.hpp"
 #include "cep/Matcher.hpp"
-
+#include "qop/ZMQSink.hpp"
 
 namespace pfabric {
 
@@ -278,6 +278,34 @@ namespace pfabric {
       BOOST_ASSERT_MSG(pOp != nullptr, "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
       CREATE_LINK(pOp, op);
       // we don't save the operator in publishers because FileWriter
+      // cannot act as Publisher
+      sinks.push_back(op);
+      return *this;
+    }
+
+    /**
+     * @brief Creates an operator for sending tuples via 0MQ.
+      *
+     * Creates an operator for sending tuples via 0MQ to another node.
+     *
+     * @tparam T
+     *      the input tuple type (usually a TuplePtr) for the operator.
+     * @param[in]path
+     *      the path (endpoint) describing the socket (see 0MQ documentation for details)
+     * @param[in] type
+     *      the type of communication pattern (publish-subscribe, push-pull)
+     * @param[in]
+     *      mode the encoding mode for messages (binary, ascii, ...)
+     * @return a reference to the pipe
+     */
+   template <typename T>
+   Pipe& sendZMQ(const std::string& path, ZMQParams::SinkType stype = ZMQParams::PublisherSink,
+       ZMQParams::EncodingMode mode = ZMQParams::BinaryMode) {
+      auto op = std::make_shared<ZMQSink<T> >(path, stype, mode);
+      auto pOp = dynamic_cast<DataSource<T>*>(getPublisher().get());
+      BOOST_ASSERT_MSG(pOp != nullptr, "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
+      CREATE_LINK(pOp, op);
+      // we don't save the operator in publishers because ZMQSink
       // cannot act as Publisher
       sinks.push_back(op);
       return *this;

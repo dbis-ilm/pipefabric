@@ -1,8 +1,22 @@
 /*
- * zmq_source.hpp
+ * Copyright (c) 2014-16 The PipeFabric team,
+ *                       All Rights Reserved.
  *
- *  Created on: 28 May 2013
- *      Author: Omran Saleh <omran.saleh@tu-ilmenau.de>
+ * This file is part of the PipeFabric package.
+ *
+ * PipeFabric is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License (GPL) as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; see the file LICENSE.
+ * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
  */
 
 #ifndef ZMQSource_hpp_
@@ -12,8 +26,6 @@
 #include <vector>
 #include <thread>
 #include <mutex>
-
-// #include <boost/thread.hpp>
 
 #include "core/Punctuation.hpp"
 #include "core/Tuple.hpp"
@@ -30,10 +42,15 @@
 
 namespace pfabric {
 
+/**
+ * Typedefs for a tuple containing only a byte array for serializing tuples.
+ */
 typedef Tuple<StreamType> TBuf;
 typedef TuplePtr<TBuf> TBufPtr;
+
 /**
- * a zeromq source (subscriber) to receive stream tuples from a socket
+ * ZMQSourceImpl provides the basic implementation of ZMQSource to
+ * receive tuples from socket.
  */
 class ZMQSourceImpl {
 public:
@@ -42,11 +59,15 @@ public:
   typedef std::function< void(PunctuationPtr) > PunctuationCallbackFunc;
 
 	/**
-	 * Constructor to assign a path for the socket, assign the schema and specify the type of encoding.
-	 *
-	 * @param path  the socket path  where AndunIn2 should receive the tuples
-	 * @param schema the schema of the stream
-	 * @param emode the type of encoding
+	 * Constructor for a ZMQSource implementation to assign a path for the socket,
+   * the type of source, and the encoding.
+   *
+	 * @param path  the socket path where we receive the tuples
+	 * @param stype the type of 0MQ source (pull or sink)
+	 * @param emode the type of encoding (binary or ascii)
+   * @param cb1 a callback function for receiving string tuples
+   * @param cb2 a callback function for receiving serialized tuples
+   * @param cb3 a callback function for receiving punctuations
 	 */
   ZMQSourceImpl(const std::string& path,
     ZMQParams::SourceType stype,
@@ -56,67 +77,74 @@ public:
     PunctuationCallbackFunc const& cb3);
 
 	/**
-	 * Destructor : release resources.
+	 * Destructor for releasing resources.
 	 */
 	~ZMQSourceImpl();
 
 	/**
-	 * start the zmq source (start the thread)
+	 * Start the processing.
 	 */
 	void start();
+
 	/**
-	 * stop the zmq source (start the thread)
+	 * Stop the processing.
 	 */
 	void stop();
+
 	/**
-	 * Interrupted or not
+	 * Check whether the processing was interrupted or not.
+   *
+   * @return true if processing was interrupted
 	 */
 	bool isInterrupted() const;
 
-	/**
-	 * for synchronizing this source with a publisher
-	 * the path of synchronization is the same address but the port is increased by one
-	 */
-//	void sync();
-
 private:
 
-	// void produceTuple(const std::string& sdata);
-
 	/**
-	 * try to receive and process incoming tuples
+	 * Try to receive and process incoming tuples.
+   *
 	 * @return number of received tuples
 	 */
 	unsigned long process();
 
- 	TStringCallbackFunc mTStringCB;
-	BufCallbackFunc mBufCB;
-	PunctuationCallbackFunc mPunctuationCB;
+  typedef std::unique_ptr< sock::ZMQSocket > ZMQSocketPtr;
 
-	typedef std::unique_ptr< sock::ZMQSocket > ZMQSocketPtr;
+ 	TStringCallbackFunc mTStringCB;          //<
+	BufCallbackFunc mBufCB;                  //<
+	PunctuationCallbackFunc mPunctuationCB;  //<
 
 	ZMQSocketPtr mSocket;                //< the subscriber socket
 	int mNumTuples;                      //< number tuple processed by the socket
 	ZMQParams::EncodingMode mMode;       //< the encoding mode
-	bool mInterrupted;
-  std::thread mSourceThread;             //< socket thread
-	mutable std::mutex mZmqMtx;
-	mutable std::mutex mStartMtx;
-	// boost::condition_variable mStarted;
-	ZMQParams::SourceType mType;
+	bool mInterrupted;                   //< a flag for interrupting
+  std::thread mSourceThread;           //< the socket  reader thread
+	mutable std::mutex mZmqMtx;          //<
+	mutable std::mutex mStartMtx;        //<
+	ZMQParams::SourceType mType;         //<
 };
 
+ /**
+  * ZMQSourceBase is the parametric base class for all ZMQSource classes
+  * providing only the basic functionality of an internal ZMQSourceBase
+  * instance.
+  *
+  * @tparam Tout
+  *         the data stream element type which is produced by the source
+  */
 	template<typename Tout>
 	class ZMQSourceBase : public DataSource<Tout> {
     PFABRIC_SOURCE_TYPEDEFS(Tout)
 
 	public:
 		/**
-		 * Constructor to assign a path for the socket, assign the schema and specify the type of encoding.
-		 *
-		 * @param path  the socket path  where AndunIn2 should receive the tuples
-		 * @param schema the schema of the stream
-		 * @param emode the type of encoding
+		 * Constructor to create a ZMQSourceBase object delegating the
+     * actual processing to a ZMQSourceImpl instance.
+     *
+     * @param path  the socket path where we receive the tuples
+  	 * @param stype the type of 0MQ source (pull or sink)
+  	 * @param emode the type of encoding (binary or ascii)
+     * @param cb1 a callback function for receiving string tuples
+     * @param cb2 a callback function for receiving serialized tuples
 	 */
 		ZMQSourceBase(const std::string& path,
               ZMQParams::SourceType stype = ZMQParams::SubscriberSource,
@@ -127,10 +155,18 @@ private:
         cb1, cb2,
         std::bind(&ZMQSourceBase::publishPunctuation, this, std::placeholders::_1))) {}
 
+    /**
+     * Stop the processing.
+     */
 		void stop() {
 			mImpl->stop();
 		}
 
+    /**
+     * Start the processing.
+     *
+     * @return always 0
+     */
     unsigned long start() {
       mImpl->start();
       return 0;
@@ -138,47 +174,93 @@ private:
 
 	protected:
 
+    /**
+     * Produce and forward a punctuation tuple. This method is used as callback
+     * for @c ZMQSourceImpl.
+     *
+     * @param pp the punctuation tuple
+     */
 		void publishPunctuation(PunctuationPtr pp) {
 			this->getOutputPunctuationChannel().publish(pp);
 		}
 
 	private:
-		std::unique_ptr< ZMQSourceImpl > mImpl;
+		std::unique_ptr< ZMQSourceImpl > mImpl; //< pointer to the actual implementation
 	};
 
+  /**
+   * ZMQSource is a source operator for receiving tuples via 0MQ and produce
+   * a stream of tuples. ZMQSource is a template class that can be type specialized
+   * for different wire formats ("encoding").
+   *
+   * @tparam T
+   *         the data stream element type which is produced by the source
+   */
   template<typename T>
   class ZMQSource : public ZMQSourceBase<T> {};
 
+  /**
+   * A type specialized implementation of ZMQSource for serialized tuples, i.e.
+   * tuples which are serialized into a byte array.
+   */
   template<>
   class ZMQSource<TBufPtr>  : public ZMQSourceBase<TBufPtr> {
     PFABRIC_SOURCE_TYPEDEFS(TBufPtr)
 
   public:
+    /**
+     * Constructor to create a ZMQSource for serialized tuples.
+     *
+     * @param path  the socket path where we receive the tuples
+     * @param stype the type of 0MQ source (pull or sink)
+     */
     ZMQSource(const std::string& path, ZMQParams::SourceType stype = ZMQParams::SubscriberSource) :
       ZMQSourceBase<TBufPtr>(path, stype, ZMQParams::BinaryMode,
         nullptr,
         std::bind(&ZMQSource<TBufPtr>::publishTuple, this, std::placeholders::_1)) {}
 
-        void publishTuple(TBufPtr tp) {
-    			this->getOutputDataChannel().publish(tp, false);
-    		}
+    /**
+     * Forward the tuple to all subscribers. This method is used as callback
+     * for @c ZMQSourceImpl.
+     *
+     * @param tp a serialized tuple that is published
+     */
+    void publishTuple(TBufPtr tp) {
+    	this->getOutputDataChannel().publish(tp, false);
+    }
 
 
   };
 
+  /**
+   * A type specialized implementation of ZMQSource for string tuples, i.e.
+   * tuples which are consists only of a single text line.
+   */
   template<>
   class ZMQSource<TStringPtr> : public ZMQSourceBase<TStringPtr> {
     PFABRIC_SOURCE_TYPEDEFS(TStringPtr)
 
   public:
+    /**
+     * Constructor to create a ZMQSource object for string tuples.
+     *
+     * @param path  the socket path where we receive the tuples
+     * @param stype the type of 0MQ source (pull or sink)
+   */
     ZMQSource(const std::string& path, ZMQParams::SourceType stype = ZMQParams::SubscriberSource) :
     ZMQSourceBase<TStringPtr>(path, stype, ZMQParams::AsciiMode,
       std::bind(&ZMQSource<TStringPtr>::publishTuple, this, std::placeholders::_1),
     nullptr) {}
 
-      void publishTuple(TStringPtr tp) {
-        this->getOutputDataChannel().publish(tp, false);
-      }
+    /**
+     * Forward the tuple to all subscribers. This method is used as callback
+     * for @c ZMQSourceImpl.
+     *
+     * @param tp a string tuple that is published
+     */
+    void publishTuple(TStringPtr tp) {
+      this->getOutputDataChannel().publish(tp, false);
+    }
 
   };
 }
