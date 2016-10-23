@@ -160,14 +160,14 @@ namespace pfabric {
      * @param[in] sz
      *      the window size (in number of tuples for row window or in milliseconds for range
      *      windows)
-     * @param[in] sd
-     *      @TODO
+     * @param[in] ei
+     *      the eviction interval, i.e., time for triggering the eviction (in milliseconds)
      * @return a reference to the pipe
      */
     template <typename T>
     Pipe& slidingWindow(const WindowParams::WinType& wt,
                         const unsigned int sz,
-                        const unsigned int sd = 0) {
+                        const unsigned int ei = 0) {
       typedef typename Window<T>::TimestampExtractorFunc ExtractorFunc;
       // we use a try block because the type cast of the timestamp extractor
       // could fail
@@ -178,10 +178,10 @@ namespace pfabric {
         if (wt == WindowParams::RangeWindow) {
           // a range window requires a timestamp extractor
           fn = boost::any_cast<ExtractorFunc>(timestampExtractor);
-          op = std::make_shared<SlidingWindow<T> >(fn, wt, sz, sd);
+          op = std::make_shared<SlidingWindow<T> >(fn, wt, sz, ei);
         }
         else
-          op =  std::make_shared<SlidingWindow<T> >(wt, sz, sd);
+          op =  std::make_shared<SlidingWindow<T> >(wt, sz, ei);
         addPublisher<SlidingWindow<T>, DataSource<T>>(op);
       }
       catch (boost::bad_any_cast &e) {
@@ -362,6 +362,7 @@ namespace pfabric {
       addPublisher<TupleDeserializer<T>, DataSource<TBufPtr> >(op);
       return *this;
     }
+
    /**
      * @brief Creates a filter operator for selecting tuples.
      *
