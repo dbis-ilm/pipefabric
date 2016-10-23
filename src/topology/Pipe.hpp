@@ -93,6 +93,14 @@ namespace pfabric {
      */
     BaseOpPtr getPublisher() const { return publishers.back(); }
 
+    template<typename Publisher, typename SinkType>
+    void addPublisher(std::shared_ptr<Publisher> op) {
+      auto pOp = dynamic_cast<SinkType*>(getPublisher().get());
+      BOOST_ASSERT_MSG(pOp != nullptr, "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
+      CREATE_LINK(pOp, op);
+      publishers.push_back(op);
+    }
+
   public:
     /**
      * @brief Destructor of the pipe.
@@ -174,11 +182,7 @@ namespace pfabric {
         }
         else
           op =  std::make_shared<SlidingWindow<T> >(wt, sz, sd);
-
-        auto pOp = dynamic_cast<DataSource<T>*>(getPublisher().get());
-        BOOST_ASSERT_MSG(pOp != nullptr, "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
-        CREATE_LINK(pOp, op);
-        publishers.push_back(op);
+        addPublisher<SlidingWindow<T>, DataSource<T>>(op);
       }
       catch (boost::bad_any_cast &e) {
         BOOST_ASSERT_MSG(false, "No TimestampExtractor defined for SlidingWindow.");
@@ -215,11 +219,7 @@ namespace pfabric {
         }
         else
           op = std::make_shared<TumblingWindow<T> >(wt, sz);
-
-        auto pOp = dynamic_cast<DataSource<T>*>(getPublisher().get());
-        BOOST_ASSERT_MSG(pOp != nullptr, "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
-        CREATE_LINK(pOp, op);
-        publishers.push_back(op);
+        addPublisher<TumblingWindow<T>, DataSource<T>>(op);
       }
       catch (boost::bad_any_cast &e) {
         BOOST_ASSERT_MSG(false, "No TimestampExtractor defined for TumblingWindow.");
@@ -326,10 +326,7 @@ namespace pfabric {
     template <class T>
     Pipe& extract(char sep) {
       auto op = std::make_shared<TupleExtractor<T> >(sep);
-      auto pOp = dynamic_cast<DataSource<TStringPtr>*>(getPublisher().get());
-      BOOST_ASSERT_MSG(pOp != nullptr, "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
-      CREATE_LINK(pOp, op);
-      publishers.push_back(op);
+      addPublisher<TupleExtractor<T>, DataSource<TStringPtr> >(op);
       return *this;
     }
 
@@ -348,10 +345,7 @@ namespace pfabric {
     Pipe& extractJson(const std::initializer_list<std::string>& keys) {
       std::vector<std::string> keyList(keys);
       auto op = std::make_shared<JsonExtractor<T> >(keyList);
-      auto pOp = dynamic_cast<DataSource<TStringPtr>*>(getPublisher().get());
-      BOOST_ASSERT_MSG(pOp != nullptr, "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
-      CREATE_LINK(pOp, op);
-      publishers.push_back(op);
+      addPublisher<JsonExtractor<T>, DataSource<TStringPtr> >(op);
       return *this;
     }
 
@@ -365,10 +359,7 @@ namespace pfabric {
     template <class T>
     Pipe& deserialize() {
       auto op = std::make_shared<TupleDeserializer<T> >();
-      auto pOp = dynamic_cast<DataSource<TBufPtr>*>(getPublisher().get());
-      BOOST_ASSERT_MSG(pOp != nullptr, "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
-      CREATE_LINK(pOp, op);
-      publishers.push_back(op);
+      addPublisher<TupleDeserializer<T>, DataSource<TBufPtr> >(op);
       return *this;
     }
    /**
@@ -387,10 +378,7 @@ namespace pfabric {
     template <typename T>
     Pipe& where(typename Where<T>::PredicateFunc func) {
       auto op = std::make_shared<Where<T> >(func);
-      auto pOp = dynamic_cast<DataSource<T>*>(getPublisher().get());
-      BOOST_ASSERT_MSG(pOp != nullptr, "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
-      CREATE_LINK(pOp, op);
-      publishers.push_back(op);
+      addPublisher<Where<T>, DataSource<T> >(op);
       return *this;
     }
 
@@ -410,10 +398,7 @@ namespace pfabric {
      template <typename T>
      Pipe& notify(typename Notify<T>::CallbackFunc func) {
        auto op = std::make_shared<Notify<T> >(func);
-       auto pOp = dynamic_cast<DataSource<T>*>(getPublisher().get());
-       BOOST_ASSERT_MSG(pOp != nullptr, "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
-       CREATE_LINK(pOp, op);
-       publishers.push_back(op);
+       addPublisher<Notify<T>, DataSource<T> >(op);
        return *this;
      }
 
@@ -432,10 +417,7 @@ namespace pfabric {
     template <typename T>
     Pipe& queue() {
       auto op = std::make_shared<Queue<T> >();
-      auto pOp = dynamic_cast<DataSource<T>*>(getPublisher().get());
-      BOOST_ASSERT_MSG(pOp != nullptr, "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
-      CREATE_LINK(pOp, op);
-      publishers.push_back(op);
+      addPublisher<Queue<T>, DataSource<T> >(op);
       return *this;
     }
 
@@ -457,10 +439,7 @@ namespace pfabric {
     template <typename Tin, typename Tout>
     Pipe& map(typename Map<Tin, Tout>::MapFunc func) {
       auto op = std::make_shared<Map<Tin, Tout> >(func);
-      auto pOp = dynamic_cast<DataSource<Tin>*>(getPublisher().get());
-      BOOST_ASSERT_MSG(pOp != nullptr, "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
-      CREATE_LINK(pOp, op);
-      publishers.push_back(op);
+      addPublisher<Map<Tin, Tout>, DataSource<Tin> >(op);
       return *this;
     }
 
@@ -551,11 +530,7 @@ namespace pfabric {
                      AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0) {
        auto op = std::make_shared<Aggregation<Tin, Tout, AggrState> >(std::make_shared<AggrState>(),
              finalFun, iterFun, tType, tInterval);
-       auto pOp = dynamic_cast<DataSource<Tin>*>(getPublisher().get());
-       BOOST_ASSERT_MSG(pOp != nullptr,
-           "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
-       CREATE_LINK(pOp, op);
-       publishers.push_back(op);
+       addPublisher<Aggregation<Tin, Tout, AggrState>, DataSource<Tin> >(op);
        return *this;
      }
 
@@ -629,11 +604,7 @@ namespace pfabric {
         auto op =
           std::make_shared<GroupedAggregation<Tin, Tout, AggrState, KeyType> >(aggrStatePtr,
               keyFunc, finalFun, iterFun, tType, tInterval);
-        auto pOp = dynamic_cast<DataSource<Tin>*>(getPublisher().get());
-        BOOST_ASSERT_MSG(pOp != nullptr,
-          "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
-          CREATE_LINK(pOp, op);
-          publishers.push_back(op);
+        addPublisher<GroupedAggregation<Tin, Tout, AggrState, KeyType>, DataSource<Tin> >(op);
       } catch (boost::bad_any_cast &e) {
         BOOST_ASSERT_MSG(false, "No KeyExtractor defined for groupBy.");
       }
@@ -665,11 +636,7 @@ namespace pfabric {
     	auto op = std::make_shared<Matcher<Tin, Tout, RelatedValueType>>(
 				Matcher<Tin, Tout, RelatedValueType>::FirstMatch);
     	op->setNFAController(nfa);
-    	auto pOp = dynamic_cast<DataSource<Tin>*>(getPublisher().get());
-    	BOOST_ASSERT_MSG(pOp != nullptr,
-    			"Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
-    	CREATE_LINK(pOp, op);
-    	publishers.push_back(op);
+      addPublisher<Matcher<Tin, Tout, RelatedValueType>, DataSource<Tin> >(op);
     	return *this;
     }
     /**
@@ -753,11 +720,7 @@ namespace pfabric {
         KeyExtractorFunc keyFunc = boost::any_cast<KeyExtractorFunc>(keyExtractor);
 
         auto op = std::make_shared<ToTable<T, KeyType> >(tbl, keyFunc, autoCommit);
-        auto pOp = dynamic_cast<DataSource<T>*>(getPublisher().get());
-        BOOST_ASSERT_MSG(pOp != nullptr,
-          "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
-        CREATE_LINK(pOp, op);
-        publishers.push_back(op);
+        addPublisher<ToTable<T, KeyType>, DataSource<T> >(op);
       } catch (boost::bad_any_cast &e) {
         BOOST_ASSERT_MSG(false, "No KeyExtractor defined for ToTable.");
       }
