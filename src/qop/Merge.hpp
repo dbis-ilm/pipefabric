@@ -35,11 +35,10 @@ namespace pfabric {
  * @tparam StreamElement
  *   the data stream element type consumed by Merge
  */
- // TODO: Synchronized!!
-template<typename StreamElement>
-class Merge : public UnaryTransform<StreamElement, StreamElement> /*, DefaultSourceSignal, true, DefaultSlotFunction> */ {
+ template<typename StreamElement>
+class Merge : public UnaryTransform<StreamElement, StreamElement, true> {
 private:
-	PFABRIC_UNARY_TRANSFORM_TYPEDEFS(StreamElement, StreamElement);
+	PFABRIC_SYNC_UNARY_TRANSFORM_TYPEDEFS(StreamElement, StreamElement);
 
 	/**
 	 * @brief Bind the callback for the data channel.

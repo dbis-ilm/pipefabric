@@ -27,27 +27,26 @@
 #include "core/Tuple.hpp"
 #include "qop/UnaryTransform.hpp"
 #include "qop/Queue.hpp"
-#include "qop/DataSink.hpp"
 
 namespace pfabric {
 
 
 /**
- * \brief an operator for partitioning the input stream and running subqueries in separate threads on each partition
+ * @brief PartitionBy is an operator for partitioning the input stream and
+ * running subqueries in separate threads on each partition.
  *
- * The PartitionSplit operator partitions the input stream on given partition id which is derived using a user-defined function
- * and forwards the tuples of each partition to a subquery which is constructed by the given QueryBuilder function.
+ * The PartitionBy operator partitions the input stream on given partition id
+ * which is derived using a user-defined function and forwards the tuples of
+ * each partition to a subquery. Subqueries are registered via their input channels
+ * for each partition id.
+ *
+ * @tparam StreamElement
+ *   the data stream element type consumed by Merge
  */
 template<typename StreamElement>
-class PartitionBy: public UnaryTransform<StreamElement, StreamElement> {
+class PartitionBy : public UnaryTransform<StreamElement, StreamElement> {
 public:
 	PFABRIC_UNARY_TRANSFORM_TYPEDEFS(StreamElement, StreamElement);
-
-	typedef DataSource<StreamElement> SourceBase;
-	typedef std::shared_ptr<SourceBase> SourcePtr;
-
-	typedef DataSink<StreamElement> SinkBase;
-	typedef std::shared_ptr<SinkBase> SinkPtr;
 
 	/**
 	 * Typedef for the partition id.
@@ -60,15 +59,13 @@ public:
 	typedef std::function<PartitionID(const StreamElement&)> PartitionFunc;
 
 	/**
-	 * Creates a new instance of the operator.
+	 * Create a new instance of the operator.
 	 *
-	 * \param pFun the function for deriving the partition id
-	 * \param qFun the function for constructing the subquery
-	 * \param mergeOp an operator instance for merging the results of the subquery and acting as the publisher for subsequent operators
-	 * \param numPartitions the number of partitions, if numPartitions == 0 then partitions are created on demand
+	 * @param pFun the function for deriving the partition id
+	 * @param numPartitions the number of partitions
 	 */
-	PartitionBy(unsigned int numPartitions, PartitionFunc pFun = nullptr) :
-			mNumPartitions(numPartitions), mFunc(pFun) {
+	PartitionBy(PartitionFunc pFun, unsigned int numPartitions) :
+			mFunc(pFun), mNumPartitions(numPartitions) {
 	}
 
 	/**
@@ -83,68 +80,75 @@ public:
 
 	/**
 	 * This method is invoked when a punctuation arrives. It simply forwards the punctuation
-	 * to the subscribers.
+	 * to all partitions.
 	 *
-	 * \param punctuation the incoming punctuation tuple
+	 * @param punctuation the incoming punctuation tuple
 	 */
 	void processPunctuation( const PunctuationPtr& punctuation ) {
-		// TODO
-		this->getOutputPunctuationChannel().publish(punctuation);
+		for (auto it : mPartitions) {
+			auto qop = it.second;
+			auto slot = qop->template getInputChannelByID<1>().getSlot();
+			slot(punctuation);
+		}
 	}
 
 	/**
 	 * This method is invoked when a tuple arrives from the publisher. It forwards the incoming tuple
 	 * to the corresponding partition.
 	 *
-	 * \param data the incoming tuple
-	 * \param c the channel at which we receive the tuple
-	 * \param outdated indicates whether the tuple is new or invalidated now (outdated == true)
+	 * @param data the incoming tuple
+	 * @param outdated indicates whether the tuple is new or invalidated now (outdated == true)
 	 */
 	void processDataElement(const StreamElement& data, const bool outdated) {
+		// first, we determine the partition id
 		PartitionID keyVal = mFunc(data);
 		typename PartitionTable::iterator it = mPartitions.find(keyVal);
 		if (it != mPartitions.end()) {
 			auto qop = it->second;
-			// we cannot simply call our publish method, because we want to inform
-			// only the operator child - all other subscribers are notified
-			// by their own thread
-			qop->template getOutputChannelByID<0>().publish(data, outdated);
+
+			// we cannot simply call our publish method, because we want to forward
+			// the data to the queue associated with this partition id
+			auto slot = qop->template getInputChannelByID<0>().getSlot();
+			slot(data, outdated);
 		}
 	}
 
 	/**
-	 * Creates a new subquery using the QueryBuilder function, connects its operators
-	 * accordingly, and registers it in the partition table.
+	 * Register an operator (i.e. its data and punctuation channel for a given
+   * partition id). All stream elements whose partition id (determined by the
+   * partitioning functio)n is equal to the given id are forwarded to this
+	 * data channel. Punctuations are always sent to all partitions.
 	 *
-	 * \param key the partition key
+	 * @param id the partition id
+   * @param dataChannel the input data channel of the operator associated with this partition
+	 * @param	punctuationChannel the input punctuation channel of the operator
 	 */
-	void setSubscriberForPartitionID(PartitionID id, SinkPtr subscriber) {
-		BOOST_ASSERT_MSG(id < mNumPartitions, "invalid partition id");
+	void connectChannelsForPartition(PartitionID id, InputDataChannel& dataChannel,
+				InputPunctuationChannel& punctuationChannel) {
+		BOOST_ASSERT_MSG(id >= 0 && id < mNumPartitions, "invalid partition id");
+		// we decouple the channels by introducing a Queue operator which
+		// runs the consumer side within a separate thread
+		auto queue = std::make_shared<Queue<StreamElement> >();
 
-		// first, we create a SourceBase as the root of the subquery
-		// because we need an operator whose OutputChannel can be accessed
-		// to send tuples
-		auto src = std::make_shared<SourceBase>();
+		// and connect the Queue to the given channels
+		connectChannels(queue->getOutputDataChannel(), dataChannel);
+		connectChannels(queue->getOutputPunctuationChannel(), punctuationChannel);
 
-		// then we decouple the subquery into a separate thread by introducing a Queue
-		auto queue = std::make_shared<Queue<StreamElement>>();
-		CREATE_LINK(src, queue);
-
-		// both operators are interconnected
-		CREATE_LINK(queue, subscriber); // <-- TODO
-		mPartitions.insert(std::make_pair(id, src));
+		// finally, we register the Queue in our hashtable
+		mPartitions.insert(std::make_pair(id, queue));
 	}
 
 protected:
 
 	/**
-	 * Typedef for the table mapping keys to partitions.
+	 * Typedef for the table mapping keys to partitions, i.e. the Queue instance.
 	 */
-	typedef boost::unordered_map<PartitionID, SourcePtr> PartitionTable;
+	typedef std::shared_ptr<Queue<StreamElement> > QueuePtr;
+	typedef boost::unordered_map<PartitionID, QueuePtr> PartitionTable;
 
-	PartitionTable mPartitions;  //< a hashtable for mapping parition ids to subqueries
-	unsigned int mNumPartitions; //< maximum number of partitions (subqueries) to be created
+	PartitionTable mPartitions;  //< a hashtable for mapping parition ids to Queue
 	PartitionFunc mFunc;         //< pointer to the function producing the partition id
+	unsigned int mNumPartitions; //< number of partitions
 };
 
 }

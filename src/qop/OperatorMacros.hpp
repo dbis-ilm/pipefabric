@@ -80,6 +80,19 @@ typedef typename TransformBase::OutputPunctuationChannel OutputPunctuationChanne
 typedef typename TransformBase::OutputDataElementTraits OutputDataElementTraits;
 
 /**
+ * Typedefs for an operator class which transforms tuples (i.e. changing
+ * the tuple type) and is derived from the @ UnaryTransform base class.
+ */
+#define PFABRIC_SYNC_UNARY_TRANSFORM_TYPEDEFS(InputStreamElement, OutputStreamElement) \
+typedef UnaryTransform< InputStreamElement, OutputStreamElement, true > TransformBase; \
+typedef typename TransformBase::InputDataChannel InputDataChannel; \
+typedef typename TransformBase::InputPunctuationChannel InputPunctuationChannel; \
+typedef typename TransformBase::InputDataElementTraits InputDataElementTraits; \
+typedef typename TransformBase::OutputDataChannel OutputDataChannel; \
+typedef typename TransformBase::OutputPunctuationChannel OutputPunctuationChannel; \
+typedef typename TransformBase::OutputDataElementTraits OutputDataElementTraits;
+
+/**
  * Typedefs for an operator class which combines and transforms two input tuples
  * into a single tuple of a new tuple type and is derived from
  * the @ BinaryTransform base class.

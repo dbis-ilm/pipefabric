@@ -24,6 +24,7 @@
 
 #include "qop/BaseOp.hpp"
 #include "qop/DataSource.hpp"
+#include "qop/DataSink.hpp"
 #include "pubsub/Sink.hpp"
 #include "pubsub/Source.hpp"
 #include "pubsub/signals/DefaultSlotFunction.hpp"
@@ -61,11 +62,12 @@ namespace pfabric {
 template<
 	typename InputStreamElement,
 	typename OutputStreamElement,
-	template< typename... > class SignalImpl = DefaultSourceSignal,
 	bool synchronized = false,
+	template< typename... > class SignalImpl = DefaultSourceSignal,
 	template<typename...> class SlotImpl = DefaultSlotFunction
 >
 class UnaryTransform :
+
 	public Sink<   // generate input channels
 		InputChannelParameters< // IN ID 0 - data channel
 			synchronized, SlotImpl, InputStreamElement, bool
@@ -74,6 +76,7 @@ class UnaryTransform :
 			synchronized, SlotImpl, PunctuationPtr
 		>
 	>,
+
 	public DataSource<OutputStreamElement, SignalImpl>
 {
 private:
@@ -84,14 +87,13 @@ private:
 		InputChannelParameters< synchronized, SlotImpl, InputStreamElement, bool >,
 		InputChannelParameters<	synchronized, SlotImpl, PunctuationPtr >
 	> SinkBase;
-
 public:
 
 	UnaryTransform( std::string name = "" ) :
 		SinkBase( name ), DataSource<OutputStreamElement, SignalImpl> ( name ) {
 	}
 
-
+#if 1
 	//< the common interface for all incoming data stream elements
 	typedef StreamElementTraits< InputStreamElement > InputDataElementTraits;
 
@@ -119,7 +121,7 @@ public:
 	InputPunctuationChannel& getInputPunctuationChannel() {
 		return SinkBase::template getInputChannelByID< 1 >();
 	}
-
+#endif
 };
 
 }

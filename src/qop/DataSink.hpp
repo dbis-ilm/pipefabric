@@ -133,7 +133,7 @@ template<
 using SynchronizedDataSink = DataSink< StreamElement, true, SlotImpl >;
 
 
-} /* end namespace pquery */
+} /* end namespace pfabric */
 
 
 #endif /* DataSink_hpp_ */

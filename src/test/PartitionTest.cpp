@@ -25,7 +25,9 @@ typedef TuplePtr< MyTuple > MyTuplePtr;
 /**
  * A test of the partition/merge operators.
  */
-TEST_CASE("Applying a filter to a tuple stream", "[Partition][Merge]") {
+TEST_CASE("Partitioning a data stream and merging the results.", "[Partition][Merge]") {
+
+	// we create some input data and the expected results for a filter "$0 % 2 == 0"
 	const int numTuples = 1000;
 
 	std::vector<MyTuplePtr> input, expected;
@@ -36,23 +38,38 @@ TEST_CASE("Applying a filter to a tuple stream", "[Partition][Merge]") {
 			expected.push_back(makeTuplePtr(i, i * 1.1, fmt::format("text{0}", i)));
 	}
 
+	// Due to the multi-threaded processing there is no guarantee that tuples
+	// arrive in the same order as produced. Thus, StreamMockup has to sort the
+	// the results using the given comparison function.
+	auto mockup = std::make_shared< StreamMockup<MyTuplePtr, MyTuplePtr> >(input, expected,
+		false, [] (const MyTuplePtr& lhs, const MyTuplePtr& rhs) {
+    return lhs->getAttribute<0>() < rhs->getAttribute<0>();
+	});
+
+	// create a PartitionBy instance with a partitioning function ($0 % 3)
+	auto partition = std::make_shared<PartitionBy<MyTuplePtr> >([&](const MyTuplePtr& tp) {
+		return tp->getAttribute<0>() % 3;
+	}, 3);
+	CREATE_DATA_LINK(mockup, partition);
+
+	// the filter predicate
 	auto filter_fun = [&]( const MyTuplePtr& tp, bool outdated ) -> bool {
+		// std::cout << "where: " << tp << std::endl;
 		return tp->getAttribute<0>() % 2 == 0;
 	};
 
-	auto mockup = std::make_shared< StreamMockup<MyTuplePtr, MyTuplePtr> >(input, expected);
-	auto partition = std::make_shared<PartitionBy<MyTuplePtr> >(3);
-	CREATE_DATA_LINK(mockup, partition);
-
+	// for each partition we create a filter operator and register it for one
+	// of the partition identifiers
 	auto wop1 = std::make_shared< Where<MyTuplePtr> >(filter_fun);
-	partition->setSubscriberForPartitionID(0, wop1);
+	partition->connectChannelsForPartition(0, wop1->getInputDataChannel(), wop1->getInputPunctuationChannel());
 
 	auto wop2 = std::make_shared< Where<MyTuplePtr> >(filter_fun);
-	partition->setSubscriberForPartitionID(1, wop2);
+	partition->connectChannelsForPartition(1, wop2->getInputDataChannel(), wop2->getInputPunctuationChannel());
 
 	auto wop3 = std::make_shared< Where<MyTuplePtr> >(filter_fun);
-	partition->setSubscriberForPartitionID(2, wop3);
+	partition->connectChannelsForPartition(2, wop3->getInputDataChannel(), wop3->getInputPunctuationChannel());
 
+	// finally, we create a merge operator to combine the results
 	auto merge = std::make_shared<Merge<MyTuplePtr> >();
 	CREATE_DATA_LINK(wop1, merge);
 	CREATE_DATA_LINK(wop2, merge);
@@ -61,4 +78,9 @@ TEST_CASE("Applying a filter to a tuple stream", "[Partition][Merge]") {
 	CREATE_DATA_LINK(merge, mockup);
 
 	mockup->start();
+
+	using namespace std::chrono_literals;
+	std::this_thread::sleep_for(1s);
+
+	REQUIRE(mockup->numTuplesProcessed() == numTuples / 2);
 }
