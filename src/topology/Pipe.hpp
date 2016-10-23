@@ -499,14 +499,7 @@ namespace pfabric {
      */
     template <typename Tin, typename Tout, typename AggrState>
     Pipe& aggregate(AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0) {
-      auto op = std::make_shared<Aggregation<Tin, Tout, AggrState> >(std::make_shared<AggrState>(),
-          AggrState::finalize, AggrState::iterate, tType, tInterval);
-      auto pOp = dynamic_cast<DataSource<Tin>*>(getPublisher().get());
-      BOOST_ASSERT_MSG(pOp != nullptr,
-        "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
-      CREATE_LINK(pOp, op);
-      publishers.push_back(op);
-      return *this;
+      return aggregate<Tin, Tout, AggrState>(AggrState::finalize, AggrState::iterate, tType, tInterval);
     }
 
     /**
@@ -528,8 +521,7 @@ namespace pfabric {
       *
       * // Aggregator1 defines already functions for finalize and iterate
       * t->newStreamFrom...
-      *    .aggregate<T1, T2, MyAggrState> (std::make_shared<MyAggrState>(),
-      *                                    MyAggrState::finalize,
+      *    .aggregate<T1, T2, MyAggrState> (MyAggrState::finalize,
       *                                    MyAggrState::iterate)
       * @endcode
       *
@@ -541,8 +533,6 @@ namespace pfabric {
       *      the type of representing the aggregation state as a subclass of
       *      @c AggregationStateBase. There are predefined template classes
       *      @c Aggregator1 ... @c AggregatorN which can be used directly here.
-      * @param[in] aggrStatePtr
-      *      an instance of the AggrState class which is used as prototype
       * @param[in] finalFun
       *    a function pointer for constructing the aggregation tuple
       * @param[in] iterFun
@@ -556,11 +546,10 @@ namespace pfabric {
       * @return a reference to the pipe
       */
       template <typename Tin, typename Tout, typename AggrState>
-      Pipe& aggregate(std::shared_ptr<AggrState> aggrStatePtr,
-                     typename Aggregation<Tin, Tout, AggrState>::FinalFunc finalFun,
+      Pipe& aggregate(typename Aggregation<Tin, Tout, AggrState>::FinalFunc finalFun,
                      typename Aggregation<Tin, Tout, AggrState>::IterateFunc iterFun,
                      AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0) {
-       auto op = std::make_shared<Aggregation<Tin, Tout, AggrState> >(aggrStatePtr,
+       auto op = std::make_shared<Aggregation<Tin, Tout, AggrState> >(std::make_shared<AggrState>(),
              finalFun, iterFun, tType, tInterval);
        auto pOp = dynamic_cast<DataSource<Tin>*>(getPublisher().get());
        BOOST_ASSERT_MSG(pOp != nullptr,
@@ -569,6 +558,34 @@ namespace pfabric {
        publishers.push_back(op);
        return *this;
      }
+
+     /**
+      * @brief Creates an operator for calculating grouped aggregates over the entire stream.
+      *
+      * Creates an operator implementing a groupBy together with aggregations which
+      * are represented internally by instances of AggregateState. The operator supports
+      * window-based aggregation by handling delete tuples accordingly.
+      *
+      * @tparam Tin
+      *      the input tuple type (usually a TuplePtr) for the operator.
+      * @tparam Tout
+      *      the result tuple type (usually a TuplePtr) for the operator.
+      *      the type of representing the aggregation state as a subclass of
+      *      @c AggregationStateBase. There are predefined template classes
+      *      @c Aggregator1 ... @c AggregatorN which can be used directly here.
+      * @tparam KeyType
+      *      the data type for representing keys (grouping values)
+      * @param[in] tType
+      *    the mode for triggering the calculation of the aggregate (TriggerAll,
+           TriggerByCount, TriggerByTime, TriggerByTimestamp)
+      * @param[in] tInterval
+      *    the interval for producing aggregate tuples
+      * @return a reference to the pipe
+      */
+     template <typename Tin, typename Tout, typename AggrState, typename KeyType = DefaultKeyType>
+     Pipe& groupBy(AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0) {
+       return groupBy<Tin, Tout, AggrState, KeyType>(AggrState::finalize, AggrState::iterate, tType, tInterval);
+    }
 
     /**
      * @brief Creates an operator for calculating grouped aggregates over the entire stream.

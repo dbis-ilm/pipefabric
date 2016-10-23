@@ -206,4 +206,4 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/"
 
 #-----------------------------------------------------------------------------------------
 #
-# add_subdirectory(demo)
+add_subdirectory(demo)
