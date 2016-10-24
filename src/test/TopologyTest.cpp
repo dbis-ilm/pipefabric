@@ -154,20 +154,26 @@ TEST_CASE("Building and running a topology with partitioning", "[Topology]") {
   tgen.writeData(1000);
 
   std::vector<int> results;
+  std::mutex r_mutex;
 
   Topology t;
   auto s = t.newStreamFromFile("file.csv")
     .extract<T1>(',')
-    // .keyBy<T1, int>([](auto tp) { return getAttribute<0>(tp); })
     .partitionBy<T1>([](auto tp) { return getAttribute<0>(tp) % 5; }, 5)
     .where<T1>([](auto tp, bool outdated) { return getAttribute<0>(tp) % 2 == 0; } )
     .map<T1,T2>([](auto tp) -> T2 { return makeTuplePtr(getAttribute<0>(tp)); } )
     .merge<T2>()
-    .notify<T2>([&](auto tp, bool outdated) { results.push_back(getAttribute<0>(tp)); } );
-  t.start(true);
-  std::cout << "done." << std::endl;
+    .notify<T2>([&](auto tp, bool outdated) {
+      std::lock_guard<std::mutex> lock(r_mutex);
+      int v = getAttribute<0>(tp);
+      results.push_back(v);
+    });
 
-  t.wait();
+  t.start(false);
+
+  using namespace std::chrono_literals;
+  std::this_thread::sleep_for(1s);
+
   REQUIRE(results.size() == 500);
 
   std::sort(results.begin(), results.end());

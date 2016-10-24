@@ -61,8 +61,9 @@ private:
 	 *    flag indicating whether the tuple is new or invalidated now
 	 */
 	void processDataElement( const StreamElement& data, const bool outdated ) {
-		this->getOutputDataChannel().publish( data, outdated );
+    this->getOutputDataChannel().publish( data, outdated );
 	}
+  
 	/**
 	 * @brief This method is invoked when a punctuation arrives.
 	 *
@@ -80,7 +81,7 @@ public:
 	 * source operator.
 	 */
 	Merge() {}
-
+ 
 };
 }
 

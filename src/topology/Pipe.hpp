@@ -109,7 +109,6 @@ namespace pfabric {
     BaseOpPtr getPublisher() { return publishers.back(); }
 
     BaseOpIterator getPublishers() {
-      std::cout << "getPublishers" << std::endl;
       return publishers.end() - numPartitions;
     }
 
@@ -125,13 +124,11 @@ namespace pfabric {
     void addPartitionedPublisher(std::vector<std::shared_ptr<Publisher>>& opList) {
       BOOST_ASSERT_MSG(partitioningState != NoPartitioning, "Missing PartitionBy operator in topology.");
       if (partitioningState == FirstInPartitioning) {
-        std::cout << "FirstInPartitioning" << std::endl;
         auto partition = dynamic_cast<PartitionBy<StreamElement> *>(getPublisher().get());
         BOOST_ASSERT_MSG(partition != nullptr,
           "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
         for (int i = 0; i < opList.size(); i++) {
           auto& op = opList[i];
-          std::cout << "op -> " << typeid(op).name() << std::endl;
           partition->connectChannelsForPartition(i,
             op->getInputDataChannel(),
             op->getInputPunctuationChannel());
@@ -139,14 +136,10 @@ namespace pfabric {
         partitioningState = NextInPartitioning;
       }
       else {
-        std::cout << "NextInPartitioning: " << publishers.size() << std::endl;
         auto iter = getPublishers();
-        std::cout << "\topList = " << opList.size() << std::endl;
         for (int i = 0; i < opList.size() && iter != publishers.end(); i++) {
           auto p = iter->get();
-          std::cout << "p[" << i << "]-> " << typeid(p).name() << std::endl;
           auto pOp = dynamic_cast<DataSource<StreamElement> *>(p);
-          std::cout << "pOp[" << i << "]-> " << typeid(pOp).name() << std::endl;
           BOOST_ASSERT_MSG(pOp != nullptr,
             "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
           CREATE_LINK(pOp, opList[i]);
