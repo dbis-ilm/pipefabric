@@ -20,7 +20,12 @@ namespace pfabric {
 
 class TestDataGenerator {
 public:
-  TestDataGenerator(const std::string& fname) : fileName(fname), isCompressed(false) {
+  TestDataGenerator(const std::string& fname) :
+  fileName(fname)
+#ifdef COMPRESSED_FILE_SOURCE
+  , isCompressed(false)
+#endif
+  {
   }
 
   ~TestDataGenerator() { cleanup(); }
@@ -61,7 +66,9 @@ public:
 
   private:
   std::string fileName;
+#ifdef COMPRESSED_FILE_SOURCE
   bool isCompressed;
+#endif  
 };
 
 }

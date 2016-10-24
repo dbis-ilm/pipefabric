@@ -47,6 +47,8 @@
 #include "qop/GroupedAggregation.hpp"
 #include "qop/SHJoin.hpp"
 #include "qop/ToTable.hpp"
+#include "qop/Merge.hpp"
+#include "qop/PartitionBy.hpp"
 #include "cep/Matcher.hpp"
 #include "qop/ZMQSink.hpp"
 
@@ -63,12 +65,25 @@ namespace pfabric {
   class Pipe {
     friend class Topology;
   private:
+    enum PartitioningState {
+        NoPartitioning,
+        FirstInPartitioning,
+        NextInPartitioning
+    } partitioningState;
+
+    /**
+     * Typedef for pointer to BaseOp (any PipeFabric operator).
+     */
     typedef std::shared_ptr<BaseOp> BaseOpPtr;
-    std::list<BaseOpPtr> publishers; // the list of all operators acting as publisher (source)
-    std::list<BaseOpPtr> sinks;     // the list of sink operators (which are not publishers)
+    typedef std::vector<BaseOpPtr> BaseOpList;
+    typedef BaseOpList::iterator BaseOpIterator;
+
+    BaseOpList publishers; // the list of all operators acting as publisher (source)
+    BaseOpList sinks;     // the list of sink operators (which are not publishers)
     /// Note, we need boost::any values here because the functions pointers are typed (via templates)
     boost::any timestampExtractor; // a function pointer to a timestamp extractor function
     boost::any keyExtractor;            // a function pointer to a key extractor function
+    unsigned int numPartitions;
 
     /**
      * @brief Constructor for Pipe.
@@ -78,7 +93,7 @@ namespace pfabric {
      * @param[in] op
      *     an operator producing the tuple for the this pipeline
      */
-    Pipe(BaseOpPtr op) {
+    Pipe(BaseOpPtr op) : partitioningState(NoPartitioning), numPartitions(0) {
       publishers.push_back(op);
     }
 
@@ -91,14 +106,55 @@ namespace pfabric {
      * @return
      *    the last operator in the publisher list
      */
-    BaseOpPtr getPublisher() const { return publishers.back(); }
+    BaseOpPtr getPublisher() { return publishers.back(); }
 
-    template<typename Publisher, typename SinkType>
+    BaseOpIterator getPublishers() {
+      std::cout << "getPublishers" << std::endl;
+      return publishers.end() - numPartitions;
+    }
+
+    template<typename Publisher, typename SourceType>
     void addPublisher(std::shared_ptr<Publisher> op) {
-      auto pOp = dynamic_cast<SinkType*>(getPublisher().get());
+      auto pOp = dynamic_cast<SourceType*>(getPublisher().get());
       BOOST_ASSERT_MSG(pOp != nullptr, "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
       CREATE_LINK(pOp, op);
       publishers.push_back(op);
+    }
+
+    template<typename Publisher, typename StreamElement>
+    void addPartitionedPublisher(std::vector<std::shared_ptr<Publisher>>& opList) {
+      BOOST_ASSERT_MSG(partitioningState != NoPartitioning, "Missing PartitionBy operator in topology.");
+      if (partitioningState == FirstInPartitioning) {
+        std::cout << "FirstInPartitioning" << std::endl;
+        auto partition = dynamic_cast<PartitionBy<StreamElement> *>(getPublisher().get());
+        BOOST_ASSERT_MSG(partition != nullptr,
+          "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
+        for (int i = 0; i < opList.size(); i++) {
+          auto& op = opList[i];
+          std::cout << "op -> " << typeid(op).name() << std::endl;
+          partition->connectChannelsForPartition(i,
+            op->getInputDataChannel(),
+            op->getInputPunctuationChannel());
+        }
+        partitioningState = NextInPartitioning;
+      }
+      else {
+        std::cout << "NextInPartitioning: " << publishers.size() << std::endl;
+        auto iter = getPublishers();
+        std::cout << "\topList = " << opList.size() << std::endl;
+        for (int i = 0; i < opList.size() && iter != publishers.end(); i++) {
+          auto p = iter->get();
+          std::cout << "p[" << i << "]-> " << typeid(p).name() << std::endl;
+          auto pOp = dynamic_cast<DataSource<StreamElement> *>(p);
+          std::cout << "pOp[" << i << "]-> " << typeid(pOp).name() << std::endl;
+          BOOST_ASSERT_MSG(pOp != nullptr,
+            "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
+          CREATE_LINK(pOp, opList[i]);
+          iter++;
+        }
+      }
+      for (auto& op : opList)
+        publishers.push_back(op);
     }
 
   public:
@@ -378,8 +434,17 @@ namespace pfabric {
      */
     template <typename T>
     Pipe& where(typename Where<T>::PredicateFunc func) {
-      auto op = std::make_shared<Where<T> >(func);
-      addPublisher<Where<T>, DataSource<T> >(op);
+      if (partitioningState == NoPartitioning) {
+        auto op = std::make_shared<Where<T> >(func);
+        addPublisher<Where<T>, DataSource<T> >(op);
+      }
+      else {
+        std::vector<std::shared_ptr<Where<T>>> ops;
+        for (int i = 0; i < numPartitions; i++) {
+          ops.push_back(std::make_shared<Where<T> >(func));
+        }
+        addPartitionedPublisher<Where<T>, T>(ops);
+      }
       return *this;
     }
 
@@ -439,8 +504,17 @@ namespace pfabric {
      */
     template <typename Tin, typename Tout>
     Pipe& map(typename Map<Tin, Tout>::MapFunc func) {
-      auto op = std::make_shared<Map<Tin, Tout> >(func);
-      addPublisher<Map<Tin, Tout>, DataSource<Tin> >(op);
+      if (partitioningState == NoPartitioning) {
+        auto op = std::make_shared<Map<Tin, Tout> >(func);
+        addPublisher<Map<Tin, Tout>, DataSource<Tin> >(op);
+      }
+      else {
+        std::vector<std::shared_ptr<Map<Tin, Tout>>> ops;
+        for (int i = 0; i < numPartitions; i++) {
+          ops.push_back(std::make_shared<Map<Tin, Tout>>(func));
+        }
+        addPartitionedPublisher<Map<Tin, Tout>, Tin>(ops);
+      }
       return *this;
     }
 
@@ -726,6 +800,31 @@ namespace pfabric {
         BOOST_ASSERT_MSG(false, "No KeyExtractor defined for ToTable.");
       }
 
+      return *this;
+    }
+
+    template <typename T>
+    Pipe& partitionBy(typename PartitionBy<T>::PartitionFunc pFun, unsigned int nPartitions) {
+      auto op = std::make_shared<PartitionBy<T>>(pFun, nPartitions);
+      addPublisher<PartitionBy<T>, DataSource<T> >(op);
+      partitioningState = FirstInPartitioning;
+      numPartitions = nPartitions;
+      return *this;
+    }
+
+    template <typename T>
+    Pipe& merge() {
+      auto op = std::make_shared<Merge<T> >();
+      std::cout << "partitioningState = " << partitioningState << std::endl;
+      BOOST_ASSERT_MSG(partitioningState == NextInPartitioning, "Nothing to merge in topology.");
+      for (auto iter = getPublishers(); iter != publishers.end(); iter++) {
+        auto pOp = dynamic_cast<DataSource<T> *>(iter->get());
+        BOOST_ASSERT_MSG(pOp != nullptr,
+          "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
+        CREATE_LINK(pOp, op);
+      }
+      publishers.push_back(op);
+      partitioningState = NoPartitioning;
       return *this;
     }
   };

@@ -93,9 +93,9 @@ public:
 		SinkBase( name ), DataSource<OutputStreamElement, SignalImpl> ( name ) {
 	}
 
-#if 1
 	//< the common interface for all incoming data stream elements
 	typedef StreamElementTraits< InputStreamElement > InputDataElementTraits;
+
 
 	//< the input channel type for incoming data elements
 	IMPORT_INPUT_CHANNEL_TYPE( SinkBase, 0, InputDataChannel );
@@ -121,7 +121,6 @@ public:
 	InputPunctuationChannel& getInputPunctuationChannel() {
 		return SinkBase::template getInputChannelByID< 1 >();
 	}
-#endif
 };
 
 }

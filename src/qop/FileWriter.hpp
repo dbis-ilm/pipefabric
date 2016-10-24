@@ -53,6 +53,7 @@ class FileWriter :
 private:
 	PFABRIC_SYNC_SINK_TYPEDEFS(StreamElement)
 
+public:
 	/// typedef for the formatter function
 	typedef std::function< void (std::ostream&, const StreamElement&) > FormatterFunc;
 
@@ -69,9 +70,6 @@ private:
 		// TODO access via element traits
 		os << streamElement << std::endl;
 	}
-
-
-public:
 
 	/**
 	 * @brief Create a new instance of the FileWriter operator.
