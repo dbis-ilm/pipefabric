@@ -38,14 +38,14 @@ a combination of attributes). Furthermore, tuples are not copied around but only
 For this purpose, the `TuplePtr<>` template is used. Thus, a complete schema definition for a stream
 looks like the following:
 
-```
+```C++
 typedef TuplePtr<Tuple<int, std::string, double> > T1;
 ```
 
 Tuples can be constructed using the `makeTuplePtr` function which of course requires correctly
 typed parameters:
 
-```
+```C++
 auto tp = makeTuplePtr(1, std::string("a string"), 2.0);
 ```
 
@@ -53,7 +53,7 @@ For accessing the individual components of an attribute we provide the `getAttri
 function where the template parameter is the position of the attribute in the tuple. In order to
 access the `string` component of tuple `tp` the following code an be used:
 
-```
+```C++
 auto s = getAttribute<1>(tp);
 ```
 
@@ -61,7 +61,7 @@ The recommended interface for implementing stream processing pipelines is the `T
 which allows to specify processing steps in a DSL very similar to Apache Spark. The following
 code snippet gives an example. See below for an explanation of the provided operators.
 
-```
+```C++
 typedef TuplePtr<Tuple<int, std::string, double> > T1;
 typedef TuplePtr<Tuple<double, int> > T2;
 
@@ -106,7 +106,7 @@ As an example we want to implement a simple dataflow receiving data via REST, ca
 
 First, we need to include the PipeFabric header file and should use the namespace.
 
-```
+```C++
 include "pfabric.hpp"
 
 using namespace pfabric;
@@ -114,7 +114,7 @@ using namespace pfabric;
 
 Next, we define the schema: the tuple types for representing input and output data:
 
-```
+```C++
 // the structure of tuples we receive via REST
 typedef TuplePtr<Tuple<int, double> > InTuple;
 
@@ -124,7 +124,7 @@ typedef TuplePtr<Tuple<double> > ResultTuple;
 
 And for the aggregation we have to define a type the captures the aggregation state.
 
-```
+```C++
 // the aggregate operator needs a state object that is defined here:
 // template parameters are:
 //     * the input type,
@@ -144,7 +144,7 @@ for sending results to `std::cout` and start the topology. The default mode of
 starting is asynchronously, therefore we invoke `wait()` to wait until the execution
 is finished (which will never happen in this example).
 
-```
+```C++
 int main(int argc, char **argv) {
   PFabricContext ctx;
 
@@ -163,7 +163,7 @@ int main(int argc, char **argv) {
 
 After starting the program with `./RestDemo` we can send some data via `curl`:
 
-```
+```C++
 curl -H "Content-Type: application/json" \
      -X POST -d '{"key": "xyz", "data": "1.0"}' \
      http://localhost:8099/publish
@@ -181,7 +181,7 @@ components of your application. This is achieved very easily by using the
 `notify` operator which invokes your code (e.g. a lambda function) for each
 incoming tuple. Thus, the example above can be modified:
 
-```
+```C++
 auto s = t->newStreamFromREST(8099, "^/publish$", RESTSource::POST_METHOD)
   ...
   .notify<ResultTuplePtr>([&](auto tp, bool outdated) {
@@ -189,16 +189,39 @@ auto s = t->newStreamFromREST(8099, "^/publish$", RESTSource::POST_METHOD)
   });
 
 ```
+### Partitioning for multithreaded processing ###
+
+PipeFabric provides two basic operators for supporting stream partitioning on
+a multicore machine: `partitionBy` splits a stream into sub-streams which are sent
+to different instances of the subsequent operators in the dataflow and `merge` combines
+the resulting substreams into a single one. In the following example a stream
+is created from a file and after transforming the tuples the stream is split into
+5 sub-streams based on the given partitioning function. Hence, the `where` and `map`
+operators are processing in 5 separate threads on the partitions of the stream:
+
+```C++
+auto s = t->newStreamFromFile()
+  .extract<Tin>(',')
+  .partitionBy<Tin>([](auto tp) { return getAttribute<0>(tp) % 5; }, 5)
+  .where<Tin>([](auto tp, bool outdated) { return getAttribute<0>(tp) % 2 == 0; } )
+  .map<Tin, Tout>([](auto tp) -> Tout { return makeTuplePtr(getAttribute<0>(tp)); } )
+  .merge<Tout>()
+```
+
+Finally, the partitions are merged into a single stream.
 
 ### Docker ###
 
-For your convenience we provide a docker image with all the necessary libraries and a precompiled PipeFabric. This Dockerfile is based on Dan Liew cxxdev image. Simply download the Dockerfile and run
+For your convenience we provide a docker image with all the necessary libraries
+and a precompiled PipeFabric. This Dockerfile is based on Dan Liew cxxdev image.
+Simply download the Dockerfile and run
 
 ```
 docker build -t cxxdev .
 ```
 
-After some time needed to fetch all packages, building Boost, CMake, ZMQ, and PipeFabric you can start working with
+After some time needed to fetch all packages, building Boost, CMake, ZMQ, and
+PipeFabric you can start working with
 
 ```
 docker run -i -t cxxdev /bin/bash
