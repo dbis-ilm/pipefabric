@@ -81,6 +81,8 @@ public:
 	 */
 	BIND_INPUT_CHANNEL_DEFAULT( InputPunctuationChannel, PartitionBy, processPunctuation );
 
+	const std::string opName() const override { return std::string("PartitionBy"); }
+
 	/**
 	 * This method is invoked when a punctuation arrives. It simply forwards the punctuation
 	 * to all partitions.

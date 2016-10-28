@@ -39,6 +39,7 @@
 #include "qop/FromTable.hpp"
 
 #include "topology/Pipe.hpp"
+#include "topology/Dataflow.hpp"
 
 namespace pfabric {
 
@@ -80,6 +81,8 @@ namespace pfabric {
     std::vector<std::future<unsigned long> > startupFutures; //< futures for the startup functions
     std::mutex mMutex;                    //< mutex for accessing startupFutures
 
+    DataflowPtr dataflow;
+
     /**
      * @brief Registers a startup function for initiating the processing.
      *
@@ -102,7 +105,7 @@ namespace pfabric {
     /**
      * @brief Constructs a new empty topology.
      */
-    Topology() : asyncStarted(false) {}
+    Topology() : asyncStarted(false), dataflow(make_shared<Dataflow>()) {}
 
     /**
      * @brief Destructor for topology.
@@ -144,7 +147,7 @@ namespace pfabric {
      * @return
      *    a new pipe where TextFileSource acts as a producer.
      */
-    Pipe& newStreamFromFile(const std::string& fname);
+    Pipe newStreamFromFile(const std::string& fname);
 
     /**
      * @brief Creates a pipe from a REST source as input.
@@ -164,7 +167,7 @@ namespace pfabric {
      * @return
      *    a new pipe where RESTSource acts as a producer.
      */
-    Pipe& newStreamFromREST(unsigned int port,
+    Pipe newStreamFromREST(unsigned int port,
                             const std::string& path,
                             RESTSource::RESTMethod method,
                             unsigned short numThreads = 1);
@@ -187,7 +190,7 @@ namespace pfabric {
      * @return
      *    a new pipe where ZMQSource acts as a producer.
      */
-    Pipe& newStreamFromZMQ(const std::string& path,
+    Pipe newStreamFromZMQ(const std::string& path,
       ZMQParams::EncodingMode encoding = ZMQParams::AsciiMode,
       ZMQParams::SourceType stype = ZMQParams::SubscriberSource);
 
@@ -211,12 +214,10 @@ namespace pfabric {
      *    a new pipe where RESTSource acts as a producer.
      */
     template<typename T, typename KeyType = DefaultKeyType>
-    Pipe& newStreamFromTable(std::shared_ptr<Table<T, KeyType>> tbl,
+    Pipe newStreamFromTable(std::shared_ptr<Table<T, KeyType>> tbl,
                              TableParams::NotificationMode mode = TableParams::Immediate) {
       auto op = std::make_shared<FromTable<T, KeyType>>(tbl, mode);
-      auto s = new Pipe(op);
-      pipes.push_back(s);
-      return *s;
+      return Pipe(dataflow, dataflow->addPublisher(op));
     }
   };
 

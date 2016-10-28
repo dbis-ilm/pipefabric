@@ -51,6 +51,7 @@
 #include "qop/PartitionBy.hpp"
 #include "cep/Matcher.hpp"
 #include "qop/ZMQSink.hpp"
+#include "topology/Dataflow.hpp"
 
 namespace pfabric {
 
@@ -63,8 +64,9 @@ namespace pfabric {
    * by one via methods of the @c Pipe class.
    */
   class Pipe {
-    friend class Topology;
   private:
+    friend class Topology;
+
     enum PartitioningState {
         NoPartitioning,
         FirstInPartitioning,
@@ -74,17 +76,32 @@ namespace pfabric {
     /**
      * Typedef for pointer to BaseOp (any PipeFabric operator).
      */
-    typedef std::shared_ptr<BaseOp> BaseOpPtr;
-    typedef std::vector<BaseOpPtr> BaseOpList;
-    typedef BaseOpList::iterator BaseOpIterator;
+  //  typedef std::shared_ptr<BaseOp> BaseOpPtr;
+  //  typedef std::vector<BaseOpPtr> BaseOpList;
+  //  typedef BaseOpList::iterator BaseOpIterator;
+    typedef Dataflow::BaseOpIterator OpIterator;
 
-    BaseOpList publishers; // the list of all operators acting as publisher (source)
-    BaseOpList sinks;     // the list of sink operators (which are not publishers)
+    Dataflow::BaseOpList publishers; // the list of all operators acting as publisher (source)
+//    BaseOpList sinks;     // the list of sink operators (which are not publishers)
     /// Note, we need boost::any values here because the functions pointers are typed (via templates)
     boost::any timestampExtractor; // a function pointer to a timestamp extractor function
     boost::any keyExtractor;            // a function pointer to a key extractor function
     unsigned int numPartitions;
+    DataflowPtr dataflow;
+    OpIterator tailIter;
 
+/*
+    Pipe(DataflowPtr ptr, Dataflow::BaseOpPtr op, boost::any keyFunc, boost::any::tsFunc);
+
+    Pipe(DataflowPtr ptr, Dataflow::BaseOpList& op, PartitioningState pState,
+      boost::any keyFunc, boost::any::tsFunc);
+*/
+  /*
+    Pipe(const Pipe& p) : partitioningState(p.partitioningState), publishers(p.publishers),
+      timestampExtractor(p.timestampExtractor), keyExtractor(t.keyExtractor),
+      numPartitions(p.numPartitions), dataflow(p.dataflow) {
+    }
+*/
     /**
      * @brief Constructor for Pipe.
      *
@@ -93,10 +110,33 @@ namespace pfabric {
      * @param[in] op
      *     an operator producing the tuple for the this pipeline
      */
-    Pipe(BaseOpPtr op) : partitioningState(NoPartitioning), numPartitions(0) {
-      publishers.push_back(op);
+    Pipe(DataflowPtr ptr, Dataflow::BaseOpIterator iter) :
+      partitioningState(NoPartitioning), numPartitions(0), dataflow(ptr), tailIter(iter) {
+      publishers.push_back(*iter);
+      std::cout << "Pipe(" << dataflow->size() << ")" << std::endl;
     }
 
+public:
+    Pipe(const Pipe& p) {
+      std::cout << "Pipe(" << this << ", " << p.publishers.size() << ")" << std::endl;
+      partitioningState = p.partitioningState;
+      numPartitions = p.numPartitions;
+      dataflow = p.dataflow;
+      publishers = p.publishers;
+    }
+
+    Pipe& operator=(const Pipe& p) {
+      std::cout << "Pipe.operator=" << std::endl;
+      partitioningState = p.partitioningState;
+      numPartitions = p.numPartitions;
+      dataflow = p.dataflow;
+      publishers = p.publishers;
+      return *this;
+    }
+
+    std::size_t size() const { return publishers.size(); }
+
+  private:
     /**
      * @brief Returns the operator at the end of the publisher list.
      *
@@ -106,18 +146,25 @@ namespace pfabric {
      * @return
      *    the last operator in the publisher list
      */
-    BaseOpPtr getPublisher() { return publishers.back(); }
+    Dataflow::BaseOpPtr getPublisher() {
+      BOOST_ASSERT_MSG(tailIter != dataflow->end(), "No DataSource available in dataflow");
+      return *tailIter; /*publishers.back();*/
+    }
 
-    BaseOpIterator getPublishers() {
+    Dataflow::BaseOpIterator getPublishers() {
       return publishers.end() - numPartitions;
     }
 
     template<typename Publisher, typename SourceType>
-    void addPublisher(std::shared_ptr<Publisher> op) {
+    OpIterator addPublisher(std::shared_ptr<Publisher> op) {
+      std::cout << "addPublisher: " << publishers.size() << " : " /*<< getPublisher().get()->opName()*/ << std::endl;
       auto pOp = dynamic_cast<SourceType*>(getPublisher().get());
       BOOST_ASSERT_MSG(pOp != nullptr, "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
       CREATE_LINK(pOp, op);
-      publishers.push_back(op);
+      std::cout << "Pipe: " << this << ": connect: " << pOp->opName() << " - " << op->opName() << std::endl;
+      // publishers.clear();
+      // publishers.push_back(op);
+      return dataflow->addPublisher(op);
     }
 
     template<typename Publisher, typename StreamElement>
@@ -146,8 +193,11 @@ namespace pfabric {
           iter++;
         }
       }
-      for (auto& op : opList)
+      // publishers.clear();
+      for (auto& op : opList) {
         publishers.push_back(op);
+        dataflow->addPublisher(op);
+      }
     }
 
   public:
@@ -156,7 +206,10 @@ namespace pfabric {
      *
      * Destroys the pipe and removes all publishers.
      */
-    ~Pipe() { publishers.clear(); }
+    ~Pipe() {
+      std::cout << "~Pipe(" << this << ")" << std::endl;
+      publishers.clear();
+    }
 
     /**
      * @brief Defines the key extractor function for all subsequent operators.
@@ -298,10 +351,11 @@ namespace pfabric {
       auto op = std::make_shared<ConsoleWriter<T> >(os, ffun);
       auto pOp = dynamic_cast<DataSource<T>*>(getPublisher().get());
       BOOST_ASSERT_MSG(pOp != nullptr, "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
+      std::cout << "Pipe: " << this << ": connect: " << pOp->opName() << " - " << op->opName() << std::endl;
       CREATE_LINK(pOp, op);
       // we don't save the operator in publishers because ConsoleWriter
       // cannot act as Publisher
-      sinks.push_back(op);
+      dataflow->addSink(op);
       return *this;
     }
 
@@ -328,7 +382,7 @@ namespace pfabric {
       CREATE_LINK(pOp, op);
       // we don't save the operator in publishers because FileWriter
       // cannot act as Publisher
-      sinks.push_back(op);
+      dataflow->addSink(op);
       return *this;
     }
 
@@ -356,7 +410,7 @@ namespace pfabric {
       CREATE_LINK(pOp, op);
       // we don't save the operator in publishers because ZMQSink
       // cannot act as Publisher
-      sinks.push_back(op);
+      dataflow->addSink(op);
       return *this;
     }
 
@@ -430,6 +484,7 @@ namespace pfabric {
       if (partitioningState == NoPartitioning) {
         auto op = std::make_shared<Where<T> >(func);
         addPublisher<Where<T>, DataSource<T> >(op);
+      //  return Pipe(dataflow, op, keyExtractor, timestampExtractor);
       }
       else {
         std::vector<std::shared_ptr<Where<T>>> ops;
@@ -816,6 +871,7 @@ namespace pfabric {
           "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
         CREATE_LINK(pOp, op);
       }
+      dataflow->addPublisher(op);
       publishers.push_back(op);
       partitioningState = NoPartitioning;
       return *this;

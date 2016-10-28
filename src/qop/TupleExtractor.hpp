@@ -74,6 +74,7 @@ namespace pfabric {
      */
     BIND_INPUT_CHANNEL_DEFAULT( InputPunctuationChannel, TupleExtractor, processPunctuation );
 
+    const std::string opName() const override { return std::string("TupleExtractor"); }
 
   private:
 
