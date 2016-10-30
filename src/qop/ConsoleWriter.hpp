@@ -99,6 +99,7 @@ public:
 	 */
 	BIND_INPUT_CHANNEL_DEFAULT( InputPunctuationChannel, ConsoleWriter, processPunctuation );
 
+	const std::string opName() const override { return std::string("ConsoleWriter"); }
 
 private:
 

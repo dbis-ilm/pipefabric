@@ -22,6 +22,8 @@
 #ifndef BaseOp_hpp_
 #define BaseOp_hpp_
 
+#include <string>
+
 namespace pfabric {
 
 /**
@@ -34,6 +36,8 @@ class BaseOp {
 public:
 
 	virtual ~BaseOp() {}
+
+	virtual const std::string opName() const { return std::string("BaseOp"); }
 };
 
 } // namespace pfabric

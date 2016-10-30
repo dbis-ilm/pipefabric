@@ -97,6 +97,8 @@ t.start();
 | `aggregate<Tin, Tout, State>(ffinal, fiter, m, interval)` | calculates a set of aggregates over the stream of type `Tin`, possibly supported by a window. The aggregates a represented by tuples of type `Tout`. `aggregate` needs a helper class of type parameter `State`. The parameters are a function to calculate the final aggregates (`ffinal`), a function to update the aggregates (`fiter`), the mode `m` for triggering the  aggregate calculation, and an optional interval time for producing aggregate values (`interval`). |
 | `groupBy<>` | |
 | `join<>` | |
+| `notify<T>` | |
+| `barrier<T>` | |
 | `toTable<T,K>(tbl, auto)` |  stores tuples from the input stream of type `T` with key type `K` into the table `tbl` and forwards them to its subscribers. Outdated tuples are handled as deletes, non-outdated tuples either as insert (if the key does not exist yet) or update (otherwise). The parameter `auto` determines the autocommit mode.|
 
 ### How to write a query ###
@@ -197,18 +199,18 @@ to different instances of the subsequent operators in the dataflow and `merge` c
 the resulting substreams into a single one. In the following example a stream
 is created from a file and after transforming the tuples the stream is split into
 5 sub-streams based on the given partitioning function. Hence, the `where` and `map`
-operators are processing in 5 separate threads on the partitions of the stream:
+operators are processing in 5 separate threads on the partitions of the stream, which
+are finally merged into a single stream again.
 
 ```C++
-auto s = t->newStreamFromFile()
+auto s = t->newStreamFromFile("data.csv")
   .extract<Tin>(',')
   .partitionBy<Tin>([](auto tp) { return getAttribute<0>(tp) % 5; }, 5)
   .where<Tin>([](auto tp, bool outdated) { return getAttribute<0>(tp) % 2 == 0; } )
-  .map<Tin, Tout>([](auto tp) -> Tout { return makeTuplePtr(getAttribute<0>(tp)); } )
+  .map<Tin, Tout>([](auto tp) { return makeTuplePtr(getAttribute<0>(tp)); } )
   .merge<Tout>()
+  ..print<Tout>(std::cout);
 ```
-
-Finally, the partitions are merged into a single stream.
 
 ### Docker ###
 

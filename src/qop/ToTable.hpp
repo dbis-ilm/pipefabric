@@ -77,6 +77,7 @@ namespace pfabric {
      */
     BIND_INPUT_CHANNEL_DEFAULT(InputPunctuationChannel, ToTable, processPunctuation);
 
+    const std::string opName() const override { return std::string("ToTable"); }
 
   private:
 

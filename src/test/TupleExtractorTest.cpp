@@ -43,6 +43,8 @@ TEST_CASE("Extracting tuples from text lines", "[TupleExtractor]") {
 	CREATE_DATA_LINK(extractor, mockup)
 
 	mockup->start();
+  
+  REQUIRE(mockup->numTuplesProcessed() == expected.size());
 }
 
 TEST_CASE("Extracting tuples from text lines with a non-standard separator", "[TupleExtractor]") {
@@ -66,6 +68,8 @@ TEST_CASE("Extracting tuples from text lines with a non-standard separator", "[T
 	CREATE_DATA_LINK(extractor, mockup)
 
 	mockup->start();
+  
+  REQUIRE(mockup->numTuplesProcessed() == expected.size());
 }
 
 TEST_CASE("Extracting tuples from text lines with null values", "[TupleExtractor]") {
@@ -89,6 +93,8 @@ TEST_CASE("Extracting tuples from text lines with null values", "[TupleExtractor
 	CREATE_DATA_LINK(extractor, mockup)
 
 	mockup->start();
+  
+  REQUIRE(mockup->numTuplesProcessed() == expected.size());
 }
 
 TEST_CASE("Extracting tuples from JSON strings", "[JsonExtractor]") {
@@ -115,6 +121,8 @@ TEST_CASE("Extracting tuples from JSON strings", "[JsonExtractor]") {
 	CREATE_DATA_LINK(extractor, mockup)
 
 	mockup->start();
+  
+  REQUIRE(mockup->numTuplesProcessed() == expected.size());
 }
 
 TEST_CASE("Deserializing tuples from buffer", "[TupleDeserializer]") {
@@ -139,4 +147,6 @@ TEST_CASE("Deserializing tuples from buffer", "[TupleDeserializer]") {
   CREATE_DATA_LINK(deserializer, mockup)
 
   mockup->start();
+  
+  REQUIRE(mockup->numTuplesProcessed() == expected.size());
 }

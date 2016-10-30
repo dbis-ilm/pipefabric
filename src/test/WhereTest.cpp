@@ -42,4 +42,6 @@ TEST_CASE("Applying a filter to a tuple stream", "[Where]") {
 	CREATE_DATA_LINK(wop, mockup)
 
 	mockup->start();
+  
+  REQUIRE(mockup->numTuplesProcessed() == expected.size());
 }

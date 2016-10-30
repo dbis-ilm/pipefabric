@@ -169,6 +169,7 @@ TEST_CASE("Building and running a topology with partitioning", "[Topology]") {
       results.push_back(v);
     });
 
+  std::cout << "start topology" << std::endl;
   t.start(false);
 
   using namespace std::chrono_literals;

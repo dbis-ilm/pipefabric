@@ -70,6 +70,7 @@ namespace pfabric {
      */
     BIND_INPUT_CHANNEL_DEFAULT(InputPunctuationChannel, Where, processPunctuation);
 
+    const std::string opName() const override { return std::string("Where"); }
 
   private:
 

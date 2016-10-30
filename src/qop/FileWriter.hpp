@@ -34,7 +34,7 @@ namespace pfabric {
 
 	/**
 	 * @brief FileWriter is an operator for writing stream elements to
-	 * a file.
+	 *        a file.
 	 *
 	 * FileWriter is an operator for writing stream elements to a file specified
 	 * by a filename. In addition, an optional formatter function can be specified

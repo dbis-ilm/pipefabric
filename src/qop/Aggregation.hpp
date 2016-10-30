@@ -155,6 +155,7 @@ namespace pfabric {
      */
     BIND_INPUT_CHANNEL_DEFAULT( InputPunctuationChannel, Aggregation, processPunctuation );
 
+    const std::string opName() const override { return std::string("Aggregation"); }
 
   private:
 

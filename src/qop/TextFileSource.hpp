@@ -69,6 +69,8 @@ public:
 	 */
 	unsigned long start();
 
+	 const std::string opName() const override { return std::string("TextFileSource"); }
+
 protected:
 	/**
 	 * Read the tuples from a file using standard IO functions.

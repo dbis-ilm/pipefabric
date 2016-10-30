@@ -147,6 +147,7 @@ add_library(pfabric_core SHARED
   qop/Window.cpp
   qop/TriggerNotifier.cpp
   topology/Topology.cpp
+  topology/Dataflow.cpp
   topology/PFabricContext.cpp
   ${ZEROMQ_SOURCES}
   # we need this as dependency to download the sources from github
@@ -207,3 +208,4 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/"
 #-----------------------------------------------------------------------------------------
 #
 add_subdirectory(demo)
+add_subdirectory(debs2016)

@@ -63,7 +63,7 @@ private:
 	void processDataElement( const StreamElement& data, const bool outdated ) {
     this->getOutputDataChannel().publish( data, outdated );
 	}
-  
+
 	/**
 	 * @brief This method is invoked when a punctuation arrives.
 	 *
@@ -81,7 +81,9 @@ public:
 	 * source operator.
 	 */
 	Merge() {}
- 
+
+  const std::string opName() const override { return std::string("Merge"); }
+
 };
 }
 

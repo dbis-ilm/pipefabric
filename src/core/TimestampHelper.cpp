@@ -15,6 +15,26 @@ namespace pfabric {
 
 boost::posix_time::ptime UNIX_EPOCH( boost::gregorian::date(1970,1,1) );
 
+/**
+ * Converts the given string with a format (%Y-%m-%dT%H:%M:%S) into a timestamp.
+ */
+Timestamp TimestampHelper::stringToTimestamp(const std::string& date) {
+	//TODO: make generic date expression
+	//TODO: find UTC difference automatically, -1 for Germany
+	struct std::tm tm;
+	if( strptime(date.c_str(), "%Y-%m-%dT%H:%M:%S", &tm) == NULL ) {
+			/* TODO Handle error */
+	}
+	// TODO: strptime ignores the milliseconds:
+	auto offs1 = date.find('.') + 1;
+	auto offs2 = date.find('+', offs1);
+	unsigned long milliseconds = std::stoi(date.substr(offs1, offs2 - offs1));
+	//tm.tm_isdst = -1;   // to determine whether daylight saving time is considered
+	// Timestamp t = time_to_epoch(&tm, -1); //faster than mktime but wrong!
+	Timestamp t = mktime(&tm);
+	return t * 1000000 + milliseconds * 1000;
+}
+
 Timestamp TimestampHelper::parseTimestamp(const std::string& val) {
 	enum TimeFormat {
 		Unknown,

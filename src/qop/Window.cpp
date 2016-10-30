@@ -54,17 +54,4 @@ void EvictionNotifier::operator()() {
     // invoke the callback
     mEvictFun();
   }
-/*
-  while(!(*mInterrupted)) {
-    // let's wait some time
-    boost::xtime xt;
-    boost::xtime_get(&xt, boost::TIME_UTC_);
-    xt.sec += mEvictInterval;
-    boost::thread::sleep(xt);
-    // and finally invoke the eviction function
-    if(!(*mInterrupted)) {
-		    mEvictFun();
-    }
-  }
-  */
 }

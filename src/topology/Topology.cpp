@@ -67,19 +67,22 @@ void Topology::wait() {
       f.get();
 }
 
-Pipe& Topology::newStreamFromFile(const std::string& fname) {
+Pipe Topology::newStreamFromFile(const std::string& fname) {
   // create a new TextFileSource
   auto op = std::make_shared<TextFileSource>(fname);
   // register it's start function
   registerStartupFunction(std::bind(&TextFileSource::start, op.get()));
   // and create a new pipe; we use a raw pointer here because
   // we want to return a reference to a Pipe object
-  auto s = new Pipe(op);
+  return Pipe(dataflow, dataflow->addPublisher(op));
+  /*
+  auto s = new Pipe(op, dataflow);
   pipes.push_back(s);
   return *s;
+  */
 }
 
-Pipe& Topology::newStreamFromREST(unsigned int port,
+Pipe Topology::newStreamFromREST(unsigned int port,
                                   const std::string& path,
                                   RESTSource::RESTMethod method,
                                   unsigned short numThreads) {
@@ -89,25 +92,20 @@ Pipe& Topology::newStreamFromREST(unsigned int port,
   registerStartupFunction(std::bind(&RESTSource::start, op.get()));
   // and create a new pipe; we use a raw pointer here because
   // we want to return a reference to a Pipe object
-  auto s = new Pipe(op);
-  pipes.push_back(s);
-  return *s;
+  return Pipe(dataflow, dataflow->addPublisher(op));
 }
 
-Pipe& Topology::newStreamFromZMQ(const std::string& path,
+Pipe Topology::newStreamFromZMQ(const std::string& path,
                                  ZMQParams::EncodingMode encoding,
                                  ZMQParams::SourceType stype) {
-  Pipe *pipe = nullptr;
   // depending on the encoding mode, we create a ZMQSource with
   // different type parameters
   if (encoding == ZMQParams::AsciiMode) {
     auto op = std::make_shared<ZMQSource<TStringPtr> >(path, stype);
-    pipe = new Pipe(op);
+    return Pipe(dataflow, dataflow->addPublisher(op));
   }
   else {
     auto op = std::make_shared<ZMQSource<TBufPtr> >(path, stype);
-    pipe = new Pipe(op);
+    return Pipe(dataflow, dataflow->addPublisher(op));
   }
-  pipes.push_back(pipe);
-  return *pipe;
 }

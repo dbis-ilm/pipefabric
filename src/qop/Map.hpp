@@ -74,6 +74,7 @@ public:
 	 */
 	BIND_INPUT_CHANNEL_DEFAULT( InputPunctuationChannel, Map, processPunctuation );
 
+	const std::string opName() const override { return std::string("Map"); }
 
 private:
 

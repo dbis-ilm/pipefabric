@@ -29,6 +29,9 @@ extern boost::posix_time::ptime UNIX_EPOCH;
  */
 struct TimestampHelper {
 
+	static inline std::string timestampToString(Timestamp t) {
+		return boost::posix_time::to_simple_string(timestampToPtime(t));
+	}
 	/**
 	 * Returns the current system time as timestamp (microseconds since 01/01/1970).
 	 */
@@ -59,22 +62,9 @@ struct TimestampHelper {
 	}
 
 	/**
-	 * Converts the given string with a format (%Y-%m-%d %H:%M:%S) into a timestamp (# of seconds since 01/01/1970).
+	 * Converts the given string with a format (%Y-%m-%dT%H:%M:%S) into a timestamp.
 	 */
-	static inline Timestamp stringToTimestamp(const std::string& date) {
-		//TODO: make generic date expression
-		//TODO: find UTC difference automatically, -1 for Germany
-		struct std::tm tm ;
-		if( strptime(date.c_str(), "%Y-%m-%d %H:%M:%S", &tm) == NULL ) {
-		    /* TODO Handle error */
-		}
-
-		//tm.tm_isdst = -1;   // to determine whether daylight saving time is considered
-		Timestamp t = time_to_epoch(&tm, -1); //faster than mktime
-		//Timestamp t = mktime(&tm);
-		return t * 1000000;
-	}
-
+	static Timestamp stringToTimestamp(const std::string& date);
 
 	/**
 	 * TODO

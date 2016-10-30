@@ -49,6 +49,7 @@
 #include "qop/ToTable.hpp"
 #include "qop/Merge.hpp"
 #include "qop/PartitionBy.hpp"
+#include "qop/Barrier.hpp"
 #include "cep/Matcher.hpp"
 #include "qop/ZMQSink.hpp"
 #include "topology/Dataflow.hpp"
@@ -73,16 +74,8 @@ namespace pfabric {
         NextInPartitioning
     } partitioningState;
 
-    /**
-     * Typedef for pointer to BaseOp (any PipeFabric operator).
-     */
-  //  typedef std::shared_ptr<BaseOp> BaseOpPtr;
-  //  typedef std::vector<BaseOpPtr> BaseOpList;
-  //  typedef BaseOpList::iterator BaseOpIterator;
     typedef Dataflow::BaseOpIterator OpIterator;
 
-    Dataflow::BaseOpList publishers; // the list of all operators acting as publisher (source)
-//    BaseOpList sinks;     // the list of sink operators (which are not publishers)
     /// Note, we need boost::any values here because the functions pointers are typed (via templates)
     boost::any timestampExtractor; // a function pointer to a timestamp extractor function
     boost::any keyExtractor;            // a function pointer to a key extractor function
@@ -90,18 +83,6 @@ namespace pfabric {
     DataflowPtr dataflow;
     OpIterator tailIter;
 
-/*
-    Pipe(DataflowPtr ptr, Dataflow::BaseOpPtr op, boost::any keyFunc, boost::any::tsFunc);
-
-    Pipe(DataflowPtr ptr, Dataflow::BaseOpList& op, PartitioningState pState,
-      boost::any keyFunc, boost::any::tsFunc);
-*/
-  /*
-    Pipe(const Pipe& p) : partitioningState(p.partitioningState), publishers(p.publishers),
-      timestampExtractor(p.timestampExtractor), keyExtractor(t.keyExtractor),
-      numPartitions(p.numPartitions), dataflow(p.dataflow) {
-    }
-*/
     /**
      * @brief Constructor for Pipe.
      *
@@ -112,29 +93,21 @@ namespace pfabric {
      */
     Pipe(DataflowPtr ptr, Dataflow::BaseOpIterator iter) :
       partitioningState(NoPartitioning), numPartitions(0), dataflow(ptr), tailIter(iter) {
-      publishers.push_back(*iter);
-      std::cout << "Pipe(" << dataflow->size() << ")" << std::endl;
+    }
+
+    Pipe(DataflowPtr ptr, Dataflow::BaseOpIterator iter, boost::any keyFunc, boost::any tsFunc, PartitioningState pState,
+         unsigned int nPartitions = 0) : partitioningState(pState),
+          timestampExtractor(tsFunc), keyExtractor(keyFunc),
+          numPartitions(nPartitions), dataflow(ptr), tailIter(iter) {
     }
 
 public:
     Pipe(const Pipe& p) {
-      std::cout << "Pipe(" << this << ", " << p.publishers.size() << ")" << std::endl;
       partitioningState = p.partitioningState;
       numPartitions = p.numPartitions;
       dataflow = p.dataflow;
-      publishers = p.publishers;
+      tailIter = p.tailIter;
     }
-
-    Pipe& operator=(const Pipe& p) {
-      std::cout << "Pipe.operator=" << std::endl;
-      partitioningState = p.partitioningState;
-      numPartitions = p.numPartitions;
-      dataflow = p.dataflow;
-      publishers = p.publishers;
-      return *this;
-    }
-
-    std::size_t size() const { return publishers.size(); }
 
   private:
     /**
@@ -147,35 +120,31 @@ public:
      *    the last operator in the publisher list
      */
     Dataflow::BaseOpPtr getPublisher() {
-      BOOST_ASSERT_MSG(tailIter != dataflow->end(), "No DataSource available in dataflow");
-      return *tailIter; /*publishers.back();*/
+      BOOST_ASSERT_MSG(tailIter != dataflow->publisherEnd(), "No DataSource available in dataflow");
+      return *tailIter;
     }
 
     Dataflow::BaseOpIterator getPublishers() {
-      return publishers.end() - numPartitions;
+      return tailIter;
     }
 
     template<typename Publisher, typename SourceType>
     OpIterator addPublisher(std::shared_ptr<Publisher> op) {
-      std::cout << "addPublisher: " << publishers.size() << " : " /*<< getPublisher().get()->opName()*/ << std::endl;
       auto pOp = dynamic_cast<SourceType*>(getPublisher().get());
       BOOST_ASSERT_MSG(pOp != nullptr, "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
       CREATE_LINK(pOp, op);
-      std::cout << "Pipe: " << this << ": connect: " << pOp->opName() << " - " << op->opName() << std::endl;
-      // publishers.clear();
-      // publishers.push_back(op);
       return dataflow->addPublisher(op);
     }
 
     template<typename Publisher, typename StreamElement>
-    void addPartitionedPublisher(std::vector<std::shared_ptr<Publisher>>& opList) {
+    OpIterator addPartitionedPublisher(std::vector<std::shared_ptr<Publisher>>& opList) {
       BOOST_ASSERT_MSG(partitioningState != NoPartitioning, "Missing PartitionBy operator in topology.");
       if (partitioningState == FirstInPartitioning) {
         auto partition = dynamic_cast<PartitionBy<StreamElement> *>(getPublisher().get());
         BOOST_ASSERT_MSG(partition != nullptr,
           "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
         for (int i = 0; i < opList.size(); i++) {
-          auto& op = opList[i];
+          auto op = opList[i];
           partition->connectChannelsForPartition(i,
             op->getInputDataChannel(),
             op->getInputPunctuationChannel());
@@ -184,20 +153,19 @@ public:
       }
       else {
         auto iter = getPublishers();
-        for (int i = 0; i < opList.size() && iter != publishers.end(); i++) {
+        for (int i = 0; i < opList.size() && iter != dataflow->publisherEnd(); i++) {
           auto p = iter->get();
           auto pOp = dynamic_cast<DataSource<StreamElement> *>(p);
           BOOST_ASSERT_MSG(pOp != nullptr,
             "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
+          std::cout << "Pipe: " << this << ": connect: " << pOp->opName() << " - "
+                    << opList[i]->opName() << std::endl;
           CREATE_LINK(pOp, opList[i]);
           iter++;
         }
       }
-      // publishers.clear();
-      for (auto& op : opList) {
-        publishers.push_back(op);
-        dataflow->addPublisher(op);
-      }
+      Dataflow::BaseOpList bops(opList.begin(), opList.end());
+      return dataflow->addPublisherList(bops);
     }
 
   public:
@@ -207,8 +175,6 @@ public:
      * Destroys the pipe and removes all publishers.
      */
     ~Pipe() {
-      std::cout << "~Pipe(" << this << ")" << std::endl;
-      publishers.clear();
     }
 
     /**
@@ -227,9 +193,8 @@ public:
      * @return a reference to the pipe
      */
     template <typename T, typename KeyType = DefaultKeyType>
-    Pipe& keyBy(std::function<KeyType(const T&)> func) {
-      keyExtractor = func;
-      return *this;
+    Pipe keyBy(std::function<KeyType(const T&)> func) {
+      return Pipe(dataflow, tailIter, func, timestampExtractor, partitioningState, numPartitions);
     }
 
     /**
@@ -245,9 +210,8 @@ public:
      * @return a reference to the pipe
      */
     template <typename T>
-    Pipe& assignTimestamps(typename Window<T>::TimestampExtractorFunc func) {
-      timestampExtractor = func;
-      return *this;
+    Pipe assignTimestamps(typename Window<T>::TimestampExtractorFunc func) {
+      return Pipe(dataflow, tailIter, func, func, partitioningState, numPartitions);
     }
 
     /**
@@ -267,7 +231,7 @@ public:
      * @return a reference to the pipe
      */
     template <typename T>
-    Pipe& slidingWindow(const WindowParams::WinType& wt,
+    Pipe slidingWindow(const WindowParams::WinType& wt,
                         const unsigned int sz,
                         const unsigned int ei = 0) {
       typedef typename Window<T>::TimestampExtractorFunc ExtractorFunc;
@@ -284,12 +248,12 @@ public:
         }
         else
           op =  std::make_shared<SlidingWindow<T> >(wt, sz, ei);
-        addPublisher<SlidingWindow<T>, DataSource<T>>(op);
+        auto iter = addPublisher<SlidingWindow<T>, DataSource<T>>(op);
+        return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
       }
       catch (boost::bad_any_cast &e) {
         BOOST_ASSERT_MSG(false, "No TimestampExtractor defined for SlidingWindow.");
       }
-      return *this;
     }
 
     /**
@@ -307,7 +271,7 @@ public:
      * @return a reference to the pipe
      */
     template <typename T>
-    Pipe& tumblingWindow(const WindowParams::WinType& wt,
+    Pipe tumblingWindow(const WindowParams::WinType& wt,
                          const unsigned int sz) {
       typedef typename Window<T>::TimestampExtractorFunc ExtractorFunc;
       try {
@@ -321,12 +285,12 @@ public:
         }
         else
           op = std::make_shared<TumblingWindow<T> >(wt, sz);
-        addPublisher<TumblingWindow<T>, DataSource<T>>(op);
+        auto iter = addPublisher<TumblingWindow<T>, DataSource<T>>(op);
+        return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
       }
       catch (boost::bad_any_cast &e) {
         BOOST_ASSERT_MSG(false, "No TimestampExtractor defined for TumblingWindow.");
       }
-      return *this;
     }
 
     /**
@@ -346,17 +310,16 @@ public:
      * @return a reference to the pipe
      */
     template <typename T>
-    Pipe& print(std::ostream& os = std::cout,
+    Pipe print(std::ostream& os = std::cout,
                 typename ConsoleWriter<T>::FormatterFunc ffun = ConsoleWriter<T>::defaultFormatter) {
       auto op = std::make_shared<ConsoleWriter<T> >(os, ffun);
       auto pOp = dynamic_cast<DataSource<T>*>(getPublisher().get());
       BOOST_ASSERT_MSG(pOp != nullptr, "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
-      std::cout << "Pipe: " << this << ": connect: " << pOp->opName() << " - " << op->opName() << std::endl;
       CREATE_LINK(pOp, op);
       // we don't save the operator in publishers because ConsoleWriter
       // cannot act as Publisher
       dataflow->addSink(op);
-      return *this;
+      return Pipe(dataflow, tailIter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
     }
 
     /**
@@ -374,7 +337,7 @@ public:
      * @return a reference to the pipe
      */
    template <typename T>
-    Pipe& saveToFile(const std::string& fname,
+    Pipe saveToFile(const std::string& fname,
                      typename FileWriter<T>::FormatterFunc ffun = ConsoleWriter<T>::defaultFormatter) {
       auto op = std::make_shared<FileWriter<T> >(fname, ffun);
       auto pOp = dynamic_cast<DataSource<T>*>(getPublisher().get());
@@ -383,7 +346,7 @@ public:
       // we don't save the operator in publishers because FileWriter
       // cannot act as Publisher
       dataflow->addSink(op);
-      return *this;
+      return Pipe(dataflow, tailIter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
     }
 
     /**
@@ -402,7 +365,7 @@ public:
      * @return a reference to the pipe
      */
    template <typename T>
-   Pipe& sendZMQ(const std::string& path, ZMQParams::SinkType stype = ZMQParams::PublisherSink,
+   Pipe sendZMQ(const std::string& path, ZMQParams::SinkType stype = ZMQParams::PublisherSink,
        ZMQParams::EncodingMode mode = ZMQParams::BinaryMode) {
       auto op = std::make_shared<ZMQSink<T> >(path, stype, mode);
       auto pOp = dynamic_cast<DataSource<T>*>(getPublisher().get());
@@ -411,7 +374,7 @@ public:
       // we don't save the operator in publishers because ZMQSink
       // cannot act as Publisher
       dataflow->addSink(op);
-      return *this;
+     return Pipe(dataflow, tailIter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
     }
 
     /**
@@ -427,10 +390,10 @@ public:
      * @return a reference to the pipe
      */
     template <class T>
-    Pipe& extract(char sep) {
+    Pipe extract(char sep) {
       auto op = std::make_shared<TupleExtractor<T> >(sep);
-      addPublisher<TupleExtractor<T>, DataSource<TStringPtr> >(op);
-      return *this;
+      auto iter = addPublisher<TupleExtractor<T>, DataSource<TStringPtr> >(op);
+      return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
     }
 
     /**
@@ -445,11 +408,11 @@ public:
      * @return a reference to the pipe
      */
     template <class T>
-    Pipe& extractJson(const std::initializer_list<std::string>& keys) {
+    Pipe extractJson(const std::initializer_list<std::string>& keys) {
       std::vector<std::string> keyList(keys);
       auto op = std::make_shared<JsonExtractor<T> >(keyList);
-      addPublisher<JsonExtractor<T>, DataSource<TStringPtr> >(op);
-      return *this;
+      auto iter = addPublisher<JsonExtractor<T>, DataSource<TStringPtr> >(op);
+      return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
     }
 
     /**
@@ -460,10 +423,10 @@ public:
      * @return a reference to the pipe
      */
     template <class T>
-    Pipe& deserialize() {
+    Pipe deserialize() {
       auto op = std::make_shared<TupleDeserializer<T> >();
-      addPublisher<TupleDeserializer<T>, DataSource<TBufPtr> >(op);
-      return *this;
+      auto iter = addPublisher<TupleDeserializer<T>, DataSource<TBufPtr> >(op);
+      return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
     }
 
    /**
@@ -480,20 +443,20 @@ public:
      * @return a reference to the pipe
      */
     template <typename T>
-    Pipe& where(typename Where<T>::PredicateFunc func) {
+    Pipe where(typename Where<T>::PredicateFunc func) {
       if (partitioningState == NoPartitioning) {
         auto op = std::make_shared<Where<T> >(func);
-        addPublisher<Where<T>, DataSource<T> >(op);
-      //  return Pipe(dataflow, op, keyExtractor, timestampExtractor);
+        auto iter = addPublisher<Where<T>, DataSource<T> >(op);
+        return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
       }
       else {
         std::vector<std::shared_ptr<Where<T>>> ops;
         for (int i = 0; i < numPartitions; i++) {
           ops.push_back(std::make_shared<Where<T> >(func));
         }
-        addPartitionedPublisher<Where<T>, T>(ops);
+        auto iter = addPartitionedPublisher<Where<T>, T>(ops);
+        return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
       }
-      return *this;
     }
 
     /**
@@ -507,13 +470,17 @@ public:
       * @param[in] func
       *      a function pointer or lambda function representing the callback
       *      that is invoked for each input tuple
+      * @param[in] pfunc
+      *      an optional function pointer or lambda function representing the callback
+      *      that is invoked for each punctuation
       * @return a reference to the pipe
       */
      template <typename T>
-     Pipe& notify(typename Notify<T>::CallbackFunc func) {
-       auto op = std::make_shared<Notify<T> >(func);
-       addPublisher<Notify<T>, DataSource<T> >(op);
-       return *this;
+     Pipe notify(typename Notify<T>::CallbackFunc func,
+                 typename Notify<T>::PunctuationCallbackFunc pfunc = nullptr) {
+       auto op = std::make_shared<Notify<T> >(func, pfunc);
+       auto iter = addPublisher<Notify<T>, DataSource<T> >(op);
+       return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
      }
 
     /**
@@ -529,10 +496,10 @@ public:
      * @return a reference to the pipe
      */
     template <typename T>
-    Pipe& queue() {
+    Pipe queue() {
       auto op = std::make_shared<Queue<T> >();
-      addPublisher<Queue<T>, DataSource<T> >(op);
-      return *this;
+      auto iter = addPublisher<Queue<T>, DataSource<T> >(op);
+      return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
     }
 
     /**
@@ -551,19 +518,21 @@ public:
      * @return a reference to the pipe
      */
     template <typename Tin, typename Tout>
-    Pipe& map(typename Map<Tin, Tout>::MapFunc func) {
+    Pipe map(typename Map<Tin, Tout>::MapFunc func) {
       if (partitioningState == NoPartitioning) {
         auto op = std::make_shared<Map<Tin, Tout> >(func);
-        addPublisher<Map<Tin, Tout>, DataSource<Tin> >(op);
+        auto iter = addPublisher<Map<Tin, Tout>, DataSource<Tin> >(op);
+        return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+
       }
       else {
         std::vector<std::shared_ptr<Map<Tin, Tout>>> ops;
         for (int i = 0; i < numPartitions; i++) {
           ops.push_back(std::make_shared<Map<Tin, Tout>>(func));
         }
-        addPartitionedPublisher<Map<Tin, Tout>, Tin>(ops);
+        auto iter = addPartitionedPublisher<Map<Tin, Tout>, Tin>(ops);
+        return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
       }
-      return *this;
     }
 
     /**
@@ -600,7 +569,7 @@ public:
      * @return a reference to the pipe
      */
     template <typename Tin, typename Tout, typename AggrState>
-    Pipe& aggregate(AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0) {
+    Pipe aggregate(AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0) {
       return aggregate<Tin, Tout, AggrState>(AggrState::finalize, AggrState::iterate, tType, tInterval);
     }
 
@@ -648,13 +617,13 @@ public:
       * @return a reference to the pipe
       */
       template <typename Tin, typename Tout, typename AggrState>
-      Pipe& aggregate(typename Aggregation<Tin, Tout, AggrState>::FinalFunc finalFun,
+      Pipe aggregate(typename Aggregation<Tin, Tout, AggrState>::FinalFunc finalFun,
                      typename Aggregation<Tin, Tout, AggrState>::IterateFunc iterFun,
                      AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0) {
        auto op = std::make_shared<Aggregation<Tin, Tout, AggrState> >(std::make_shared<AggrState>(),
              finalFun, iterFun, tType, tInterval);
-       addPublisher<Aggregation<Tin, Tout, AggrState>, DataSource<Tin> >(op);
-       return *this;
+       auto iter = addPublisher<Aggregation<Tin, Tout, AggrState>, DataSource<Tin> >(op);
+       return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
      }
 
      /**
@@ -716,7 +685,7 @@ public:
      * @return a reference to the pipe
      */
     template <typename Tin, typename Tout, typename AggrState, typename KeyType = DefaultKeyType>
-    Pipe& groupBy(std::shared_ptr<AggrState> aggrStatePtr,
+    Pipe groupBy(std::shared_ptr<AggrState> aggrStatePtr,
                     typename GroupedAggregation<Tin, Tout, AggrState, KeyType>::FinalFunc finalFun,
                     typename GroupedAggregation<Tin, Tout, AggrState, KeyType>::IterateFunc iterFun,
                     AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0) {
@@ -727,7 +696,8 @@ public:
         auto op =
           std::make_shared<GroupedAggregation<Tin, Tout, AggrState, KeyType> >(aggrStatePtr,
               keyFunc, finalFun, iterFun, tType, tInterval);
-        addPublisher<GroupedAggregation<Tin, Tout, AggrState, KeyType>, DataSource<Tin> >(op);
+        auto iter = addPublisher<GroupedAggregation<Tin, Tout, AggrState, KeyType>, DataSource<Tin> >(op);
+        return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
       } catch (boost::bad_any_cast &e) {
         BOOST_ASSERT_MSG(false, "No KeyExtractor defined for groupBy.");
       }
@@ -755,12 +725,12 @@ public:
      * TODO: make better
      */
     template <typename Tin, typename Tout, typename RelatedValueType>
-    Pipe& matchByNFA(typename NFAController<Tin, Tout, RelatedValueType>::NFAControllerPtr nfa) {
+    Pipe matchByNFA(typename NFAController<Tin, Tout, RelatedValueType>::NFAControllerPtr nfa) {
     	auto op = std::make_shared<Matcher<Tin, Tout, RelatedValueType>>(
 				Matcher<Tin, Tout, RelatedValueType>::FirstMatch);
     	op->setNFAController(nfa);
-      addPublisher<Matcher<Tin, Tout, RelatedValueType>, DataSource<Tin> >(op);
-    	return *this;
+      auto iter = addPublisher<Matcher<Tin, Tout, RelatedValueType>, DataSource<Tin> >(op);
+      return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
     }
     /**
      * @brief Creates an operator for joining two streams represented by pipes.
@@ -784,7 +754,7 @@ public:
      * @return a reference to the pipe
      */
     template <typename T1, typename T2, typename KeyType = DefaultKeyType>
-    Pipe& join(Pipe& otherPipe,
+    Pipe join(Pipe& otherPipe,
                typename SHJoin<T1, T2, KeyType>::JoinPredicateFunc pred) {
       try {
         typedef std::function<KeyType(const T1&)> LKeyExtractorFunc;
@@ -809,11 +779,11 @@ public:
         connectChannels(otherOp->getOutputDataChannel(), op->getRightInputDataChannel());
         connectChannels(otherOp->getOutputPunctuationChannel(), op->getInputPunctuationChannel());
 
-	      publishers.push_back(op);
+        auto iter = dataflow->addPublisher(op);
+        return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
       } catch (boost::bad_any_cast &e) {
         BOOST_ASSERT_MSG(false, "No KeyExtractor defined for SHJoin.");
       }
-      return *this;
     }
 
     /**
@@ -836,45 +806,81 @@ public:
      * @return a reference to the pipe
      */
     template <typename T, typename KeyType = DefaultKeyType>
-    Pipe& toTable(std::shared_ptr<Table<T, KeyType>> tbl, bool autoCommit = true) {
+    Pipe toTable(std::shared_ptr<Table<T, KeyType>> tbl, bool autoCommit = true) {
       typedef std::function<KeyType(const T&)> KeyExtractorFunc;
 
       try {
         KeyExtractorFunc keyFunc = boost::any_cast<KeyExtractorFunc>(keyExtractor);
 
         auto op = std::make_shared<ToTable<T, KeyType> >(tbl, keyFunc, autoCommit);
-        addPublisher<ToTable<T, KeyType>, DataSource<T> >(op);
+        auto iter = addPublisher<ToTable<T, KeyType>, DataSource<T> >(op);
+        return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
       } catch (boost::bad_any_cast &e) {
         BOOST_ASSERT_MSG(false, "No KeyExtractor defined for ToTable.");
       }
-
-      return *this;
     }
 
+    /**
+     * @brief
+     *
+     * @tparam
+     * @param pFun
+     * @param nPartitions
+     * @return
+     */
     template <typename T>
-    Pipe& partitionBy(typename PartitionBy<T>::PartitionFunc pFun, unsigned int nPartitions) {
+    Pipe partitionBy(typename PartitionBy<T>::PartitionFunc pFun, unsigned int nPartitions) {
       auto op = std::make_shared<PartitionBy<T>>(pFun, nPartitions);
-      addPublisher<PartitionBy<T>, DataSource<T> >(op);
-      partitioningState = FirstInPartitioning;
-      numPartitions = nPartitions;
-      return *this;
+      auto iter = addPublisher<PartitionBy<T>, DataSource<T> >(op);
+      return Pipe(dataflow, iter, keyExtractor, timestampExtractor, FirstInPartitioning, nPartitions);
     }
 
+    /**
+     * @brief
+     *
+     * @tparam
+     * @return
+     */
     template <typename T>
-    Pipe& merge() {
+    Pipe merge() {
       auto op = std::make_shared<Merge<T> >();
-      std::cout << "partitioningState = " << partitioningState << std::endl;
       BOOST_ASSERT_MSG(partitioningState == NextInPartitioning, "Nothing to merge in topology.");
-      for (auto iter = getPublishers(); iter != publishers.end(); iter++) {
+      for (auto iter = getPublishers(); iter != dataflow->publisherEnd(); iter++) {
         auto pOp = dynamic_cast<DataSource<T> *>(iter->get());
         BOOST_ASSERT_MSG(pOp != nullptr,
           "Cannot obtain DataSource from pipe probably due to incompatible tuple types.");
         CREATE_LINK(pOp, op);
       }
-      dataflow->addPublisher(op);
-      publishers.push_back(op);
-      partitioningState = NoPartitioning;
-      return *this;
+      auto iter = dataflow->addPublisher(op);
+      return Pipe(dataflow, iter, keyExtractor, timestampExtractor, NoPartitioning, 0);
+    }
+
+    /**
+     * @brief  Create a new barrier operator evaluating the given predicate
+     * on each incoming tuple.
+     *
+     * @tparam
+     *      the input tuple type (usually a TuplePtr) for the operator.
+     * @param cVar a condition variable for signaling when the predicate
+     *             shall be re-evaluated
+     * @param mtx the mutex required to access the condition variable
+     * @param f function pointer to a barrier predicate
+     */
+    template <typename T>
+    Pipe barrier(std::condition_variable& cVar, std::mutex& mtx, typename Barrier<T>::PredicateFunc f) {
+      if (partitioningState == NoPartitioning) {
+        auto op = std::make_shared<Barrier<T> >(cVar, mtx, f);
+        auto iter = addPublisher<Barrier<T>, DataSource<T> >(op);
+        return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+      }
+      else {
+        std::vector<std::shared_ptr<Barrier<T>>> ops;
+        for (int i = 0; i < numPartitions; i++) {
+          ops.push_back(std::make_shared<Barrier<T> >(cVar, mtx, f));
+        }
+        auto iter = addPartitionedPublisher<Barrier<T>, T>(ops);
+        return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+      }
     }
   };
 }

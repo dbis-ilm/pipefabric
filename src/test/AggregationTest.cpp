@@ -88,6 +88,9 @@ TEST_CASE( "Compute an incremental aggregate on the entire stream", "[Aggregatio
 	CREATE_LINK(aggr, mockup);
 
 	mockup->start();
+  
+  REQUIRE(mockup->numTuplesProcessed() == expected.size());
+  
 }
 
 TEST_CASE( "Compute an incremental min/maxaggregate on the stream", "[Aggregation]" ) {
@@ -120,6 +123,9 @@ TEST_CASE( "Compute an incremental min/maxaggregate on the stream", "[Aggregatio
 	CREATE_LINK(aggr, mockup);
 
 	mockup->start();
+  
+  REQUIRE(mockup->numTuplesProcessed() == expected.size());
+
 }
 
 TEST_CASE( "Compute an incremental min/maxaggregate on a window", "[Aggregation]" ) {
@@ -160,4 +166,6 @@ TEST_CASE( "Compute an incremental min/maxaggregate on a window", "[Aggregation]
 	CREATE_LINK(aggr, mockup);
 
 	mockup->start();
+  
+  REQUIRE(mockup->numTuplesProcessed() == expected.size());
 }

@@ -52,4 +52,6 @@ TEST_CASE("Applying a map function to a tuple stream", "[Map]") {
 	CREATE_DATA_LINK(mop, mockup)
 
 	mockup->start();
+  
+  REQUIRE(mockup->numTuplesProcessed() == expected.size());
 }

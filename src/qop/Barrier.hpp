@@ -19,8 +19,11 @@
  * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
  */
 
-#ifndef Notify_hpp_
-#define Notify_hpp_
+#ifndef Barrier_hpp_
+#define Barrier_hpp_
+
+#include <condition_variable>
+#include <mutex>
 
 #include "qop/UnaryTransform.hpp"
 #include "qop/OperatorMacros.hpp"
@@ -28,55 +31,54 @@
 namespace pfabric {
 
   /**
-   * @brief Notify is an operator for triggering callbacks on each tuple of a data stream.
+   * @brief Barrier is an operator for delaying the forwarding of tuples
+   *        of a stream based on a given predicate.
    *
-   * Notify is an operator for triggering callbacks. It forwards all tuples
-   * to its subscribers and invokes the callback for each tuple.
-   * Because notify does not modify the tuple structure, the template is parameterized
-   * only by one tuple type representing both input and output.
+   * The Barrier operator can be used to synchronize the processing of
+   * a stream based on an external condition. For this purpose, the given
+   * predicate function is evaluated and only if this predicate is satisfied
+   * the tuple is forwarded to the subscribers. Otherwise, the tuple and
+   * all subsequent tuples are blocked. The predicate is re-evaluated for the
+   * tuple if the given condition variable is changed.
    *
    * @tparam StreamElement
-   *    the input data stream element type
+   *    the data stream element type which shall be filtered
    */
   template<typename StreamElement>
-  class Notify : public UnaryTransform<StreamElement, StreamElement> {
+  class Barrier : public UnaryTransform<StreamElement, StreamElement> {
   private:
     PFABRIC_UNARY_TRANSFORM_TYPEDEFS(StreamElement, StreamElement);
 
   public:
 
     /**
-     * Typedef for a function pointer to a callback function.
+     * Typedef for a function pointer to a barrier predicates.
      */
-    typedef std::function<void(const StreamElement&, bool)> CallbackFunc;
+    typedef std::function<bool(const StreamElement&)> PredicateFunc;
 
-    typedef std::function<void(const PunctuationPtr&)> PunctuationCallbackFunc;
     /**
-     * @brief Construct a new instance of the notify operator.
-     *
-     * Create a new notify operator invoking the given callback
+     * Create a new barrier operator evaluating the given predicate
      * on each incoming tuple.
      *
-     * @param[in] f
-     *      a function pointer or lambda function representing the callback
-     *      that is invoked for each input tuple
-     * @param[in] pf
-     *      an optional function pointer or lambda function representing the callback
-     *      that is invoked for each punctuation
+     * @param cVar a condition variable for signaling when the predicate
+     *             shall be re-evaluated
+     * @param mtx the mutex required to access the condition variable
+     * @param f function pointer to a barrier predicate
      */
-    Notify(CallbackFunc f, PunctuationCallbackFunc pf = nullptr) : mFunc(f), mPunctFunc(pf) {}
+    Barrier(std::condition_variable& cVar, std::mutex& mtx, PredicateFunc f) :
+      mCond(cVar), mMtx(mtx), mPred(f) {}
 
     /**
      * @brief Bind the callback for the data channel.
      */
-    BIND_INPUT_CHANNEL_DEFAULT(InputDataChannel, Notify, processDataElement);
+    BIND_INPUT_CHANNEL_DEFAULT(InputDataChannel, Barrier, processDataElement);
 
     /**
      * @brief Bind the callback for the punctuation channel.
      */
-    BIND_INPUT_CHANNEL_DEFAULT(InputPunctuationChannel, Notify, processPunctuation);
+    BIND_INPUT_CHANNEL_DEFAULT(InputPunctuationChannel, Barrier, processPunctuation);
 
-    const std::string opName() const override { return std::string("Notify"); }
+    const std::string opName() const override { return std::string("Barrier"); }
 
   private:
 
@@ -89,15 +91,13 @@ namespace pfabric {
      *    the incoming punctuation tuple
      */
     void processPunctuation(const PunctuationPtr& punctuation) {
-      if (mPunctFunc != nullptr)
-        mPunctFunc(punctuation);
       this->getOutputPunctuationChannel().publish(punctuation);
     }
 
     /**
      * @brief This method is invoked when a stream element arrives from the publisher.
      *
-     * It invokes the callback and forwards the incoming stream element.
+     * It forwards the incoming stream element if it satisfies the filter predicate.
      *
      * @param[in] data
      *    the incoming stream element
@@ -105,13 +105,17 @@ namespace pfabric {
      *    flag indicating whether the tuple is new or invalidated now
      */
     void processDataElement(const StreamElement& data, const bool outdated) {
-      mFunc(data, outdated);
+      std::unique_lock<std::mutex> lock(mMtx);
+      while (!mPred(data)) {
+        mCond.wait(lock);
+      }
       this->getOutputDataChannel().publish(data, outdated);
     }
 
 
-    CallbackFunc mFunc;                 //< function pointer to the callback
-    PunctuationCallbackFunc mPunctFunc; //< function pointer to the punctuation callback
+    std::condition_variable& mCond;  //< condition variable for checking the predicate
+    std::mutex& mMtx;                //< mutex for accessing the condition variable
+    PredicateFunc mPred;             //< function pointer to the barrier predicate
   };
 
 } // namespace pfabric

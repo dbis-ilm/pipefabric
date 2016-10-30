@@ -3,11 +3,11 @@
 
 #include "catch.hpp"
 
-#include <boost/core/ignore_unused.hpp>
 #include <boost/algorithm/string/find_iterator.hpp>
 #include <boost/algorithm/string.hpp>
 
 #include <vector>
+#include <mutex>
 
 #include "core/Tuple.hpp"
 #include "qop/Map.hpp"
@@ -94,7 +94,19 @@ public:
 		}
 	}
 
-	int numTuplesProcessed() const { return tuplesProcessed; }
+	int numTuplesProcessed() const {
+		int res = 0;
+		{
+			std::lock_guard<std::mutex> guard(mMtx);
+			res = tuplesProcessed;
+		}
+		return res;
+	}
+
+	void addExpected(const std::vector<OutputStreamElement>& expected) {
+		std::lock_guard<std::mutex> guard(mMtx);
+		expectedTuples.insert(expectedTuples.end(), expected.begin(), expected.end());
+	}
 
 	/**
 	 * @brief Bind the callback for the data channel.
@@ -109,6 +121,7 @@ public:
 private:
 
 	void processDataElement( const OutputStreamElement& data, const bool outdated ) {
+		std::lock_guard<std::mutex> guard(mMtx);
 		// std::cout << "StreamMockup::processDataElement: " << data << std::endl;
 		REQUIRE(unsigned(tuplesProcessed) < expectedTuples.size());
 		if (compareOrdered) {
@@ -149,6 +162,7 @@ private:
 	int tuplesProcessed;
 	bool compareOrdered;
 	CompareFunc compareFunc;
+	mutable std::mutex mMtx;
 };
 
 }
