@@ -29,6 +29,10 @@
 
 namespace pfabric {
 
+  /**
+   * @brief TODO
+   *
+   */
   class Dataflow {
   public:
     Dataflow() {}
@@ -39,13 +43,41 @@ namespace pfabric {
     typedef std::list<BaseOpPtr> BaseOpList;
     typedef BaseOpList::iterator BaseOpIterator;
 
+    /**
+     * @brief TODO
+     *
+     * @param op
+     * @return
+     */
     BaseOpIterator addPublisher(BaseOpPtr op);
 
+    /**
+     * @brief TODO
+     *
+     * @param lst
+     * @return
+     */
     BaseOpIterator addPublisherList(const BaseOpList& lst);
 
+    /**
+     * @brief TODO
+     *
+     * @return
+     */
     BaseOpIterator publisherEnd() { return publishers.end(); }
+
+    /**
+     * @brief TODO
+     *
+     * @return
+     */
     BaseOpIterator publisherBegin() { return publishers.begin(); }
 
+    /**
+     * @brief TODO
+     *
+     * @param op
+     */
     void addSink(BaseOpPtr op);
 
     /**
@@ -59,8 +91,19 @@ namespace pfabric {
      */
     BaseOpPtr getPublisher();
 
+    /**
+     * @brief TODO
+     *
+     * @param num
+     * @return
+     */
     BaseOpIterator getPublishers(unsigned int num);
 
+    /**
+     * @brief TODO
+     *
+     * @return
+     */
     std::size_t size() const;
 
 private:

@@ -136,4 +136,27 @@ TEST_CASE("Creating a table with a given schema, inserting and deleting data", "
     });
     REQUIRE(updateDetected == true);
   }
+
+  SECTION("scanning the whole table") {
+    REQUIRE(testTable->size() == 10000);
+
+    unsigned int num = 0;
+    auto handle = testTable->select();
+    for (auto i = handle.first; i != handle.second; i++)
+      num++;
+
+    REQUIRE(num == testTable->size());
+  }
+
+  SECTION("scanning the table with a predicate") {
+    REQUIRE(testTable->size() == 10000);
+
+    unsigned int num = 0;
+    auto handle = testTable->select([](const MyTuplePtr& tp) {
+      return tp->getAttribute<0>() % 2 == 0;
+    });
+    for (auto i = handle.first; i != handle.second; i++)
+      num++;
+      REQUIRE(num == testTable->size() / 2);
+  }
 }

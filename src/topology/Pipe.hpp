@@ -848,14 +848,29 @@ public:
     }
 
     /**
-     * @brief
+     * @brief Create an operator for updating a given table with data from the
+     *        incoming tuple.
      *
+     * Create a Map operator that executes an update on the given table for
+     * each incoming stream tuple. The update function is the following function
+     *  @code
+     *     RecordType updateFunc(const &T data, bool outdated, const RecordType& old)
+     *  @endcode
+     *  where @c data is the stream element, @outdated the flag for outdated tuples,
+     *  and @old the old record from the table. This record should be updated
+     *  and returned.
      *
      * @tparam T
+     *      the input tuple type (usually a TuplePtr) for the operator.
      * @tparam RecordType
+     *    the record type of the table
      * @tparam KeyType
-     * @param tbl
-     * @param updateFunc
+     *    the data type representing keys in the table
+     * @param[in] tbl
+     *    a pointer to the table object which is updated. This table has to be
+     *    of type Table<RecordType, KeyType>
+     * @param[in] updateFunc
+     *    the update function which is executed for each stream tuple
      * @return a new pipe
      */
     template <typename T, typename RecordType, typename KeyType = DefaultKeyType>
@@ -879,26 +894,41 @@ public:
     }
     /*------------------------------ partitioning -----------------------------*/
     /**
-     * @brief
+     * @brief Create a PartitionBy operator.
      *
-     * @tparam
+     * Crate a PartitionBy operator for partitioning the input stream on given partition id
+     * which is derived using a user-defined function and forwarding the tuples of
+     * each partition to a subquery. Subqueries are registered via their input channels
+     * for each partition id.
+     *
+     * @tparam T
+     *   the data stream element type consumed by PartitionBy
+     *
      * @param pFun
-     * @param nPartitions
-     * @return
+     *        the function for deriving the partition id
+  	 * @param numPartitions
+     *        the number of partitions
+     * @return a new pipe
      */
     template <typename T>
     Pipe partitionBy(typename PartitionBy<T>::PartitionFunc pFun, unsigned int nPartitions)
       throw (TopologyException) {
+        if (partitioningState != NoPartitioning)
+          throw TopologyException("Cannot partition an already partitioned stream.");
       auto op = std::make_shared<PartitionBy<T>>(pFun, nPartitions);
       auto iter = addPublisher<PartitionBy<T>, DataSource<T> >(op);
       return Pipe(dataflow, iter, keyExtractor, timestampExtractor, FirstInPartitioning, nPartitions);
     }
 
     /**
-     * @brief
+     * @brief Create a Merge operator.
      *
-     * @tparam
-     * @return
+     * Create a Merge operator which subscribes to multiple streams and combines all tuples
+     * produced by these input stream into a single stream.
+     *
+     * @tparam T
+     *   the data stream element type consumed by PartitionBy
+     * @return a new pipe
      */
     template <typename T>
     Pipe merge() throw (TopologyException) {
@@ -926,6 +956,7 @@ public:
      *             shall be re-evaluated
      * @param mtx the mutex required to access the condition variable
      * @param f function pointer to a barrier predicate
+     * @return a new pipe
      */
     template <typename T>
     Pipe barrier(std::condition_variable& cVar, std::mutex& mtx, typename Barrier<T>::PredicateFunc f)

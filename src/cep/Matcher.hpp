@@ -21,6 +21,7 @@
 
 #ifndef  Matcher_hpp_
 #define  Matcher_hpp_
+
 #include "CEPEngine.hpp"
 #include "engine/FirstMatchEngine.hpp"
 #include "engine/NextMatchEngine.hpp"

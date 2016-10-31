@@ -6,12 +6,16 @@
 #include <unordered_map>
 #include <functional>
 #include <exception>
+#include <iterator>
 
 #include <mutex>
 #include <shared_mutex>
 
 #include <boost/signals2.hpp>
+
 #include "fmt/format.h"
+
+#include "table/FilterIterator.hpp"
 
 namespace pfabric {
 
@@ -46,10 +50,15 @@ protected:
 template <typename RecordType, typename KeyType = DefaultKeyType>
 class Table : public BaseTable {
 public:
-  typedef std::function<bool(const RecordType&)> Predicate;
+  typedef std::unordered_map<KeyType, RecordType> TableMap;
+
   typedef std::function<RecordType(const RecordType&)> UpdaterFunc;
 
   typedef boost::signals2::signal<void (const RecordType&, TableParams::ModificationMode)> ObserverCallback;
+
+  typedef FilterIterator<typename TableMap::iterator> TableIterator;
+  typedef typename TableIterator::Predicate Predicate;
+
 
   Table() {}
 
@@ -93,7 +102,7 @@ public:
 
   unsigned long updateByKey(KeyType key, UpdaterFunc ufunc) {
     std::unique_lock<std::mutex> lock(mMtx);
-    
+
     auto res = mDataTable.find(key);
     if (res != mDataTable.end()) {
       auto rec = ufunc(res->second);
@@ -129,7 +138,16 @@ public:
       throw TableException();
   }
 
-  // TODO: TableIterator select(Predicate func);
+  std::pair<TableIterator, TableIterator> select(Predicate func) {
+    return make_pair(makeFilterIterator(mDataTable.begin(), func),
+                      makeFilterIterator(mDataTable.end(), func));
+  }
+
+  std::pair<TableIterator, TableIterator> select() {
+    auto alwaysTrue = [](const RecordType&) { return true; };
+    return make_pair(makeFilterIterator(mDataTable.begin(), alwaysTrue),
+                      makeFilterIterator(mDataTable.end(), alwaysTrue));
+  }
 
   unsigned long size() const { return mDataTable.size(); }
 
@@ -156,7 +174,7 @@ private:
   }
 
   mutable std::mutex mMtx;
-  std::unordered_map<KeyType, RecordType> mDataTable;
+  TableMap mDataTable;
   ObserverCallback mImmediateObservers, mDeferredObservers;
 };
 

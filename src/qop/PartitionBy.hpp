@@ -44,7 +44,7 @@ namespace pfabric {
  * for each partition id.
  *
  * @tparam StreamElement
- *   the data stream element type consumed by Merge
+ *   the data stream element type consumed by PartitionBy
  */
 template<typename StreamElement>
 class PartitionBy : public UnaryTransform<StreamElement, StreamElement> {

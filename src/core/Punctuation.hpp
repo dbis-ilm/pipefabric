@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2014 The PipeFabric team,
- *                    All Rights Reserved.
+ * Copyright (c) 2014-16 The PipeFabric team,
+ *                       All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -116,6 +116,6 @@ private:
 	Timestamp mTstamp; //< the timestamp of the punctuation
 };
 
-} /* end namespace pquery */
+} /* end namespace pfabric */
 
 #endif
