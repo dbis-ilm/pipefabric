@@ -7,6 +7,9 @@
 #include <functional>
 #include <exception>
 
+#include <mutex>
+#include <shared_mutex>
+
 #include <boost/signals2.hpp>
 #include "fmt/format.h"
 
@@ -53,17 +56,25 @@ public:
   ~Table() { std::cout << "deallocate table" << std::endl; }
 
   void insert(KeyType key, const RecordType& rec) throw (TableException) {
-    mDataTable.insert({key, rec});
+    {
+      std::lock_guard<std::mutex> lock(mMtx);
+      mDataTable.insert({key, rec});
+    }
     notifyObservers(rec, TableParams::Insert, TableParams::Immediate);
   }
 
   unsigned long deleteByKey(KeyType key) {
-    if (!mImmediateObservers.empty()) {
-      auto res = mDataTable.find(key);
-      if (res != mDataTable.end())
-        notifyObservers(res->second, TableParams::Delete, TableParams::Immediate);
+    unsigned long res = 0;
+    {
+      std::lock_guard<std::mutex> lock(mMtx);
+      if (!mImmediateObservers.empty()) {
+        auto res = mDataTable.find(key);
+        if (res != mDataTable.end())
+          notifyObservers(res->second, TableParams::Delete, TableParams::Immediate);
+      }
+      res = mDataTable.erase(key);
     }
-    return mDataTable.erase(key);
+    return res;
   }
 
   unsigned long deleteWhere(Predicate func) {
@@ -81,15 +92,20 @@ public:
   }
 
   unsigned long updateByKey(KeyType key, UpdaterFunc ufunc) {
+    std::unique_lock<std::mutex> lock(mMtx);
+    
     auto res = mDataTable.find(key);
     if (res != mDataTable.end()) {
       auto rec = ufunc(res->second);
       mDataTable[key] = rec;
+      lock.unlock();
       notifyObservers(rec, TableParams::Update, TableParams::Immediate);
       return 1;
     }
-    else
-      throw TableException();
+    else {
+      lock.unlock();
+    }
+    return 0;
   }
 
   unsigned long updateWhere(Predicate pfunc, UpdaterFunc ufunc) {
@@ -139,8 +155,9 @@ private:
     }
   }
 
-   std::unordered_map<KeyType, RecordType> mDataTable;
-   ObserverCallback mImmediateObservers, mDeferredObservers;
+  mutable std::mutex mMtx;
+  std::unordered_map<KeyType, RecordType> mDataTable;
+  ObserverCallback mImmediateObservers, mDeferredObservers;
 };
 
 }

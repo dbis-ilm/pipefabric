@@ -37,7 +37,7 @@ TEST_CASE("Building and running a simple topology", "[Topology]") {
   auto s1 = t.newStreamFromFile("file.csv")
     .extract<T1>(',')
     .where<T1>([](auto tp, bool outdated) { return getAttribute<0>(tp) % 2 == 0; } )
-    .map<T1,T2>([](auto tp) -> T2 {
+    .map<T1,T2>([](auto tp, bool outdated) -> T2 {
       return makeTuplePtr(getAttribute<2>(tp), getAttribute<0>(tp));
     })
     .assignTimestamps<T2>([](auto tp) { return getAttribute<1>(tp); })
@@ -161,7 +161,7 @@ TEST_CASE("Building and running a topology with partitioning", "[Topology]") {
     .extract<T1>(',')
     .partitionBy<T1>([](auto tp) { return getAttribute<0>(tp) % 5; }, 5)
     .where<T1>([](auto tp, bool outdated) { return getAttribute<0>(tp) % 2 == 0; } )
-    .map<T1,T2>([](auto tp) -> T2 { return makeTuplePtr(getAttribute<0>(tp)); } )
+    .map<T1,T2>([](auto tp, bool outdated) -> T2 { return makeTuplePtr(getAttribute<0>(tp)); } )
     .merge<T2>()
     .notify<T2>([&](auto tp, bool outdated) {
       std::lock_guard<std::mutex> lock(r_mutex);

@@ -847,6 +847,36 @@ public:
       }
     }
 
+    /**
+     * @brief
+     *
+     *
+     * @tparam T
+     * @tparam RecordType
+     * @tparam KeyType
+     * @param tbl
+     * @param updateFunc
+     * @return a new pipe
+     */
+    template <typename T, typename RecordType, typename KeyType = DefaultKeyType>
+    Pipe updateTable(std::shared_ptr<Table<RecordType, KeyType>> tbl,
+                    std::function<RecordType(const T&, bool, const RecordType&)> updateFunc)
+          throw (TopologyException) {
+      typedef std::function<KeyType(const T&)> KeyExtractorFunc;
+
+      try {
+        KeyExtractorFunc keyFunc = boost::any_cast<KeyExtractorFunc>(keyExtractor);
+        return map<T, T>([=](auto tp, bool outdated) {
+            KeyType key = keyFunc(tp);
+            tbl->updateByKey(key, [=](const RecordType& old) -> RecordType {
+                  return updateFunc(tp, outdated, old);
+            });
+            return tp;
+        });
+      } catch (boost::bad_any_cast &e) {
+        throw TopologyException("No KeyExtractor defined for updateTable.");
+      }
+    }
     /*------------------------------ partitioning -----------------------------*/
     /**
      * @brief

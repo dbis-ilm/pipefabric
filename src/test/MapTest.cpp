@@ -40,7 +40,7 @@ TEST_CASE("Applying a map function to a tuple stream", "[Map]") {
 
 	auto mockup = std::make_shared< StreamMockup<InTuplePtr, OutTuplePtr> >(input, expected);
 
-	auto map_fun = [&]( const InTuplePtr& tp ) -> OutTuplePtr {
+	auto map_fun = [&]( const InTuplePtr& tp, bool ) -> OutTuplePtr {
 		return makeTuplePtr(
 			tp->getAttribute<0>(), tp->getAttribute<2>(), tp->getAttribute<1>(),
 			tp->getAttribute<1>() + tp->getAttribute<2>()
@@ -52,6 +52,6 @@ TEST_CASE("Applying a map function to a tuple stream", "[Map]") {
 	CREATE_DATA_LINK(mop, mockup)
 
 	mockup->start();
-  
+
   REQUIRE(mockup->numTuplesProcessed() == expected.size());
 }

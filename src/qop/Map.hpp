@@ -52,7 +52,7 @@ public:
 	/**
 	 * Typedef for a function pointer to a projection function.
 	 */
-	typedef std::function< OutputStreamElement (const InputStreamElement&) > MapFunc;
+	typedef std::function< OutputStreamElement (const InputStreamElement&, bool) > MapFunc;
 
 	/**
 	 * @brief Construct a new instance of the map (projection) operator.
@@ -101,7 +101,7 @@ private:
 	 *    flag indicating whether the tuple is new or invalidated now
 	 */
 	void processDataElement( const InputStreamElement& data, const bool outdated ) {
-		auto res = mFunc( data );
+		auto res = mFunc( data, outdated );
 		this->getOutputDataChannel().publish( res, outdated );
 	}
 
