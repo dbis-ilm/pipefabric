@@ -182,3 +182,4 @@ TEST_CASE("Building and running a topology with partitioning", "[Topology]") {
     REQUIRE(results[i] == i * 2);
   }
 }
+

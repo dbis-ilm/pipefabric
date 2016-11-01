@@ -37,6 +37,7 @@
 #include "qop/ZMQSource.hpp"
 #include "qop/ToTable.hpp"
 #include "qop/FromTable.hpp"
+#include "qop/SelectFromTable.hpp"
 
 #include "topology/Pipe.hpp"
 #include "topology/Dataflow.hpp"
@@ -217,6 +218,31 @@ namespace pfabric {
     Pipe newStreamFromTable(std::shared_ptr<Table<T, KeyType>> tbl,
                              TableParams::NotificationMode mode = TableParams::Immediate) {
       auto op = std::make_shared<FromTable<T, KeyType>>(tbl, mode);
+      return Pipe(dataflow, dataflow->addPublisher(op));
+    }
+
+    /**
+     * @brief Create a SeletFromTable operator as data source.
+     *
+     * Create a new SelectFromTable operator that produces a stream of tuples
+     * from the given table.
+     *
+     * @tparam T
+     *    the record type of the table, usually a @c TuplePtr<Tuple<...> >
+     * @tparam KeyType
+     *    the data type of the key of the table
+     * @param tbl
+     *    the table that is read
+     * @param pred
+     *    an optional filter predicate
+     * @return
+     *    a new pipe where the table acts as the source
+     */
+    template<typename T, typename KeyType = DefaultKeyType>
+    Pipe selectFromTable(std::shared_ptr<Table<T, KeyType>> tbl,
+        typename Table<T, KeyType>::Predicate pred = nullptr) {
+      auto op = std::make_shared<SelectFromTable<T, KeyType>>(tbl, pred);
+      registerStartupFunction([=]() -> unsigned long { return op->start(); });
       return Pipe(dataflow, dataflow->addPublisher(op));
     }
   };

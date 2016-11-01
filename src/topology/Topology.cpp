@@ -75,11 +75,6 @@ Pipe Topology::newStreamFromFile(const std::string& fname) {
   // and create a new pipe; we use a raw pointer here because
   // we want to return a reference to a Pipe object
   return Pipe(dataflow, dataflow->addPublisher(op));
-  /*
-  auto s = new Pipe(op, dataflow);
-  pipes.push_back(s);
-  return *s;
-  */
 }
 
 Pipe Topology::newStreamFromREST(unsigned int port,

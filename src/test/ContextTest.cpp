@@ -47,3 +47,40 @@ TEST_CASE("Building and running a topology via the context", "[Context]") {
     REQUIRE(tp->getAttribute<2>() == i * 100 + 0.5);
   }
 }
+
+
+TEST_CASE("Building and running a topology with SelectFromTable", "[Context][Topology]") {
+  typedef TuplePtr<Tuple<int, std::string, double> > T1;
+
+  PFabricContext ctx;
+
+  REQUIRE(! ctx.getTable<T1>("MyTable"));
+
+  auto testTable = ctx.createTable<T1, int>("MyTable");
+
+  TestDataGenerator tgen("file.csv");
+  tgen.writeData(100);
+
+  {
+    auto t = ctx.createTopology();
+
+    auto s = t->newStreamFromFile("file.csv")
+    .extract<T1>(',')
+    .keyBy<T1, int>([](auto tp) { return getAttribute<0>(tp); })
+    .toTable<T1, int>(testTable);
+
+    t->start(false);
+    REQUIRE(testTable->size() == 100);
+  }
+
+  {
+    unsigned int num = 0;
+    auto t = ctx.createTopology();
+
+    auto s = t->selectFromTable<T1>(testTable)
+      .notify<T1>([&](auto tp, bool outdated) { num++; });
+
+    t->start(false);
+    REQUIRE(testTable->size() == num); 
+  }
+}
