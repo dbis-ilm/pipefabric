@@ -129,6 +129,10 @@ private:
 			// simply compare the current tuple with the expected tuple at the
 			// same position.
 			REQUIRE(data->data() == expectedTuples[tuplesProcessed]->data());
+			// TODO: handle Null values
+			for (auto i = 0u; i < OutputDataElementTraits::NUM_ATTRIBUTES; i++) {
+				REQUIRE(data->isNull(i) == expectedTuples[tuplesProcessed]->isNull(i));
+			}
 			tuplesProcessed++;
 		}
 		else {

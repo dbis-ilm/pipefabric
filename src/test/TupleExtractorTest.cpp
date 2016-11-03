@@ -43,7 +43,7 @@ TEST_CASE("Extracting tuples from text lines", "[TupleExtractor]") {
 	CREATE_DATA_LINK(extractor, mockup)
 
 	mockup->start();
-  
+
   REQUIRE(mockup->numTuplesProcessed() == expected.size());
 }
 
@@ -68,7 +68,7 @@ TEST_CASE("Extracting tuples from text lines with a non-standard separator", "[T
 	CREATE_DATA_LINK(extractor, mockup)
 
 	mockup->start();
-  
+
   REQUIRE(mockup->numTuplesProcessed() == expected.size());
 }
 
@@ -85,6 +85,9 @@ TEST_CASE("Extracting tuples from text lines with null values", "[TupleExtractor
 		makeTuplePtr(1, 0, 10),
 		makeTuplePtr(0, 0, 20) };
 
+	expected[0]->setNull(2); expected[1]->setNull(1);
+	expected[2]->setNull(0); expected[2]->setNull(1);
+
 	auto mockup = std::make_shared< StreamMockup<TStringPtr, ATuplePtr> >(input, expected);
 
 	auto extractor = std::make_shared< TupleExtractor<ATuplePtr> >('|');
@@ -93,7 +96,7 @@ TEST_CASE("Extracting tuples from text lines with null values", "[TupleExtractor
 	CREATE_DATA_LINK(extractor, mockup)
 
 	mockup->start();
-  
+
   REQUIRE(mockup->numTuplesProcessed() == expected.size());
 }
 
@@ -121,7 +124,7 @@ TEST_CASE("Extracting tuples from JSON strings", "[JsonExtractor]") {
 	CREATE_DATA_LINK(extractor, mockup)
 
 	mockup->start();
-  
+
   REQUIRE(mockup->numTuplesProcessed() == expected.size());
 }
 
@@ -147,6 +150,6 @@ TEST_CASE("Deserializing tuples from buffer", "[TupleDeserializer]") {
   CREATE_DATA_LINK(deserializer, mockup)
 
   mockup->start();
-  
+
   REQUIRE(mockup->numTuplesProcessed() == expected.size());
 }

@@ -50,12 +50,13 @@ TEST_CASE( "Compute a simple aggregate on the entire stream", "[Aggregation]" ) 
 
 	auto mockup = std::make_shared< StreamMockup<InTuplePtr, OutTuplePtr> >(input, expected);
 	auto aggr = std::make_shared<TestAggregation>(
-							 std::make_shared<MyAggrState>(), MyAggrState::finalize, MyAggrState::iterate, TriggerByCount, 100);
+							 std::make_shared<MyAggrState>(), MyAggrState::finalize, MyAggrState::iterate, TriggerByCount, 6);
 
 	CREATE_LINK(mockup, aggr);
 	CREATE_LINK(aggr, mockup);
 
 	mockup->start();
+	REQUIRE(mockup->numTuplesProcessed() == expected.size());
 }
 
 TEST_CASE( "Compute an incremental aggregate on the entire stream", "[Aggregation]" ) {
@@ -88,9 +89,9 @@ TEST_CASE( "Compute an incremental aggregate on the entire stream", "[Aggregatio
 	CREATE_LINK(aggr, mockup);
 
 	mockup->start();
-  
+
   REQUIRE(mockup->numTuplesProcessed() == expected.size());
-  
+
 }
 
 TEST_CASE( "Compute an incremental min/maxaggregate on the stream", "[Aggregation]" ) {
@@ -123,7 +124,7 @@ TEST_CASE( "Compute an incremental min/maxaggregate on the stream", "[Aggregatio
 	CREATE_LINK(aggr, mockup);
 
 	mockup->start();
-  
+
   REQUIRE(mockup->numTuplesProcessed() == expected.size());
 
 }
@@ -166,6 +167,6 @@ TEST_CASE( "Compute an incremental min/maxaggregate on a window", "[Aggregation]
 	CREATE_LINK(aggr, mockup);
 
 	mockup->start();
-  
+
   REQUIRE(mockup->numTuplesProcessed() == expected.size());
 }

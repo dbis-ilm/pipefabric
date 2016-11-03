@@ -36,6 +36,7 @@
 #include "qop/Notify.hpp"
 #include "qop/Queue.hpp"
 #include "qop/Map.hpp"
+#include "qop/StatefulMap.hpp"
 #include "qop/TupleExtractor.hpp"
 #include "qop/JsonExtractor.hpp"
 #include "qop/TupleDeserializer.hpp"
@@ -551,6 +552,41 @@ public:
           ops.push_back(std::make_shared<Map<Tin, Tout>>(func));
         }
         auto iter = addPartitionedPublisher<Map<Tin, Tout>, Tin>(ops);
+        return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+      }
+    }
+
+    /**
+     * @brief Creates a stateful map operator.
+     *
+     * A StatefulMap operator produces tuples according to a given map function by
+     * incorporating a state which is modified inside the map function.
+     *
+     * @tparam Tin
+     *      the input tuple type (usually a TuplePtr) for the operator.
+     * @tparam Tout
+     *      the result tuple type (usually a TuplePtr) for the operator.
+     * @tparam StateRep
+     *    the class for representing the state
+     * @param[in] func
+     *      a function pointer or lambda function accepting a tuple of type @c Tin and creating
+     *      a new tuple of type @c Tout
+     * @return new pipe
+     */
+    template <typename Tin, typename Tout, typename State>
+    Pipe statefulMap(typename StatefulMap<Tin, Tout, State>::MapFunc func) throw (TopologyException) {
+      if (partitioningState == NoPartitioning) {
+        auto op = std::make_shared<StatefulMap<Tin, Tout, State> >(func);
+        auto iter = addPublisher<StatefulMap<Tin, Tout, State>, DataSource<Tin> >(op);
+        return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+
+      }
+      else {
+        std::vector<std::shared_ptr<StatefulMap<Tin, Tout, State>>> ops;
+        for (int i = 0; i < numPartitions; i++) {
+          ops.push_back(std::make_shared<StatefulMap<Tin, Tout, State>>(func));
+        }
+        auto iter = addPartitionedPublisher<StatefulMap<Tin, Tout, State>, Tin>(ops);
         return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
       }
     }

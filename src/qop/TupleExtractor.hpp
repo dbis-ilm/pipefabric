@@ -56,13 +56,15 @@ namespace pfabric {
      */
     TupleExtractor(char separator = ',') :
       ifs(separator),
-      data(new StringRef[OutputDataElementTraits::NUM_ATTRIBUTES]) {}
+      data(new StringRef[OutputDataElementTraits::NUM_ATTRIBUTES]),
+      nulls(new bool[OutputDataElementTraits::NUM_ATTRIBUTES]) {}
 
     /**
      * Desctructor for deallocating resources.
      */
     ~TupleExtractor() {
       delete [] data;
+      delete [] nulls;
     }
     /**
      * @brief Bind the callback for the data channel.
@@ -107,15 +109,24 @@ namespace pfabric {
       while (*s) {
         char* item = (char *)s;
         while (*s && *s != ifs) s++;
-        // TODO: don't use BOOST_ASSERT here - try to continue, e.g. by
-        // setting null values
-        BOOST_ASSERT(i < OutputDataElementTraits::NUM_ATTRIBUTES);
-        data[i++].setValues(item, s - item);
-        if (*s && !*(++s)) {
-          data[i++].setValues(nullptr, 0);
+        if ((s - item) == 0) {
+          data[i].setValues(nullptr, 0);
+          nulls[i] = true;
         }
+        else {
+          data[i].setValues(item, s - item);
+          nulls[i] = false;
+        }
+        s++; i++;
+        if (i == OutputDataElementTraits::NUM_ATTRIBUTES)
+          break;
       }
       auto res = OutputDataElementTraits::create(data);
+      // because the tuple parser doesn't handle null values we
+      // have to set the null flag manually
+      for (auto n = 0; n < OutputDataElementTraits::NUM_ATTRIBUTES; n++) {
+        if (nulls[n]) res->setNull(n);
+      }
       this->getOutputDataChannel().publish( res, outdated );
     }
 
@@ -123,6 +134,7 @@ namespace pfabric {
     char ifs;         //< the field separator
     StringRef *data;  //< a field of strings used to parse the values which is
                       //< reused for all tuples
+    bool *nulls;
   };
 
 } // namespace pfabric

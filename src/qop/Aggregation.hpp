@@ -112,7 +112,7 @@ namespace pfabric {
      */
     Aggregation( AggregateStatePtr aggrs, FinalFunc final_fun, IterateFunc it_fun,
                 AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0) :
-                mAggrState( dynamic_cast<AggregateState *>(aggrs->clone()) ),
+                mAggrState( /*dynamic_cast<AggregateState *>(aggrs->clone()) */aggrs),
                 mIterateFunc( it_fun ),
                 mFinalFunc( final_fun ),
                 mNotifier(tInterval > 0 && tType == TriggerByTime ?
@@ -138,7 +138,7 @@ namespace pfabric {
      */
     Aggregation( AggregateStatePtr aggrs, FinalFunc final_fun, IterateFunc it_fun,
                 TimestampExtractorFunc func, const unsigned int tInterval) :
-                mAggrState( dynamic_cast<AggregateState *>(aggrs->clone()) ),
+                mAggrState(/* dynamic_cast<AggregateState *>(aggrs->clone()) */ aggrs),
                 mIterateFunc( it_fun ), mFinalFunc( final_fun ),
                 mTimestampExtractor(func),
                 mTriggerType(TriggerByTimestamp), mTriggerInterval( tInterval ),
@@ -170,7 +170,7 @@ namespace pfabric {
      *    flag indicating whether the tuple is new or invalidated now
      */
     void processDataElement( const InputStreamElement& data, const bool outdated ) {
-      std::lock_guard<std::mutex> guard(aggrMtx);
+      std::unique_lock<std::mutex> myLock(aggrMtx);
 
       // the actual aggregation is outsourced to a user-defined expression
       mIterateFunc(data, mAggrState, outdated);
@@ -186,8 +186,10 @@ namespace pfabric {
         case TriggerByCount:
         {
           if (++mCounter == mTriggerInterval) {
+            myLock.unlock(); // we have to unlock here: produceAggregate will acquire its own lock
             notificationCallback();
             mCounter = 0;
+            return;
           }
           break;
         }
@@ -195,14 +197,17 @@ namespace pfabric {
         {
           auto ts = mTimestampExtractor(data);
           if (ts - mLastTriggerTime >= mTriggerInterval) {
+            myLock.unlock();
             notificationCallback();
             mLastTriggerTime = ts;
+            return;
           }
           break;
         }
         default:
           break;
       }
+      myLock.unlock();
     }
 
     /**

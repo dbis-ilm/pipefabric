@@ -37,7 +37,7 @@ namespace pfabric {
    * of a relational table.
    *
    * The SelectFromTable operator produces a stream of tuples
-   * from the given table.
+   * from the given table which can be optinally selected by a predicate.
    *
    * @tparam StreamElement
    *    the data stream element type which shall be retrieve from the table
