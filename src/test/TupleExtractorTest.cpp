@@ -100,6 +100,36 @@ TEST_CASE("Extracting tuples from text lines with null values", "[TupleExtractor
   REQUIRE(mockup->numTuplesProcessed() == expected.size());
 }
 
+TEST_CASE("Extracting more tuples from text lines with null values", "[TupleExtractor]") {
+	const char *s[] = {
+		"2010-03-03T17:34:40.328+0000|405979|974|LOL|Heinz Frank|405972|",
+		"2010-03-03T17:35:33.552+0000|406918|974|great|Heinz Frank|406917|" };
+
+	std::vector<TStringPtr> input = {
+			makeTuplePtr(StringRef(s[0], strlen(s[0]))),
+			makeTuplePtr(StringRef(s[1], strlen(s[1]))) };
+
+	typedef TuplePtr<Tuple<std::string, long, long, std::string, std::string, long, long>> CommentType;
+
+	std::vector<CommentType> expected = {
+		makeTuplePtr(std::string("2010-03-03T17:34:40.328+0000"),
+			405979l, 974l, std::string("LOL"), std::string("Heinz Frank"), 405972l, 0l),
+		makeTuplePtr(std::string("2010-03-03T17:35:33.552+0000"),
+			406918l, 974l, std::string("great"), std::string("Heinz Frank"), 406917l, 0l) };
+		expected[0]->setNull(6); expected[1]->setNull(6);
+
+	auto mockup = std::make_shared< StreamMockup<TStringPtr, CommentType> >(input, expected);
+
+	auto extractor = std::make_shared< TupleExtractor<CommentType> >('|');
+
+	CREATE_DATA_LINK(mockup, extractor)
+	CREATE_DATA_LINK(extractor, mockup)
+
+	mockup->start();
+
+	REQUIRE(mockup->numTuplesProcessed() == expected.size());
+}
+
 TEST_CASE("Extracting tuples from JSON strings", "[JsonExtractor]") {
 	const char *s[] = { "{ \"key1\": 0, \"key3\": 101, \"key2\": 10 }",
 		"{ \"key1\": 1, \"key2\": 11, \"key3\": 201 }",

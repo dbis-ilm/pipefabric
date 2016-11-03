@@ -121,6 +121,10 @@ namespace pfabric {
         if (i == OutputDataElementTraits::NUM_ATTRIBUTES)
           break;
       }
+      while (i < OutputDataElementTraits::NUM_ATTRIBUTES) {
+        data[i].setValues(nullptr, 0);
+        nulls[i++] = true;
+      }
       auto res = OutputDataElementTraits::create(data);
       // because the tuple parser doesn't handle null values we
       // have to set the null flag manually

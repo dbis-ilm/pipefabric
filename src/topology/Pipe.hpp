@@ -213,6 +213,14 @@ public:
       return Pipe(dataflow, tailIter, func, timestampExtractor, partitioningState, numPartitions);
     }
 
+    template <typename T, int N, typename KeyType = DefaultKeyType>
+    Pipe keyBy() {
+      std::function<KeyType(const T&)> func =
+        [](const T& tp) -> KeyType { return getAttribute<N>(tp); };
+      return Pipe(dataflow, tailIter, func,
+        timestampExtractor, partitioningState, numPartitions);
+    }
+
     /**
      * @brief Defines the timestamp extractor function for all subsequent operators.
      *
