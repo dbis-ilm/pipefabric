@@ -19,10 +19,9 @@
  * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
  */
 
-#ifndef STREAMELEMENTTRAITS_HPP_
-#define STREAMELEMENTTRAITS_HPP_
+#ifndef StreamElementTraits_hpp_
+#define StreamElementTraits_hpp_
 
-// #include "PipeFabricTypes.hpp"
 #include "PFabricTypes.hpp"
 
 #include <type_traits>
@@ -519,6 +518,16 @@ auto getAttribute( const StreamElementType& element ) ->
 	return StreamElementTraits< StreamElementType >::template getAttribute< ID >( element );
 }
 
+template<
+	AttributeIdx ID,
+	typename StreamElementType
+>
+auto get( const StreamElementType& element ) ->
+	decltype( (StreamElementTraits< StreamElementType >::template getAttribute< ID >( element )) )
+{
+	return StreamElementTraits< StreamElementType >::template getAttribute< ID >( element );
+}
+
 /**
  * @brief Get a specific attribute value from the stream element.
  *
@@ -539,6 +548,16 @@ template<
 	typename StreamElementType
 >
 auto getAttribute( StreamElementType& element ) ->
+	decltype( (StreamElementTraits< StreamElementType >::template getAttribute< ID >( element )) )
+{
+	return StreamElementTraits< StreamElementType >::template getAttribute< ID >( element );
+}
+
+template<
+	AttributeIdx ID,
+	typename StreamElementType
+>
+auto get( StreamElementType& element ) ->
 	decltype( (StreamElementTraits< StreamElementType >::template getAttribute< ID >( element )) )
 {
 	return StreamElementTraits< StreamElementType >::template getAttribute< ID >( element );
@@ -748,7 +767,7 @@ bool elementsEqual( const LeftStreamElement& leftElement, const RightStreamEleme
 	return impl::ElementsEqual< LeftElement::NUM_ATTRIBUTES >()( leftElement, rightElement );
 }
 
-} /* end namespace pquery */
+} /* end namespace pfabric */
 
 
-#endif /* STREAMELEMENTTRAITS_HPP_ */
+#endif /* StreamElementTraits_hpp_ */

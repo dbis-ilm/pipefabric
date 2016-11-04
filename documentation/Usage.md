@@ -18,12 +18,12 @@ typed parameters:
 auto tp = makeTuplePtr(1, std::string("a string"), 2.0);
 ```
 
-For accessing the individual components of an attribute we provide the `getAttribute<>` template
+For accessing the individual components of an attribute we provide the `get<>` template
 function where the template parameter is the position of the attribute in the tuple. In order to
 access the `string` component of tuple `tp` the following code an be used:
 
 ```C++
-auto s = getAttribute<1>(tp);
+auto s = get<1>(tp);
 ```
 
 The recommended interface for implementing stream processing pipelines is the `Topology` class
@@ -37,9 +37,9 @@ typedef TuplePtr<Tuple<double, int> > T2;
 Topology t;
 auto s = t.newStreamFromFile("file.csv")
   .extract<T1>(',')
-  .where<T1>([](auto tp, bool outdated) { return getAttribute<0>(tp) % 2 == 0; } )
+  .where<T1>([](auto tp, bool outdated) { return get<0>(tp) % 2 == 0; } )
   .map<T1,T2>([](auto tp) -> T2 {
-    return makeTuplePtr(getAttribute<2>(tp), getAttribute<0>(tp));
+    return makeTuplePtr(get<2>(tp), get<0>(tp));
   })
   .print<T2>(std::cout);
 
