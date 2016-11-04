@@ -722,8 +722,8 @@ public:
                      typename Aggregation<Tin, Tout, AggrState>::IterateFunc iterFun,
                      AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0)
                      throw (TopologyException) {
-       auto op = std::make_shared<Aggregation<Tin, Tout, AggrState> >(std::make_shared<AggrState>(),
-             finalFun, iterFun, tType, tInterval);
+       auto op = std::make_shared<Aggregation<Tin, Tout, AggrState> >(finalFun, iterFun,
+            tType, tInterval);
        auto iter = addPublisher<Aggregation<Tin, Tout, AggrState>, DataSource<Tin> >(op);
        return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
      }

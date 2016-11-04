@@ -117,13 +117,11 @@ public:
 	 * @param pmask
 	 * @param fullPublish
 	 */
-	GroupedAggregation(AggregateStatePtr aggrs,
-					GroupByFunc groupby_fun,
+	GroupedAggregation(GroupByFunc groupby_fun,
 					FinalFunc final_fun,
 					IterateFunc it_fun,
 					AggregationTriggerType tType = TriggerAll,
 					const unsigned int tInterval = 0)  :
-		mAggrStatePrototype(dynamic_cast<AggregateState *>(aggrs->clone())),
 		mGroupByFunc(groupby_fun),
 		mIterateFunc(it_fun), mFinalFunc(final_fun),
     mTriggerInterval( tInterval ),
@@ -241,13 +239,13 @@ private:
     const Timestamp elementTime = mTimestampExtractor != nullptr ? mTimestampExtractor(data) : 0;
 
 		// create a new aggregation state
-		AggregateStatePtr newAggrState(dynamic_cast<AggregateState *>(mAggrStatePrototype->clone()));
+		AggregateStatePtr newAggrState = std::make_shared<AggregateState>();
 		newAggrState->setTimestamp(elementTime);
 
 		// ... call the iterate function
 		mIterateFunc(data, newAggrState, outdated);
 		// ... and insert it into the hashtable
-		mAggregateTable.insert(std::make_pair(grpKey, newAggrState));
+		mAggregateTable.insert({ grpKey, newAggrState });
 
 		// directly publish the new aggregation result if no sliding window was specified
 		if (mTriggerType == TriggerAll) {
@@ -385,7 +383,6 @@ protected:
 private:
     HashTable mAggregateTable;                  //< a hash table for storing the aggregation states for each group
     TimestampExtractorFunc mTimestampExtractor; //!< a pointer to the function for extracting the timestamp from the tuple
-    AggregateStatePtr mAggrStatePrototype;      //!< an aggregation state instance for creating new object
                                                 //!< for each group at runtime
     mutable AggregationMutex mAggrMtx;           //!< a mutex for synchronizing access between the trigger notifier thread
                                                 //!< and aggregation operator

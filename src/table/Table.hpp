@@ -31,8 +31,13 @@ public:
 };
 
 struct TableParams {
+  /**
+   * NotificationMode specifies when a stream tuple is produced
+   + from the table.
+   */
   enum NotificationMode {
-    Immediate, OnCommit
+    Immediate, //< directly for each updated tuple
+    OnCommit   //< on transaction commit
   };
 
   enum ModificationMode {

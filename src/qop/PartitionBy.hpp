@@ -141,7 +141,7 @@ public:
 		connectChannels(queue->getOutputPunctuationChannel(), punctuationChannel);
 
 		// finally, we register the Queue in our hashtable
-		mPartitions.insert(std::make_pair(id, queue));
+		mPartitions.insert({ id, queue });
 	}
 
 protected:

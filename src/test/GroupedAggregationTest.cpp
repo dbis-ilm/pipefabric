@@ -44,10 +44,6 @@ public:
 		avg2_.init();
 		cnt3_.init();
 	}
-
-	virtual AggregateStateBase< StreamElement > *clone() const override {
-		return new MyAggregateState< StreamElement >();
-	}
 };
 
 
@@ -84,7 +80,6 @@ TEST_CASE( "Compute a simple punctuation based groupby with aggregates", "[Group
 	auto mockup = std::make_shared< StreamMockup<InTuplePtr, OutTuplePtr> >(input, expected);
 
 	auto aggr = std::make_shared< TestAggregation >(
-		std::make_shared< MyAggrState >(),
 		/* key function */
 		[&](const InTuplePtr& tp) { return tp->getAttribute<0>(); },
 		/* final function */
@@ -129,9 +124,6 @@ public:
 		lrecent3_.init();
 	}
 
-	virtual AggregateStateBase< StreamElement > *clone() const override {
-		return new MyAggregateState2< StreamElement >();
-	}
 };
 
 
@@ -162,7 +154,6 @@ TEST_CASE( "Compute a groupby with incremental min/max aggregates", "[GroupedAgg
 	auto mockup = std::make_shared< StreamMockup<InTuplePtr, OutTuple2Ptr> >(input, expected);
 
 	auto aggr = std::make_shared< TestAggregation >(
-		std::make_shared< MyAggrState2 >(),
 		/* key function */
 		[&](const InTuplePtr& tp) { return tp->getAttribute<0>(); },
 		/* final function */

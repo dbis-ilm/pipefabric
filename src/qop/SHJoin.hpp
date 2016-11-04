@@ -219,7 +219,7 @@ namespace pfabric {
         boost::ignore_unused( lock );
 
         if( !outdated ) {
-          hashTable.insert( std::make_pair( key, newElement ) );
+          hashTable.insert( { key, newElement });
         }
         else {
           auto equalElements = hashTable.equal_range( key );

@@ -50,7 +50,7 @@ TEST_CASE( "Compute a simple aggregate on the entire stream", "[Aggregation]" ) 
 
 	auto mockup = std::make_shared< StreamMockup<InTuplePtr, OutTuplePtr> >(input, expected);
 	auto aggr = std::make_shared<TestAggregation>(
-							 std::make_shared<MyAggrState>(), MyAggrState::finalize, MyAggrState::iterate, TriggerByCount, 6);
+							 MyAggrState::finalize, MyAggrState::iterate, TriggerByCount, 6);
 
 	CREATE_LINK(mockup, aggr);
 	CREATE_LINK(aggr, mockup);
@@ -83,7 +83,7 @@ TEST_CASE( "Compute an incremental aggregate on the entire stream", "[Aggregatio
 
 	auto mockup = std::make_shared< StreamMockup<InTuplePtr, OutTuplePtr> >(input, expected);
 	auto aggr = std::make_shared<TestAggregation>(
-							 std::make_shared<MyAggrState>(), MyAggrState::finalize, MyAggrState::iterate);
+							 MyAggrState::finalize, MyAggrState::iterate);
 
 	CREATE_LINK(mockup, aggr);
 	CREATE_LINK(aggr, mockup);
@@ -117,7 +117,7 @@ TEST_CASE( "Compute an incremental min/maxaggregate on the stream", "[Aggregatio
 
 	auto mockup = std::make_shared< StreamMockup<InTuplePtr, Out2TuplePtr> >(input, expected);
 	auto aggr = std::make_shared<TestAggregation>(
-		std::make_shared<MyAggrState>(), MyAggrState::finalize, MyAggrState::iterate
+		MyAggrState::finalize, MyAggrState::iterate
 	);
 
 	CREATE_LINK(mockup, aggr);
@@ -159,7 +159,7 @@ TEST_CASE( "Compute an incremental min/maxaggregate on a window", "[Aggregation]
 	auto mockup = std::make_shared< StreamMockup<InTuplePtr, Out2TuplePtr> >(input, expected);
 	auto win = std::make_shared<SlidingWindow<InTuplePtr>>(WindowParams::RowWindow, 3);
 	auto aggr = std::make_shared<TestAggregation>(
-		std::make_shared<MyAggrState>(), MyAggrState::finalize, MyAggrState::iterate
+		MyAggrState::finalize, MyAggrState::iterate
 	);
 
 	CREATE_LINK(mockup, win);

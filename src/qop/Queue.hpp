@@ -37,7 +37,7 @@
 #include <condition_variable>
 
 namespace pfabric {
-  
+
   /**
    * An implementation of a concurrent queue for buffering and exchanging tuples
    * between two threads.
@@ -48,7 +48,7 @@ namespace pfabric {
     ConcurrentQueue() = default;
     ConcurrentQueue(const ConcurrentQueue&) = delete;            // disable copying
     ConcurrentQueue& operator=(const ConcurrentQueue&) = delete; // disable assignment
-    
+
     T pop() {
       std::unique_lock<std::mutex> mlock(mutex_);
       while (queue_.empty()) {
@@ -58,7 +58,7 @@ namespace pfabric {
       queue_.pop();
       return val;
     }
-    
+
     bool pop(T& item) {
       std::unique_lock<std::mutex> mlock(mutex_);
       cond_.wait(mlock, [&] (){
@@ -67,33 +67,33 @@ namespace pfabric {
 
       if (stopped_)
         return false;
-      
+
       item = queue_.front();
       queue_.pop();
       return true;
     }
-    
+
     void push(const T& item) {
       std::unique_lock<std::mutex> mlock(mutex_);
       queue_.push(item);
       mlock.unlock();
       cond_.notify_one();
     }
-    
+
     void stop() {
       stopped_ = true;
       cond_.notify_all();
     }
-    
+
   private:
     std::queue<T> queue_;
     std::mutex mutex_;
     std::condition_variable cond_;
     std::atomic<bool> stopped_;
   };
-  
 
-  
+
+
 	/**
 	 * @brief Helper class for dequeing tuples from the queue.
 	 *
@@ -214,11 +214,11 @@ namespace pfabric {
 		 * @param sender a reference to the notifier object
 		 */
 		void dequeueTuple(DequeueNotifier& sender) {
-      StreamElement tp;
+      std::pair<StreamElement, bool> tp;
       if (!mQueue.pop(tp))
         return;
-      
-			this->getOutputDataChannel().publish(tp, false);
+
+			this->getOutputDataChannel().publish(tp.first, tp.second);
 		}
 
 	/**
@@ -229,13 +229,13 @@ namespace pfabric {
 	 * @param outdated indicates whether the tuple is new or invalidated now (outdated == true)
 	 */
 	void processDataElement( const StreamElement& data, const bool outdated ) {
-    mQueue.push(data);
+    mQueue.push({ data, outdated });
 	}
 
 private:
     void stopProcessing() { mQueue.stop(); }
-    
-    ConcurrentQueue<StreamElement> mQueue;
+
+    ConcurrentQueue<std::pair<StreamElement, bool> > mQueue;
 //		boost::lockfree::spsc_queue<StreamElement,
 //		     boost::lockfree::capacity<65535> > mQueue; //< a queue acting as concurrent buffer for tuples
 		std::unique_ptr<DequeueNotifier> mNotifier;     //< the notifier object which triggers the dequeing

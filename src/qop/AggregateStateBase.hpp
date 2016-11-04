@@ -56,11 +56,6 @@ public:
 	virtual void init() = 0;
 
 	/**
-	 * Make a copy of the aggregation instance.
-	 */
-	virtual AggregateStateBase< StreamElement > *clone() const = 0;
-
-	/**
 	 * Add the given value to the internal counter.
 	 *
 	 * @param v the increment value
@@ -137,13 +132,6 @@ public:
 	}
 
 	/**
-	 * @see AggregateStateBase::clone
-	 */
-	AggregateStateBase<StreamElement> *clone() const override {
-		return new Aggregator1< StreamElement, Aggr1Func, Aggr1Col >();
-	}
-
-	/**
 	 * Process the input tuple @c tp and update the aggregation state
 	 * object @c state according the aggregation function.
 	 *
@@ -216,14 +204,6 @@ public:
 	void init() override {
 		aggr1_.init();
 		aggr2_.init();
-	}
-
-	/**
-	 * @see AggregateStateBase::clone
-	 */
-	AggregateStateBase<StreamElement> *clone() const override {
-		return new Aggregator2< StreamElement, Aggr1Func, Aggr1Col,
-			Aggr2Func, Aggr2Col >();
 	}
 
 	/**
@@ -310,14 +290,6 @@ public:
 		aggr1_.init();
 		aggr2_.init();
 		aggr3_.init();
-	}
-
-	/**
-	 * @see AggregateStateBase::clone
-	 */
-	AggregateStateBase<StreamElement> *clone() const override {
-		return new Aggregator3< StreamElement, Aggr1Func, Aggr1Col,
-			Aggr2Func, Aggr2Col, Aggr3Func, Aggr3Col >();
 	}
 
 	/**
@@ -414,14 +386,6 @@ public:
 		aggr2_.init();
 		aggr3_.init();
 		aggr4_.init();
-	}
-
-	/**
-	 * @see AggregateStateBase::clone
-	 */
-	AggregateStateBase<StreamElement> *clone() const override {
-		return new Aggregator4< StreamElement, Aggr1Func, Aggr1Col,
-			Aggr2Func, Aggr2Col, Aggr3Func, Aggr3Col, Aggr4Func, Aggr4Col >();
 	}
 
 	/**

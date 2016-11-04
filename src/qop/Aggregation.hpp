@@ -51,6 +51,7 @@ namespace pfabric {
    *    the data stream element type produced by the aggregation
    * @tparam AggregateState
    *   the type of the aggregation state object
+   * TODO: trait for AggegateState
    */
   template<
     typename InputStreamElement,
@@ -93,8 +94,6 @@ namespace pfabric {
      * defined by the trigger type (all, timestamp, count - see PipeFabricTypes.hpp)
      * and the trigger interval.
      *
-     * @param aggrs
-     *    the aggregate state, i.e. a pointer to a class with members for all aggregates
      * @param final_fun
      *    a function pointer to the aggregation function
      * @param it_fun
@@ -110,9 +109,9 @@ namespace pfabric {
      *    the time interval in seconds to produce aggregation tuples (for trigger by timestamp)
      *    or in the number of tuples (for trigger by count)
      */
-    Aggregation( AggregateStatePtr aggrs, FinalFunc final_fun, IterateFunc it_fun,
+    Aggregation(FinalFunc final_fun, IterateFunc it_fun,
                 AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0) :
-                mAggrState( /*dynamic_cast<AggregateState *>(aggrs->clone()) */aggrs),
+                mAggrState(std::make_shared<AggregateState>()),
                 mIterateFunc( it_fun ),
                 mFinalFunc( final_fun ),
                 mNotifier(tInterval > 0 && tType == TriggerByTime ?
@@ -125,8 +124,6 @@ namespace pfabric {
      * applies the given aggregate function incrementally with a TriggerByTimestamp
      * strategy.
      *
-     * @param aggrs
-     *    the aggregate state, i.e. a pointer to a class with members for all aggregates
      * @param final_fun
      *    a function pointer to the aggregation function
      * @param it_fun
@@ -136,9 +133,9 @@ namespace pfabric {
      * @param tInterval
      *    the time interval in seconds to produce aggregation tuples
      */
-    Aggregation( AggregateStatePtr aggrs, FinalFunc final_fun, IterateFunc it_fun,
+    Aggregation(FinalFunc final_fun, IterateFunc it_fun,
                 TimestampExtractorFunc func, const unsigned int tInterval) :
-                mAggrState(/* dynamic_cast<AggregateState *>(aggrs->clone()) */ aggrs),
+                mAggrState(std::make_shared<AggregateState>()),
                 mIterateFunc( it_fun ), mFinalFunc( final_fun ),
                 mTimestampExtractor(func),
                 mTriggerType(TriggerByTimestamp), mTriggerInterval( tInterval ),

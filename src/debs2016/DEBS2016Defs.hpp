@@ -39,13 +39,13 @@ typedef TuplePtr<Tuple<Timestamp, long, long, int, CommentorListPtr>> CommentedP
 inline CommentorListPtr makeCommentorList() { return std::make_shared<CommentorList>(); }
 
 inline CommentorListPtr addCommentor(CommentorListPtr lst, const CommentType& cmt) {
-	lst->push_back(Commentor(cmt->getAttribute<0>(), cmt->getAttribute<1>()));
+	lst->push_back(Commentor(get<0>(cmt), get<1>(cmt)));
 	return lst;
 }
 
 inline CommentorListPtr removeCommentor(CommentorListPtr lst, const CommentType& cmt) {
 	lst->remove_if([&cmt](const Commentor& c) -> bool {
-		return c.commentId == cmt->getAttribute<1>();
+		return c.commentId == get<1>(cmt);
 	});
 	return lst;
 }
@@ -64,7 +64,7 @@ struct Comments2PostMap {
 		}
 
 		inline void registerPostForComment(long c_id, long p_id) {
-			comment2post.insert(std::make_pair(c_id, p_id));
+			comment2post.insert({ c_id, p_id });
 		}
 };
 
