@@ -205,7 +205,5 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/"
    PATTERN "*.h"
 )
 
-#-----------------------------------------------------------------------------------------
-#
 add_subdirectory(demo)
 add_subdirectory(debs2016)

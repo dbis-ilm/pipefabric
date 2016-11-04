@@ -1,34 +1,4 @@
-
-#=============================================
-#
-# Define a macro to simplify building and linking test executables
-#
-#=============================================
-macro( build_executable arg )
-    add_executable( ${arg} "${arg}.cpp" )
-    target_link_libraries( ${arg}
-      pfabric_core
-      ${Boost_SYSTEM_LIBRARY}
-      ${MALLOC_LIB}
-    )
-endmacro( build_executable )
-
-#=============================================
-#
-# Define a macro to simplify adding tests
-#
-#=============================================
-macro (do_test arg)
-    add_test(
-        NAME ${arg}
-        COMMAND "${CMAKE_CURRENT_BINARY_DIR}/${arg}"
-    )
-    build_executable( ${arg} )
-endmacro(do_test)
-
-set (CTEST_ENVIRONMENT
-  "DYLD_FALLBACK_LIBRARY_PATH=${DYLD_LIBRARY_PATH}"
-)
+include(../../cmake/Testing.cmake.in)
 
 #=============================================
 # define the test data directory for the input and output

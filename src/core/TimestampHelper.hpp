@@ -19,8 +19,8 @@
  * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
  */
 
-#ifndef TIMESTAMPHELPER_HPP_
-#define TIMESTAMPHELPER_HPP_
+#ifndef TimestampHelper_hpp_
+#define TimestampHelper_hpp_
 
 #include "PFabricTypes.hpp"
 
@@ -80,6 +80,9 @@ struct TimestampHelper {
 	 */
 	static Timestamp stringToTimestamp(const std::string& date);
 
+	// 1000 microseconds * 60 seconds * 60 minutes * 24 hours
+	static unsigned int toDays(Timestamp ts) { return ts / 86400000; }
+
 	/**
 	 * TODO
 	 *
@@ -122,7 +125,7 @@ struct TimestampHelper {
 	}
 };
 
-} /* end namespace pquery */
+} /* end namespace pfabric */
 
 
-#endif /* TIMESTAMPHELPER_HPP_ */
+#endif /* TimestampHelper_hpp_ */

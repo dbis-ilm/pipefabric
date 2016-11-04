@@ -22,6 +22,7 @@
 #ifndef pfabric_hpp_
 #define pfabric_hpp_
 
+#include "core/PFabricTypes.hpp"
 #include "core/Tuple.hpp"
 #include "topology/PFabricContext.hpp"
 #include "topology/Topology.hpp"

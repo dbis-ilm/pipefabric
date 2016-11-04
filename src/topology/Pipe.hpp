@@ -213,6 +213,21 @@ public:
       return Pipe(dataflow, tailIter, func, timestampExtractor, partitioningState, numPartitions);
     }
 
+    /**
+     * @brief Defines the key column for all subsequent operators.
+     *
+     * Defines a column representing the key in a tuple which is used
+     * for all subsequent operators which require such a function,
+     * e.g. join, groupBy.
+     *
+     * @tparam T
+     *      the input tuple type (usually a TuplePtr) for the operator.
+     * @tparam N
+     *      the index of column used as key
+     * @tparam KeyType
+     *      the data type of the key
+     * @return a new pipe
+     */
     template <typename T, int N, typename KeyType = DefaultKeyType>
     Pipe keyBy() {
       std::function<KeyType(const T&)> func =
@@ -235,9 +250,28 @@ public:
      */
     template <typename T>
     Pipe assignTimestamps(typename Window<T>::TimestampExtractorFunc func) {
-      return Pipe(dataflow, tailIter, func, func, partitioningState, numPartitions);
+      return Pipe(dataflow, tailIter, keyExtractor, func, partitioningState, numPartitions);
     }
 
+    /**
+     * @brief Defines the timestamp column for all subsequent operators.
+     *
+     * Defines a column representing the timestamp in a tuple which is used
+     * for all subsequent operators which require such a function,
+     * e.g. window.
+     *
+     * @tparam T
+     *      the input tuple type (usually a TuplePtr) for the operator.
+     * @tparam N
+     *      the index of column used as key
+     * @return a new pipe
+     */
+    template <typename T, int N>
+    Pipe assignTimestamps() {
+      std::function<Timestamp(const T&)> func =
+        [](const T& tp) -> Timestamp { return getAttribute<N>(tp); };
+      return Pipe(dataflow, tailIter, keyExtractor, func, partitioningState, numPartitions);
+    }
     /**
      * @brief Creates a sliding window operator as the next operator on the pipe.
      *
