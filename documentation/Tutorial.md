@@ -6,7 +6,7 @@ As an example we want to implement a simple dataflow receiving data via REST, ca
 First, we need to include the PipeFabric header file and should use the namespace.
 
 ```C++
-include "pfabric.hpp"
+#include "pfabric.hpp"
 
 using namespace pfabric;
 ```
@@ -15,10 +15,10 @@ Next, we define the schema: the tuple types for representing input and output da
 
 ```C++
 // the structure of tuples we receive via REST
-typedef TuplePtr<Tuple<int, double> > InTuple;
+typedef TuplePtr<Tuple<int, double> > InTuplePtr;
 
 // the structure of our output (aggregate) tuples
-typedef TuplePtr<Tuple<double> > ResultTuple;
+typedef TuplePtr<Tuple<double> > ResultTuplePtr;
 ```
 
 And for the aggregation we have to define a type the captures the aggregation state.
@@ -30,7 +30,7 @@ And for the aggregation we have to define a type the captures the aggregation st
 //     * the aggregate function (in our case Avg on double values),
 //     * the column of the input tuple on which we calculate the aggregate (in
 //       our case column #1)
-typedef Aggregator1<InTuple, AggrAvg<double, double>, 1> MyAggrState;
+typedef Aggregator1<InTuplePtr, AggrAvg<double, double>, 1> MyAggrState;
 ```
 
 In the main function we first create a `PFabricContext` object which is needed
