@@ -30,21 +30,33 @@ public:
     }
 };
 
+/**
+ * Constants representing different modes for working with a table.
+ */
 struct TableParams {
   /**
    * NotificationMode specifies when a stream tuple is produced
-   + from the table.
+   * from the table.
    */
   enum NotificationMode {
     Immediate, //< directly for each updated tuple
     OnCommit   //< on transaction commit
   };
 
+  /**
+   * ModificationMode describes the kind of modification that
+   * triggered the tuple.
+   */
   enum ModificationMode {
-    Insert, Update, Delete
+    Insert,  //< tuple was inserted into the table
+    Update,  //< tuple was updated
+    Delete   //< tuple was deleted
   };
 };
 
+/**
+ * @brief BaseTable is the abstract base class for all table objects.
+ */
 class BaseTable {
 protected:
   BaseTable() {}
@@ -143,17 +155,53 @@ public:
       throw TableException();
   }
 
+  /**
+   * @brief Return a pair of iterators for scanning the table with a
+   *        selection predicate.
+   *
+   * Return a begin and end iterator that allows to scan the whole table
+   * and visiting only tuples which satisfy the given predicate
+   * as in the following example:
+   * @code
+   * auto handle = testTable->select([](const MyTuplePtr& tp) {
+   *                 return get<0>(tp) % 2 == 0;
+   *               });
+   * for (auto i = handle.first; i != handle.second; i++)
+   *    // do something with *i
+   * @endcode
+   *
+   * @param func a function pointer to a predicate
+   * @return a pair of iterators
+   */
   std::pair<TableIterator, TableIterator> select(Predicate func) {
     return make_pair(makeFilterIterator(mDataTable.begin(), func),
                       makeFilterIterator(mDataTable.end(), func));
   }
 
+  /**
+   * @brief Return a pair of iterators for scanning the whole table.
+   *
+   * Return a begin and end iterator that allows to scan the whole table
+   * as in the following example:
+   * @code
+   * auto handle = testTable->select();
+   * for (auto i = handle.first; i != handle.second; i++)
+   *    // do something with *i
+   * @endcode
+   *
+   * @return a pair of iterators
+   */
   std::pair<TableIterator, TableIterator> select() {
     auto alwaysTrue = [](const RecordType&) { return true; };
     return make_pair(makeFilterIterator(mDataTable.begin(), alwaysTrue),
                       makeFilterIterator(mDataTable.end(), alwaysTrue));
   }
 
+  /**
+   * @brief Return the number of tuples stored in the table.
+   *
+   * @return the number of tuples
+   */
   unsigned long size() const { return mDataTable.size(); }
 
   void registerObserver(typename ObserverCallback::slot_type const& cb, TableParams::NotificationMode mode) {

@@ -153,7 +153,7 @@ TEST_CASE("Creating a table with a given schema, inserting and deleting data", "
 
     unsigned int num = 0;
     auto handle = testTable->select([](const MyTuplePtr& tp) {
-      return tp->getAttribute<0>() % 2 == 0;
+      return get<0>(tp) % 2 == 0;
     });
     for (auto i = handle.first; i != handle.second; i++)
       num++;

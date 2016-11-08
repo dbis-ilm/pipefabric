@@ -21,9 +21,7 @@ TEST_CASE("Create and manipulate post with comments", "[Comment][Post]") {
 
     // typedef TuplePtr<Tuple<Timestamp, long, long, long>> CommentType;
     addCommentor(commentorList, c1);
-
     addCommentor(commentorList, c2);
-
     addCommentor(commentorList, c3);
 
     REQUIRE(commentorList->size() == 3);
