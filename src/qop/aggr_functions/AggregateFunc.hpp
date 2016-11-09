@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2014 The PipeFabric team,
- *                    All Rights Reserved.
+ * Copyright (c) 2014-16 The PipeFabric team,
+ *                       All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -18,7 +18,7 @@
  * along with this program; see the file LICENSE.
  * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
  */
-
+ 
 #ifndef AggregateFunc_hpp_
 #define AggregateFunc_hpp_
 
@@ -43,7 +43,7 @@ template<
 class AggregateFunc {
 public:
 	typedef Tres ResultType;
-	
+
 	AggregateFunc() {
 	}
 
