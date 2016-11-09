@@ -4,6 +4,7 @@
 
 #include <vector>
 
+#include "pfabric.hpp"
 #include "core/Tuple.hpp"
 #include "table/Table.hpp"
 #include "fmt/format.h"
