@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2014 The PipeFabric team,
- *                    All Rights Reserved.
+ * Copyright (c) 2014-16 The PipeFabric team,
+ *                       All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -91,7 +91,7 @@ public:
 	NFAState<Tin>* getDestState() const { return this->destState; }
 
 private:
-	/** 
+	/**
 	 * this variable stores the destination state of this forward edge.
 	 * it can be kleene, final and negated states
 	 */

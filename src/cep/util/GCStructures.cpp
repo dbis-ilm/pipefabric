@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2014 The PipeFabric team,
- *                    All Rights Reserved.
+ * Copyright (c) 2014-16 The PipeFabric team,
+ *                       All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -79,4 +79,3 @@ void GCStructures::setParameters(tuple_ptr tuple, pfabric::Partition* par) {
 pfabric::Partition* GCStructures::getPartition() const {
 	return par;
 }
-
