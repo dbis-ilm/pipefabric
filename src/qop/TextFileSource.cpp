@@ -208,7 +208,7 @@ unsigned long TextFileSource::start() {
 	else
   	ntuples = readMemoryMappedFile();
 	// publish punctuation
-	producePunctuation(PunctuationPtr(new Punctuation(Punctuation::EndOfStream)));
+  producePunctuation(std::make_shared<Punctuation>(Punctuation::EndOfStream));
 	return ntuples;
 }
 

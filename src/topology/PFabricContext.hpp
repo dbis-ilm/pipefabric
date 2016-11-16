@@ -26,6 +26,7 @@
 
 #include "core/PFabricTypes.hpp"
 #include "table/Table.hpp"
+#include "qop/Queue.hpp"
 #include "topology/Topology.hpp"
 
 namespace pfabric {
@@ -126,11 +127,35 @@ public:
       return std::shared_ptr<Table<RecordType, KeyType>>();
   }
 
+  /**
+   * @brief Creates a new stream with the given name and schema.
+   *
+   * Creates a new stream with the given name. A named stream is only
+   * a queue into which tuples can be pushed and where other topologies
+   * can be specified to read from.
+   * The schema is specified as template parameters. If a stream with the
+   * same name already exists, then an exception is raised.
+   *
+   * @tparam StreamElement
+   *    the type of the stream, usually a @c TuplePtr<Tuple<...> >
+   * @param[in] streamName
+   *     the name of the stream to be created
+   * @return
+   *     a pointer to the newly created stream
+   */
+  template <typename StreamElement>
+  Dataflow::BaseOpPtr createStream(const std::string& streamName) {
+    auto streamOp = std::make_shared<Queue<StreamElement>>();
+    // TODO: check whether the stream already exists
+    mStreamSet[streamName] = streamOp;
+    return streamOp;
+  }
+
 private:
   typedef std::shared_ptr<BaseTable> BaseTablePtr;
 
-  std::map<std::string, BaseTablePtr> mTableSet; /// a dictionary collecting all existing tables
-
+  std::map<std::string, BaseTablePtr> mTableSet;         //< a dictionary collecting all existing tables
+  std::map<std::string, Dataflow::BaseOpPtr> mStreamSet; //< a dictionary collecting all named streams
 };
 
 }

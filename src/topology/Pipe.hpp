@@ -565,6 +565,26 @@ public:
       return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
     }
 
+   /**
+    * @brief Creates an operator the forwards the tuples to a named stream object.
+    *
+    * Creates an operator the forwards all tuples to a named stream object that
+    * was created before explicitly via @c PFabricContext.
+    *
+    * @tparam T
+    *      the input tuple type for the operator.
+    * @param stream
+    *      the named stream object to which the tuples are sent
+    * @return a new pipe
+    */
+    template <typename T>
+    Pipe toStream(Dataflow::BaseOpPtr stream) throw (TopologyException) {
+      auto queueOp = castOperator<Queue<T>>(stream);
+      auto pOp = castOperator<DataSource<T>>(getPublisher());
+      CREATE_LINK(pOp, queueOp);
+      return Pipe(dataflow, tailIter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+    }
+
     /**
      * @brief Creates a projection operator.
      *

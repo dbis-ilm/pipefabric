@@ -110,10 +110,6 @@ public:
 		typename PartitionTable::iterator it = mPartitions.find(keyVal);
 		if (it != mPartitions.end()) {
 			auto qop = it->second;
-      // TODO: is this really necessary??
-      // intrusive_ptr_add_ref(data.get());
-			// we cannot simply call our publish method, because we want to forward
-			// the data to the queue associated with this partition id
 			auto slot = qop->template getInputChannelByID<0>().getSlot();
  			slot(data, outdated);
 		}

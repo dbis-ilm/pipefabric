@@ -24,6 +24,10 @@ typedef TuplePtr<Tuple<std::string, long, long, std::string, std::string, long, 
 // ts, comment_id, comment_replied, post_commented
 typedef TuplePtr<Tuple<Timestamp, long, long, long>> CommentType;
 
+// ------------------------- types for time-to-live ----------------------------
+// post_id, time-to-live, remaining_days
+typedef TuplePtr<Tuple<long, Timestamp, int>> TTLType;
+
 // ------------------ types for posts with scores and comments -----------------
 struct Commentor {
 	Commentor(Timestamp t, long c) : ts(t), commentId(c) {}

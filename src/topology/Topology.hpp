@@ -222,6 +222,25 @@ namespace pfabric {
     }
 
     /**
+     * @brief Create a new pipe where a named stream is used as input.
+     *
+     * @tparam T the type of the stream element
+     * @param[in] stream
+     *    the named stream object from which the pipe receives the data
+     * @return
+     *    a new pipe where the stream acts as the producer.
+     */
+    template <typename T>
+    Pipe fromStream(Dataflow::BaseOpPtr stream) throw (TopologyException) {
+      // check whether stream is a Queue<T> operator
+      auto pOp = dynamic_cast<Queue<T>*>(stream.get());
+      if (pOp == nullptr) {
+        throw TopologyException("Incompatible tuple type of stream object.");
+      }
+      return Pipe(dataflow, dataflow->addPublisher(stream));
+    }
+
+    /**
      * @brief Create a SeletFromTable operator as data source.
      *
      * Create a new SelectFromTable operator that produces a stream of tuples

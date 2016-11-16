@@ -81,6 +81,7 @@ namespace pfabric {
     }
 
     void stop() {
+      std::cout << "ConcurrentQueue::stop: " << queue_.size() << std::endl;
       stopped_ = true;
       cond_.notify_all();
     }
@@ -202,9 +203,7 @@ namespace pfabric {
 		 * @param punctuation the incoming punctuation tuple
 		 */
 		void processPunctuation( const PunctuationPtr& punctuation ) {
-	//		while (!mQueue.empty()) ;
-      // TODO: how to handle punctuations?
-			this->getOutputPunctuationChannel().publish(punctuation);
+      mQueue.push(std::make_tuple(punctuation->ptype(), nullptr, false));
 		}
 
 		/**
@@ -214,11 +213,14 @@ namespace pfabric {
 		 * @param sender a reference to the notifier object
 		 */
 		void dequeueTuple(DequeueNotifier& sender) {
-      std::pair<StreamElement, bool> tp;
+      std::tuple<Punctuation::PType, StreamElement, bool> tp;
       if (!mQueue.pop(tp))
         return;
 
-			this->getOutputDataChannel().publish(tp.first, tp.second);
+      if (std::get<0>(tp) == Punctuation::None)
+			  this->getOutputDataChannel().publish(std::get<1>(tp), std::get<2>(tp));
+      else
+        this->getOutputPunctuationChannel().publish(std::make_shared<Punctuation>(std::get<0>(tp)));
 		}
 
 	/**
@@ -229,13 +231,13 @@ namespace pfabric {
 	 * @param outdated indicates whether the tuple is new or invalidated now (outdated == true)
 	 */
 	void processDataElement( const StreamElement& data, const bool outdated ) {
-    mQueue.push({ data, outdated });
+    mQueue.push(std::make_tuple(Punctuation::None, data, outdated));
 	}
 
 private:
     void stopProcessing() { mQueue.stop(); }
 
-    ConcurrentQueue<std::pair<StreamElement, bool> > mQueue;
+    ConcurrentQueue<std::tuple<Punctuation::PType, StreamElement, bool> > mQueue;
 //		boost::lockfree::spsc_queue<StreamElement,
 //		     boost::lockfree::capacity<65535> > mQueue; //< a queue acting as concurrent buffer for tuples
 		std::unique_ptr<DequeueNotifier> mNotifier;     //< the notifier object which triggers the dequeing

@@ -47,15 +47,19 @@ void updateScore(CommentedPostType& cp, Timestamp currentTime) {
 }
 
 // -----------------------------------------------------------------------------
-void buildQuery1(std::shared_ptr<Topology> t,
-								 boost::filesystem::path& dataPath,
-							   std::shared_ptr<Table<CommentedPostType, long>> postTable) {
+std::shared_ptr<Topology>
+buildQuery1(PFabricContext& ctx, boost::filesystem::path& dataPath) {
+	auto t = ctx.createTopology();
+	auto ttl = ctx.createStream<TTLType>("ttl");
+	auto postTable = ctx.getTable<CommentedPostType, long>("Posts");
+
 	boost::filesystem::path postPath = dataPath;
 	postPath += "/posts.dat";
 
 	// ---------- posts ----------
-	typedef Aggregator1<PostType, AggrGlobalMax<Timestamp>, 0> TimestampAggrState;
-
+  //
+  // prepare the post tuples by reading the file and produce
+  // a stream of tuples with timestamps.
 	auto posts = t->newStreamFromFile(postPath.string())
  	 .extract<RawPostType>('|')
  	 .map<RawPostType, PostType>([](auto tp, bool) -> PostType {
@@ -65,16 +69,27 @@ void buildQuery1(std::shared_ptr<Topology> t,
  	});
 
 	// ---------- maxTime ----------
+  //
+  // the clock is driven by the posts - whenever we process a post, its
+  // timestamp is used to update the global time.
+  typedef Aggregator1<PostType, AggrGlobalMax<Timestamp>, 0> TimestampAggrState;
+
 	auto maxTime = posts
+    // compute the maximum of time
 		.aggregate<PostType, TimestampTupleType, TimestampAggrState>()
+    // update the global clock
 		.notify<TimestampTupleType>([&](auto tp, bool outdated) {
 			globalTime.set(get<0>(tp));
     }, [&](auto pp) {
+      // in case of end of stream we set the clock to a time in the future
 			globalTime.set(TimestampHelper::stringToTimestamp("2016-12-31T23:59:59.000+0000"));
 		});
-    // .print<TimestampTupleType>();
+//    .print<TimestampTupleType>();
 
 	// ---------- postsToTable ----------
+  //
+  // prepare the post tuples by adding a list of comments and a score value
+  // and store them in the table "posts"
   auto postsToTable = posts
 		.map<PostType, CommentedPostType>([](auto tp, bool) -> CommentedPostType {
 			return makeTuplePtr(get<0>(tp),
@@ -83,18 +98,24 @@ void buildQuery1(std::shared_ptr<Topology> t,
 													10, // initial score = 10
 													makeCommentorList());
 		})
+    // column #1 is used as the key
 		.keyBy<CommentedPostType, 1, long>()
+    // store all tuples in the table
 		.toTable<CommentedPostType, long>(postTable)
-		.print<CommentedPostType>(std::cout, [](std::ostream& os, auto tp) {
-			// os << "post -> " << TimestampHelper::timestampToString(getAttribute<0>(tp)) << std::endl;
-		});
-
+    // create a time-to-live tuple and send it to the ttl stream
+		.map<CommentedPostType, TTLType>([](auto tp, bool) -> TTLType {
+      // +1 day (when the score has to be updated) and 10 remaining days
+			return makeTuplePtr(get<1>(tp), get<0>(tp) + 1000l * 60 * 60 * 24, 10);
+		})
+		.toStream<TTLType>(ttl);
 
 	boost::filesystem::path commentPath = dataPath;
  	commentPath += "/comments.dat";
 
 	// ---------- comments ----------
-	auto comments = t->newStreamFromFile(commentPath.string())
+  //
+  // prepare the comments tuples by finding the post to which they are assigned
+ 	auto comments = t->newStreamFromFile(commentPath.string())
 		.extract<RawCommentType>('|')
 		.map<RawCommentType,CommentType>([](auto tp, bool) -> CommentType {
 			auto res = makeTuplePtr(TimestampHelper::stringToTimestamp(get<0>(tp)),
@@ -106,6 +127,8 @@ void buildQuery1(std::shared_ptr<Topology> t,
 			if (tp->isNull(6)) res->setNull(3);
 			return res;
 	    })
+    // if a comment refers to another comment then we have to identify
+    // the original post which is done via a Comments2PostMap
 		.statefulMap<CommentType,CommentType,Comments2PostMap>(
 			[](auto tp, bool, auto state) -> CommentType {
 				auto postID = tp->isNull(3)
@@ -117,12 +140,15 @@ void buildQuery1(std::shared_ptr<Topology> t,
 														get<2>(tp),
 														postID);
 			})
+    // make sure that comments are not newer than the posts we have already processed
 		.barrier<CommentType>(globalTime.mCondVar, globalTime.mCondMtx, [&](auto tp) -> bool {
 			return get<0>(tp) < globalTime.get();
 		})
 		.assignTimestamps<CommentType, 0>()
+    // comments are outdated after 10 days
 		.slidingWindow<CommentType>(WindowParams::RangeWindow, 60 * 60 * 24 * 10)
 		.keyBy<CommentType, 3, long>()
+    // update the table by adding or removing the comment to its post
 		.updateTable<CommentType, CommentedPostType, long>(postTable,
 			[](auto tp, bool outdated, auto oldRec) -> CommentedPostType {
 				auto tup = makeTuplePtr(get<0>(oldRec),
@@ -134,13 +160,47 @@ void buildQuery1(std::shared_ptr<Topology> t,
 																: addCommentor(get<4>(oldRec), tp)
 														);
 				updateScore(tup, globalTime.get());
-				std::cout << tup << std::endl;
+			//	std::cout << tup << std::endl;
 				return tup;
 			})
-			.print<CommentType>(std::cout, [](std::ostream& os, auto tp) {
-				// os << "comment -> " << TimestampHelper::timestampToString(getAttribute<0>(tp)) << std::endl;
-			});
+      // and finally create a TTL tuple
+			.map<CommentType, TTLType>([](auto tp, bool) -> TTLType {
+				return makeTuplePtr(get<3>(tp), get<0>(tp) + 1000l * 60 * 60 * 24, 10);
+			})
+  .toStream<TTLType>(ttl);
 
+  // ---------- scoreUpdates ----------
+  //
+  // process the ttl tuples to identify records in the table "posts" for which
+  // the scores have to be updated.
+	auto scoreUpdates = t->fromStream<TTLType>(ttl)
+      // ttl tuples are blocked until they are on time
+			.barrier<TTLType>(globalTime.mCondVar, globalTime.mCondMtx, [&](auto tp) -> bool {
+				return get<1>(tp) < globalTime.get();
+			})
+      // if a tuple reaches end of life then we can remove it
+      .where<TTLType>([](auto tp, bool) -> bool {
+        return get<2>(tp) > 1;
+      })
+      .keyBy<TTLType, 0, long>()
+      // update the score of the post in the table - the key is taken fom the ttl tuple
+      .updateTable<TTLType, CommentedPostType, long>(postTable,
+                                                     [](auto tp, bool outdated, auto oldRec) -> CommentedPostType {
+          auto tup = oldRec;
+          // TODO: update the table scores
+          // std::cout << tup << std::endl;
+          return tup;
+      })
+      // update the ttl field of the tuple
+			.map<TTLType, TTLType>([](auto tp, bool) -> TTLType {
+				std::cout << "---> " << tp << std::endl;
+				return makeTuplePtr(get<0>(tp), get<1>(tp) + 1000l * 60 * 60 * 24, get<2>(tp) - 1);
+      })
+      // and add it again to the stream
+			.queue<TTLType>()
+  		.toStream<TTLType>(ttl);
+
+  return t;
 }
 
 void processCmdLine(int argc, char **argv) {
@@ -188,9 +248,7 @@ int main(int argc, char** argv) {
 	// we create a table for posts with scores and a list of comments to this post
 	auto postTable = ctx.createTable<CommentedPostType, long>("Posts");
 
-	auto t = ctx.createTopology();
-
-	buildQuery1(t, dataPath, postTable);
+	auto t = buildQuery1(ctx, dataPath);
 
 	t->start();
 	t->wait();
