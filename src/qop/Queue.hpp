@@ -65,9 +65,9 @@ namespace pfabric {
         return !queue_.empty() || stopped_;
       });
 
-      if (stopped_)
+      if (stopped_) {
         return false;
-
+      }
       item = queue_.front();
       queue_.pop();
       return true;
@@ -81,7 +81,6 @@ namespace pfabric {
     }
 
     void stop() {
-      std::cout << "ConcurrentQueue::stop: " << queue_.size() << std::endl;
       stopped_ = true;
       cond_.notify_all();
     }

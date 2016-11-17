@@ -28,6 +28,7 @@ public:
 	GlobalTime() {}
 
 	void set(Timestamp ts) {
+    if (ts == 0) return;
 		mCurrentTime.store(ts);
 		std::lock_guard<std::mutex> l(mCondMtx);
 		mCondVar.notify_all();
@@ -37,18 +38,21 @@ public:
 
 GlobalTime globalTime;
 
-void updateScore(CommentedPostType& cp, Timestamp currentTime) {
+int updateScore(CommentedPostType& cp, Timestamp currentTime) {
 		int s = calcScore(cp->getAttribute<0>(), currentTime);
 		auto lst = cp->getAttribute<4>();
 		for (auto& cmt : *lst) {
 			s += calcScore(cmt.ts, currentTime);
 		}
+		cp->setAttribute<0>(currentTime);
 		cp->setAttribute<3>(s);
+		return s;
 }
 
 // -----------------------------------------------------------------------------
 std::shared_ptr<Topology>
 buildQuery1(PFabricContext& ctx, boost::filesystem::path& dataPath) {
+	auto endTime = TimestampHelper::stringToTimestamp("2016-12-31T23:59:59.000+0000");
 	auto t = ctx.createTopology();
 	auto ttl = ctx.createStream<TTLType>("ttl");
 	auto postTable = ctx.getTable<CommentedPostType, long>("Posts");
@@ -82,7 +86,7 @@ buildQuery1(PFabricContext& ctx, boost::filesystem::path& dataPath) {
 			globalTime.set(get<0>(tp));
     }, [&](auto pp) {
       // in case of end of stream we set the clock to a time in the future
-			globalTime.set(TimestampHelper::stringToTimestamp("2016-12-31T23:59:59.000+0000"));
+			globalTime.set(endTime);
 		});
 //    .print<TimestampTupleType>();
 
@@ -150,7 +154,7 @@ buildQuery1(PFabricContext& ctx, boost::filesystem::path& dataPath) {
 		.keyBy<CommentType, 3, long>()
     // update the table by adding or removing the comment to its post
 		.updateTable<CommentType, CommentedPostType, long>(postTable,
-			[](auto tp, bool outdated, auto oldRec) -> CommentedPostType {
+			[](auto tp, bool outdated, auto oldRec) -> std::pair<CommentedPostType, bool> {
 				auto tup = makeTuplePtr(get<0>(oldRec),
 															get<1>(oldRec),
 															get<2>(oldRec),
@@ -159,9 +163,8 @@ buildQuery1(PFabricContext& ctx, boost::filesystem::path& dataPath) {
 																? removeCommentor(get<4>(oldRec), tp)
 																: addCommentor(get<4>(oldRec), tp)
 														);
-				updateScore(tup, globalTime.get());
-			//	std::cout << tup << std::endl;
-				return tup;
+				auto score = updateScore(tup, globalTime.get());
+				return std::make_pair(tup, score > 0);
 			})
       // and finally create a TTL tuple
 			.map<CommentType, TTLType>([](auto tp, bool) -> TTLType {
@@ -179,26 +182,32 @@ buildQuery1(PFabricContext& ctx, boost::filesystem::path& dataPath) {
 				return get<1>(tp) < globalTime.get();
 			})
       // if a tuple reaches end of life then we can remove it
-      .where<TTLType>([](auto tp, bool) -> bool {
-        return get<2>(tp) > 1;
+      .where<TTLType>([&](auto tp, bool) -> bool {
+        return get<2>(tp) > 0 && get<1>(tp) < endTime;
       })
       .keyBy<TTLType, 0, long>()
       // update the score of the post in the table - the key is taken fom the ttl tuple
       .updateTable<TTLType, CommentedPostType, long>(postTable,
-                                                     [](auto tp, bool outdated, auto oldRec) -> CommentedPostType {
+                                                     [](auto tp, bool outdated, auto oldRec) -> std::pair<CommentedPostType, bool> {
           auto tup = oldRec;
-          // TODO: update the table scores
-          // std::cout << tup << std::endl;
-          return tup;
+          auto score = updateScore(tup, globalTime.get());
+					// delete tuple if score == 0
+          return std::make_pair(tup, score > 0);
       })
       // update the ttl field of the tuple
 			.map<TTLType, TTLType>([](auto tp, bool) -> TTLType {
-				std::cout << "---> " << tp << std::endl;
 				return makeTuplePtr(get<0>(tp), get<1>(tp) + 1000l * 60 * 60 * 24, get<2>(tp) - 1);
       })
       // and add it again to the stream
-			.queue<TTLType>()
   		.toStream<TTLType>(ttl);
+
+	//
+	auto topk = t->newStreamFromTable<CommentedPostType, long>(postTable)
+	// TODO: maintain top-3
+		.print<CommentedPostType>(std::cout, [&](std::ostream& os, auto tp) {
+			os << TimestampHelper::timestampToString(get<0>(tp)) << ","
+				 << get<1>(tp) << "," << get<3>(tp) << std::endl;
+		});
 
   return t;
 }
@@ -252,4 +261,8 @@ int main(int argc, char** argv) {
 
 	t->start();
 	t->wait();
+
+	using namespace std::chrono_literals;
+	// std::this_thread::sleep_for(120s);
+	std::cout << "--------------------------- stopping ---------------------------" << std::endl;
 }

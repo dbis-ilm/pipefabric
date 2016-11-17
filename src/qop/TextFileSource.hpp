@@ -54,7 +54,7 @@ public:
 	 *
 	 * @param fname the name of the file we read the data from
 	 */
-	TextFileSource(const std::string& fname);
+	TextFileSource(const std::string& fname, unsigned long limit = 0);
 
 	/**
 	 * Deallocates all resources.
@@ -108,6 +108,7 @@ protected:
 	void producePunctuation(PunctuationPtr pp);
 
 	std::string fileName;        //< the name of the file we read the data from
+	unsigned long maxTuples;
 };
 
 }

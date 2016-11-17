@@ -18,7 +18,7 @@
  * along with this program; see the file LICENSE.
  * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
  */
- 
+
 #include <iostream>
 
 #include <boost/iostreams/filtering_stream.hpp>
@@ -50,8 +50,8 @@
 
 using namespace pfabric;
 
-TextFileSource::TextFileSource(const std::string& fname) :
-		fileName(fname) {
+TextFileSource::TextFileSource(const std::string& fname, unsigned long limit) :
+		fileName(fname), maxTuples(limit) {
 }
 
 TextFileSource::~TextFileSource() {
@@ -89,7 +89,11 @@ unsigned long TextFileSource::readRawFile() {
 			data.setValues(store, f - p + start);
 			produceTuple(data);
 			p = f;
-			ntuples++;
+			if (++ntuples == maxTuples) {
+        close(fd);
+        delete [] store;
+        return ntuples;
+      }
 			start = 0;
 			remaining = p - buf + 1;
 		}
@@ -151,7 +155,9 @@ for (p = (char*) f; (pch = (char*) strchr(p, '\n')); ++p) {
 	data.setValues(store, pch - p);
 	produceTuple(data);
 	p = pch;
-	ntuples++;
+  if (++ntuples == maxTuples) {
+    break;
+  }
 }
 
 #ifdef POSIX
@@ -188,8 +194,10 @@ unsigned long TextFileSource::readCompressedFile() {
 		while (getline(in, line)) {
 			data.setValues( const_cast<char *> (line.c_str()), line.size());
 			produceTuple(data);
-			ntuples++;
-		}
+      if (++ntuples == maxTuples) {
+        break;
+      }
+    }
 		file.close();
 
 	} catch (std::ifstream::failure e) {

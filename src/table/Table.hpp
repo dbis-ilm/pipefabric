@@ -18,7 +18,7 @@
  * along with this program; see the file LICENSE.
  * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
  */
- 
+
 #ifndef Table_hpp_
 #define Table_hpp_
 
@@ -89,6 +89,9 @@ template <typename RecordType, typename KeyType = DefaultKeyType>
 class Table : public BaseTable {
 public:
   typedef std::unordered_map<KeyType, RecordType> TableMap;
+  typedef std::pair<RecordType, bool> UpdateResult;
+
+  typedef std::function<UpdateResult(const RecordType&)> UpdelFunc;
 
   typedef std::function<RecordType(const RecordType&)> UpdaterFunc;
 
@@ -138,11 +141,38 @@ public:
     return num;
   }
 
+  unsigned long updateOrDeleteByKey(KeyType key, UpdelFunc ufunc) {
+    std::unique_lock<std::mutex> lock(mMtx);
+
+    auto res = mDataTable.find(key);
+    if (res != mDataTable.end()) {
+      TableParams::ModificationMode mode = TableParams::Update;
+      unsigned long num = 1;
+
+      auto updateRes = ufunc(res->second);
+
+      if (updateRes.second)
+        mDataTable[key] = updateRes.first;
+      else {
+        num = mDataTable.erase(key);
+        mode = TableParams::Delete;
+      }
+      lock.unlock();
+      notifyObservers(updateRes.first, mode, TableParams::Immediate);
+      return num;
+    }
+    else {
+      lock.unlock();
+    }
+    return 0;
+  }
+
   unsigned long updateByKey(KeyType key, UpdaterFunc ufunc) {
     std::unique_lock<std::mutex> lock(mMtx);
 
     auto res = mDataTable.find(key);
     if (res != mDataTable.end()) {
+
       auto rec = ufunc(res->second);
       mDataTable[key] = rec;
       lock.unlock();

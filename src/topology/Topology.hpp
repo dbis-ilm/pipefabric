@@ -145,10 +145,12 @@ namespace pfabric {
      *
      * @param[in] fname
      *    the name of the file from which the tuples are read.
+     * @param[in] limit
+     *    maximum number of tuples to be read (default == 0 => read until EOF)
      * @return
      *    a new pipe where TextFileSource acts as a producer.
      */
-    Pipe newStreamFromFile(const std::string& fname);
+    Pipe newStreamFromFile(const std::string& fname, unsigned long limit = 0);
 
     /**
      * @brief Creates a pipe from a REST source as input.

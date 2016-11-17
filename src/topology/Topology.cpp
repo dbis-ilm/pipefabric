@@ -67,9 +67,9 @@ void Topology::wait() {
       f.get();
 }
 
-Pipe Topology::newStreamFromFile(const std::string& fname) {
+Pipe Topology::newStreamFromFile(const std::string& fname, unsigned long limit) {
   // create a new TextFileSource
-  auto op = std::make_shared<TextFileSource>(fname);
+  auto op = std::make_shared<TextFileSource>(fname, limit);
   // register it's start function
   registerStartupFunction(std::bind(&TextFileSource::start, op.get()));
   // and create a new pipe; we use a raw pointer here because

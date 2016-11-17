@@ -973,7 +973,7 @@ public:
      */
     template <typename T, typename RecordType, typename KeyType = DefaultKeyType>
     Pipe updateTable(std::shared_ptr<Table<RecordType, KeyType>> tbl,
-                    std::function<RecordType(const T&, bool, const RecordType&)> updateFunc)
+      std::function<std::pair<RecordType, bool>(const T&, bool, const RecordType&)> updateFunc)
           throw (TopologyException) {
       typedef std::function<KeyType(const T&)> KeyExtractorFunc;
 
@@ -981,7 +981,7 @@ public:
         KeyExtractorFunc keyFunc = boost::any_cast<KeyExtractorFunc>(keyExtractor);
         return map<T, T>([=](auto tp, bool outdated) {
             KeyType key = keyFunc(tp);
-            tbl->updateByKey(key, [=](const RecordType& old) -> RecordType {
+            tbl->updateOrDeleteByKey(key, [=](const RecordType& old) -> std::pair<RecordType, bool> {
                   return updateFunc(tp, outdated, old);
             });
             return tp;
