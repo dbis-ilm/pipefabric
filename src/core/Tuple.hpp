@@ -370,7 +370,6 @@ private:
  */
 template<typename ...Types>
 std::ostream& operator<< (std::ostream& os, const pfabric::Tuple<Types ...>& tp) {
-	// os << tp.getTimestamp() << ":";
 	pfabric::print(os, tp);
 	return os;
 }

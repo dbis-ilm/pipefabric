@@ -396,9 +396,9 @@ public:
 	 *    the element whose timestamp shall be returned
 	 * @return the element's timestamp
 	 */
-	static const Timestamp& getTimestamp( const StreamElement& element ) {
-		return ElementTraits::getElementRef( element ).getTimestamp();
-	}
+	//static const Timestamp& getTimestamp( const StreamElement& element ) {
+	//	return ElementTraits::getElementRef( element ).getTimestamp();
+	//}
 
 	////// nullability access
 

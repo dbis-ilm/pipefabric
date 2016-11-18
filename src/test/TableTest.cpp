@@ -24,10 +24,10 @@ TEST_CASE("Creating a table with a given schema, inserting and deleting data", "
     REQUIRE(testTable->size() == 10000);
     for (int i = 0; i < 10000; i++) {
       auto tp = testTable->getByKey(i);
-      REQUIRE(tp->getAttribute<0>() == i);
-      REQUIRE(tp->getAttribute<1>() == i + 100);
-      REQUIRE(tp->getAttribute<2>() == fmt::format("String#{}", i));
-      REQUIRE(tp->getAttribute<3>() == i / 100.0);
+      REQUIRE(get<0>(tp) == i);
+      REQUIRE(get<1>(tp) == i + 100);
+      REQUIRE(get<2>(tp) == fmt::format("String#{}", i));
+      REQUIRE(get<3>(tp) == i / 100.0);
     }
   }
 
@@ -53,7 +53,7 @@ TEST_CASE("Creating a table with a given schema, inserting and deleting data", "
   SECTION("deleting data using a predicate") {
     REQUIRE(testTable->size() == 10000);
     auto num = testTable->deleteWhere([](const MyTuplePtr& tp) -> bool {
-      return tp->getAttribute<0>() % 100 == 0;
+      return get<0>(tp) % 100 == 0;
     });
     REQUIRE(num == 100);
     REQUIRE(testTable->size() == 9900);
@@ -73,13 +73,13 @@ TEST_CASE("Creating a table with a given schema, inserting and deleting data", "
     REQUIRE(testTable->size() == 10000);
     for (int i = 100; i < 10000; i += 100) {
       testTable->updateByKey(i, [](const MyTuplePtr& tp) -> MyTuplePtr {
-          return makeTuplePtr(tp->getAttribute<0>(), tp->getAttribute<1>() + 100,
-                              tp->getAttribute<2>(), tp->getAttribute<3>());
+          return makeTuplePtr(get<0>(tp), get<1>(tp) + 100,
+                              get<2>(tp), get<3>(tp));
       });
     }
     for (int i = 100; i < 10000; i += 100) {
       auto tp = testTable->getByKey(i);
-      REQUIRE(tp->getAttribute<1>() == tp->getAttribute<0>() + 200);
+      REQUIRE(get<1>(tp) == get<0>(tp) + 200);
     }
   }
 
@@ -87,15 +87,15 @@ TEST_CASE("Creating a table with a given schema, inserting and deleting data", "
     REQUIRE(testTable->size() == 10000);
     testTable->updateWhere(
       [](const MyTuplePtr& tp) -> bool {
-        return tp->getAttribute<0>() % 100 == 0;
+        return get<0>(tp) % 100 == 0;
       },
       [](const MyTuplePtr& tp) -> MyTuplePtr {
-        return makeTuplePtr(tp->getAttribute<0>(), tp->getAttribute<1>() + 100,
-                            tp->getAttribute<2>(), tp->getAttribute<3>());
+        return makeTuplePtr(get<0>(tp), get<1>(tp) + 100,
+                            get<2>(tp), get<3>(tp));
     });
     for (int i = 0; i < 10000; i += 100) {
       auto tp = testTable->getByKey(i);
-      REQUIRE(tp->getAttribute<1>() == tp->getAttribute<0>() + 200);
+      REQUIRE(get<1>(tp) == get<0>(tp) + 200);
     }
   }
 
@@ -109,15 +109,15 @@ TEST_CASE("Creating a table with a given schema, inserting and deleting data", "
       TableParams::ModificationMode mode) {
       switch (mode) {
       case TableParams::Insert:
-        if (rec->getAttribute<0>() == 20000lu)
+        if (get<0>(rec) == 20000lu)
           insertDetected = true;
         break;
       case TableParams::Delete:
-        if (rec->getAttribute<0>() == 20000lu)
+        if (get<0>(rec) == 20000lu)
           deleteDetected = true;
         break;
       case TableParams::Update:
-        if (rec->getAttribute<0>() == 5000lu)
+        if (get<0>(rec) == 5000lu)
           updateDetected = true;
         break;
       default:
@@ -132,8 +132,8 @@ TEST_CASE("Creating a table with a given schema, inserting and deleting data", "
     REQUIRE(deleteDetected == true);
 
     testTable->updateByKey(5000, [](const MyTuplePtr& tp) -> MyTuplePtr {
-        return makeTuplePtr(tp->getAttribute<0>(), tp->getAttribute<1>() + 100,
-                            tp->getAttribute<2>(), tp->getAttribute<3>());
+        return makeTuplePtr(get<0>(tp), get<1>(tp) + 100,
+                            get<2>(tp), get<3>(tp));
     });
     REQUIRE(updateDetected == true);
   }

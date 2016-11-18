@@ -179,6 +179,7 @@ buildQuery1(PFabricContext& ctx, boost::filesystem::path& dataPath) {
 	auto scoreUpdates = t->fromStream<TTLType>(ttl)
       // ttl tuples are blocked until they are on time
 			.barrier<TTLType>(globalTime.mCondVar, globalTime.mCondMtx, [&](auto tp) -> bool {
+     //   std::cout << TimestampHelper::timestampToString(get<1>(tp)) << " -- " << TimestampHelper::timestampToString(globalTime.get()) << std::endl;
 				return get<1>(tp) < globalTime.get();
 			})
       // if a tuple reaches end of life then we can remove it
@@ -198,7 +199,7 @@ buildQuery1(PFabricContext& ctx, boost::filesystem::path& dataPath) {
 			.map<TTLType, TTLType>([](auto tp, bool) -> TTLType {
 				return makeTuplePtr(get<0>(tp), get<1>(tp) + 1000l * 60 * 60 * 24, get<2>(tp) - 1);
       })
-      // and add it again to the stream
+    // and add it again to the stream
   		.toStream<TTLType>(ttl);
 
 	//
