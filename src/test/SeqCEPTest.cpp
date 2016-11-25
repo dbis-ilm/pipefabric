@@ -15,6 +15,7 @@
 
 #include "cep/Matcher.hpp"
 #include "cep/NFAController.hpp"
+#include "cep/dsl/CEPState.hpp"
 
 #include "topology/Topology.hpp"
 #include "topology/Pipe.hpp"
@@ -164,3 +165,25 @@ TEST_CASE("Verifying the correct behavior of the CEP operator using Topology", "
 	REQUIRE(strm.str() == expected);
 }
 
+TEST_CASE("Verifying the correct behavior of the CEP operator using Topology & DSL", "[CEP]") {
+	typedef typename RelatedStateValue<InTuplePtr, int, int, 0>::RelatedStateValuePtr RelatedTuplePtr;
+	typedef CEPState<InTuplePtr, RelatedTuplePtr> MyCEPState;
+
+	std::string expected = "1,71,421\n2,76,390\n3,97,467\n1,71,52\n2,76,942\n3,97,639\n1,71,242\n2,76,901\n3,97,868\n";
+	std::stringstream strm;
+
+  MyCEPState a;
+  MyCEPState b([](auto tp, auto rt) { return get<0>(*tp) == 1 && get<1>(*tp) == 71; });
+  MyCEPState c([](auto tp, auto rt) { return get<0>(*tp) == 2 && get<1>(*tp) == 76; });
+  MyCEPState d([](auto tp, auto rt) { return get<0>(*tp) == 3 && get<1>(*tp) == 97; }, MyCEPState::Stopp);
+
+	auto inputFile = std::string(TEST_DATA_DIRECTORY) + "cep_test.in";
+	Topology t;
+	auto s = t.newStreamFromFile(inputFile)
+	    		.extract<InTuplePtr>(',')
+				  .matcher<InTuplePtr, OutTuplePtr, RelatedTuplePtr>(a >> b >> c >> d)
+				  .print<OutTuplePtr>(strm);
+
+	t.start(false);
+	REQUIRE(strm.str() == expected);
+}

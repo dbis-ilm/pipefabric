@@ -844,7 +844,7 @@ public:
      *      the type of representing the matcher result
      * @tparam Dependency
      *      the type of related values
-     * @param[in] aggrStatePtr
+     * @param[in] nfa
      *      an instance of our working NFA
      * @return a reference to the pipe
      * TODO: make better
@@ -854,6 +854,35 @@ public:
     	auto op = std::make_shared<Matcher<Tin, Tout, RelatedValueType>>(
 				Matcher<Tin, Tout, RelatedValueType>::FirstMatch);
     	op->setNFAController(nfa);
+      auto iter = addPublisher<Matcher<Tin, Tout, RelatedValueType>, DataSource<Tin> >(op);
+      return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+    }
+
+    /**
+     * @brief Creates an operator for pattern detection over the stream
+     * using NFA concept.
+     *
+     * Creates an operator implementing the matcher operator to
+     * detect complex events and patterns over the stream. The operator
+     * uses the NFA concept to carry out its task.
+     *
+     * @tparam Tin
+     *      the input tuple type (usually a TuplePtr) for the operator.
+     * @tparam Tout
+     *      the result tuple type (usually a TuplePtr) for the operator.
+     *      the type of representing the matcher result
+     * @tparam Dependency
+     *      the type of related values
+     * @param[in] expr
+     *      an expression for event matching using sequence operator (>>),
+     *      or operator (||) and negation (!)
+     * @return a reference to the pipe
+     */
+    template <typename Tin, typename Tout, typename RelatedValueType>
+    Pipe matcher(CEPState<Tin, RelatedValueType>& expr) throw (TopologyException) {
+    	auto op = std::make_shared<Matcher<Tin, Tout, RelatedValueType>>(
+				Matcher<Tin, Tout, RelatedValueType>::FirstMatch);
+    	op->constructNFA(expr);
       auto iter = addPublisher<Matcher<Tin, Tout, RelatedValueType>, DataSource<Tin> >(op);
       return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
     }

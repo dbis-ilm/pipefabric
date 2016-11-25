@@ -317,10 +317,13 @@ void Matcher<InputStreamElement,
 		// foreach state: nfa->createNormalState();
 		for (auto& p : states) {
 			auto id = std::to_string(p.first);
-			if (p.first == 0)
+			if (p.first == 0) {
 				p.second.nptr = nfa->createStartState(id);
-			else if (p.first == 10000)
+			}
+			else if (p.first == 1000) {
 				p.second.nptr = nfa->createFinalState(id);
+        p.second.eptr = nfa->createForwardEdge(p.second.cptr->predicate());
+			}
 			else {
 				// TODO: handle negateState
 				p.second.nptr = nfa->createNormalState(id);
