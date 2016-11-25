@@ -4,7 +4,7 @@
 
 #include "cep/Matcher.hpp"
 #include "cep/NFAController.hpp"
-#include "cep/dsl/CEPExpr.hpp"
+#include "cep/dsl/CEPState.hpp"
 
 using namespace pfabric;
 
@@ -15,33 +15,19 @@ typedef TuplePtr<OutTuple> OutTuplePtr;
 typedef typename RelatedStateValue<InTuplePtr, int, int, 0>::RelatedStateValuePtr RelatedTuplePtr;
 
 TEST_CASE("Defining states and transitions using a DSL", "[CEP]") {
+  typedef CEPState<InTuplePtr, RelatedTuplePtr> MyCEPState;
+  MyCEPState start;
+  MyCEPState a([](auto tp, auto rt) { return (get<0>(*tp) == 1); });
+  MyCEPState b([](auto tp, auto rt) { return (get<0>(*tp) == 2); });
+  MyCEPState c([](auto tp, auto rt) { return (get<0>(*tp) == 3); });
+  MyCEPState d([](auto tp, auto rt) { return (get<0>(*tp) == 4); });
+  MyCEPState end([](auto tp, auto rt) { return (get<0>(*tp) == 5); }, MyCEPState::Stopp);
+
+  auto expr = start >> a >> (b || c) >> !d >> end;
+  std::cout << "-------------------------" << std::endl;
+  expr.print();
+
   auto matcher = std::make_shared<Matcher<InTuplePtr, OutTuplePtr, RelatedTuplePtr>>(
 			Matcher<InTuplePtr, OutTuplePtr, RelatedTuplePtr>::FirstMatch);
-
-  Matcher<InTuplePtr, OutTuplePtr, RelatedTuplePtr>::PredicateMap predicates = {
-    {"A", [&](const InTuplePtr& tp, const RelatedTuplePtr& rt) {
-  		return (getAttribute<0>(*tp) == 1);
-    }},
-    {"B", [&](const InTuplePtr& tp, const RelatedTuplePtr& rt) {
-  		return (getAttribute<0>(*tp) == 2);
-  	}},
-    {"C", [&](const InTuplePtr& tp, const RelatedTuplePtr& rt) {
-  		return (getAttribute<0>(*tp) == 3);
-  	}}
-  };
-  matcher->constructNFA(SEQ({ _S("A"), _S("B"), _S("C")}), predicates);
-
-  matcher->constructNFA(SEQ({ _S("A"), OR({ _S("B"), _S("C") }), _S("D") }), {
-    {"A", [&](const InTuplePtr& tp, const RelatedTuplePtr& rt) {
-  		return (getAttribute<0>(*tp) == 1);
-    }},
-    {"B", [&](const InTuplePtr& tp, const RelatedTuplePtr& rt) {
-  		return (getAttribute<0>(*tp) == 2);
-  	}},
-    {"C", [&](const InTuplePtr& tp, const RelatedTuplePtr& rt) {
-  		return (getAttribute<0>(*tp) == 3);
-  	}},
-    {"D", [&](const InTuplePtr& tp, const RelatedTuplePtr& rt) {
-  		return (getAttribute<0>(*tp) == 4);
-  	}}});
+  matcher->constructNFA(expr);
 }

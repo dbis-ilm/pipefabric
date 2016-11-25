@@ -30,8 +30,9 @@
 #include "MatchProducer.hpp"
 #include "util/Partition.hpp"
 #include "edge/NFAEdge.hpp"
+#include "state/NFAState.hpp"
 
-#include "dsl/CEPExpr.hpp"
+#include "dsl/CEPState.hpp"
 
 /**
  * @brief The matcher operator for detecting complex events.
@@ -106,10 +107,6 @@ private:
 	 */
 	BIND_INPUT_CHANNEL_DEFAULT( InputPunctuationChannel, Matcher, processPunctuation );
 
-	void constructSubNFA(CEPExprPtr expr,
-		const PredicateMap& predicates,
-		typename NFAState<InputStreamElement>::StatePtr inState,
-		typename NFAState<InputStreamElement>::StatePtr outState) throw (InvalidCEPException);
 public:
 
 	/**
@@ -132,7 +129,7 @@ public:
 	 */
 	virtual ~Matcher() {delete engine;}
 
-	void constructNFA(CEPExprPtr expr, const PredicateMap& predicates) throw (InvalidCEPException);
+	void constructNFA(CEPState<InputStreamElement, EventDependency>&  expr);
 
 
 	/**
@@ -292,73 +289,59 @@ else {
 template<class InputStreamElement, class OutputStreamElement, class EventDependency>
 void Matcher<InputStreamElement,
 	OutputStreamElement,
-	EventDependency>::constructNFA(CEPExprPtr expr, const PredicateMap& predicates) throw (InvalidCEPException) {
+	EventDependency>::constructNFA(CEPState<InputStreamElement, EventDependency>& expr) {
+		typedef CEPState<InputStreamElement, EventDependency> MyCEPState;
+		typedef typename CEPState<InputStreamElement, EventDependency>::CEPStatePtr CEPStatePtr;
+		typedef typename NFAState<InputStreamElement>::StatePtr NFAStatePtr;
+		typedef typename NFAEdge<InputStreamElement, OutputStreamElement,
+			EventDependency>::NFAEdgePtr NFAEdgePtr;
+
+		struct StateInfo {
+			StateInfo() {}
+			StateInfo(CEPStatePtr ptr) : cptr(ptr), nptr(nullptr), eptr(nullptr) {}
+			CEPStatePtr cptr;
+			NFAStatePtr nptr;
+			NFAEdgePtr eptr;
+		};
+
+		std::map<int, StateInfo> states;
+
 		auto nfa = getNFAController();
+		auto exprTable = expr.exprTable();
 
-		if (expr->tag() != CEPExpr::Seq)
-	    throw InvalidCEPException("SEQ expression expected.");
-
-	  auto seq = std::dynamic_pointer_cast<SEQExpr>(expr);
-	  auto s0 = seq->sequence.front();
-	  auto sn = seq->sequence.back();
-
-		if (s0->tag() != CEPExpr::State)
-	    throw InvalidCEPException("Init state expected.");
-	  if (sn->tag() != CEPExpr::State)
-	    throw InvalidCEPException("Final state expected.");
-
-	  auto initStateId = std::dynamic_pointer_cast<CEPState>(s0);
-	  auto finalStateId = std::dynamic_pointer_cast<CEPState>(sn);
-
-		auto initState = nfa->createStartState(initStateId->id);
-		auto finalState = nfa->createFinalState(finalStateId->id);
-
-	  for (int i = 1; i < seq->sequence.size() - 1; i++) {
-	    auto s = seq->sequence[i];
-	    constructSubNFA(s, predicates, initState, finalState);
-	  }
-	}
-
-	template<class InputStreamElement, class OutputStreamElement, class EventDependency>
-	void Matcher<InputStreamElement,
-		OutputStreamElement,
-		EventDependency>::constructSubNFA(CEPExprPtr expr,
-			const PredicateMap& predicates,
-			typename NFAState<InputStreamElement>::StatePtr inState,
-			typename NFAState<InputStreamElement>::StatePtr outState) throw (InvalidCEPException) {
-
-		switch(expr->tag()) {
-		  case CEPExpr::State:
-		    std::cout << "state: ";
-		    {
-		      auto s = std::dynamic_pointer_cast<CEPState>(expr);
-		      std::cout << s->id << std::endl;
-		    }
-		    break;
-		  case CEPExpr::Seq:
-		    std::cout << "seq - ";
-		    {
-		      auto seq = std::dynamic_pointer_cast<SEQExpr>(expr);
-		      for (auto s : seq->sequence) {
-		        // constructNFA(s, level + 1);
-		      }
-		    }
-		    std::cout << std::endl;
-		    break;
-		  case CEPExpr::Or:
-		    std::cout << "or - ";
-		    {
-		    	auto seq = std::dynamic_pointer_cast<ORExpr>(expr);
-		      for (auto s : seq->sequence) {
-		        // constructNFA(s);
-		      }
-		      std::cout << std::endl;
-		    }
-		    break;
-		  default:
-		    std::cout << "unknown" << std::endl;
-		    break;
+		// extract the set of states as well as start and end
+		for (auto& ex : exprTable) {
+			states[ex.fromState->ID()] = StateInfo(ex.fromState);
+			if (ex.toState != nullptr) states[ex.toState->ID()] = StateInfo(ex.toState);
 		}
+		// foreach state: nfa->createNormalState();
+		for (auto& p : states) {
+			auto id = std::to_string(p.first);
+			if (p.first == 0)
+				p.second.nptr = nfa->createStartState(id);
+			else if (p.first == 10000)
+				p.second.nptr = nfa->createFinalState(id);
+			else {
+				// TODO: handle negateState
+				p.second.nptr = nfa->createNormalState(id);
+				// foreach state: nfa->createForwardEdge();
+				p.second.eptr = nfa->createForwardEdge(p.second.cptr->predicate());
+			}
+		}
+
+		for (auto& ex : exprTable) {
+			// foreach expr: nfa->createForwardTransition();
+			if (ex.op == MyCEPState::SEQ) {
+				auto beginState = states[ex.fromState->ID()].nptr;
+				auto endState = states[ex.toState->ID()].nptr;
+        auto predicate = states[ex.toState->ID()].eptr;
+				nfa->createForwardTransition(beginState, predicate, endState);
+			}
+			else if (ex.op == MyCEPState::OR) {
+				// TODO handle OR
+			}
+		}
+		nfa->print();
 	}
 
 }
