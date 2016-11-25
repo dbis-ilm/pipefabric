@@ -1039,7 +1039,13 @@ public:
         CREATE_LINK(pOp, op);
       }
       auto iter = dataflow->addPublisher(op);
-      return Pipe(dataflow, iter, keyExtractor, timestampExtractor, NoPartitioning, 0);
+      // return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+
+      auto queue = std::make_shared<Queue<T> >();
+      CREATE_LINK(op, queue);
+      auto iter2 = dataflow->addPublisher(queue);
+
+      return Pipe(dataflow, iter2, keyExtractor, timestampExtractor, NoPartitioning, 0);
     }
 
     /*----------------------------- synchronization ---------------------------*/
