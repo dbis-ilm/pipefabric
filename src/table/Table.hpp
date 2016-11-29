@@ -146,7 +146,7 @@ public:
   /**
    * Destructor for table.
    */
-  ~Table() { std::cout << "deallocate table" << std::endl; }
+  ~Table() {}
 
   /**
    * @brief Insert a tuple.

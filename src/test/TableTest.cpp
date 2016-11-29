@@ -156,8 +156,10 @@ TEST_CASE("Creating a table with a given schema, inserting and deleting data", "
     auto handle = testTable->select([](const MyTuplePtr& tp) {
       return get<0>(tp) % 2 == 0;
     });
-    for (auto i = handle.first; i != handle.second; i++)
+    for (auto i = handle.first; i != handle.second; i++) {
+      REQUIRE(get<0>(*i) % 2 == 0);
       num++;
+    }
     REQUIRE(num == testTable->size() / 2);
   }
 }

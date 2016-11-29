@@ -34,6 +34,9 @@ class FilterIterator :
     std::bidirectional_iterator_tag,
     typename Iter::value_type::second_type
   > {
+private:
+  void advance() {
+  }
 public:
   typedef typename Iter::value_type::second_type& reference;
   typename Iter::value_type::second_type* pointer;
@@ -41,14 +44,18 @@ public:
   typedef std::function<bool(const typename Iter::value_type::second_type&)> Predicate;
 
   explicit FilterIterator() {}
-  explicit FilterIterator(Iter j, Iter e, Predicate p) : i(j), beg(j), end(e), pred(p) {}
-  FilterIterator& operator++() {
-    if (i == end) return *this;
+  explicit FilterIterator(Iter j, Iter e, Predicate p) : i(j), beg(j), end(e), pred(p) {
+    // make sure the initial iterator position refers to an entry satisfying
+    // the predicate
+    while (i != end && ! pred(i->second)) ++i;
+  }
 
-    while (! pred(i->second) && i != end) ++i;
-    if (i != end) ++i;
+  FilterIterator& operator++() {
+    i++;
+    while (i != end && ! pred(i->second)) ++i;
     return *this;
   }
+
   FilterIterator operator++(int) { auto tmp = *this; ++(*this); return tmp; }
   FilterIterator& operator--() { --i; return *this; }
   FilterIterator operator--(int) { auto tmp = *this; --(*this); return tmp; }
