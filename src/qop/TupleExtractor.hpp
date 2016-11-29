@@ -128,7 +128,7 @@ namespace pfabric {
       auto res = OutputDataElementTraits::create(data);
       // because the tuple parser doesn't handle null values we
       // have to set the null flag manually
-      for (auto n = 0; n < OutputDataElementTraits::NUM_ATTRIBUTES; n++) {
+      for (auto n = 0u; n < OutputDataElementTraits::NUM_ATTRIBUTES; n++) {
         if (nulls[n]) res->setNull(n);
       }
       this->getOutputDataChannel().publish( res, outdated );

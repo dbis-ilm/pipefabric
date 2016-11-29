@@ -164,7 +164,7 @@ public:
       if (partitioningState == FirstInPartitioning) {
         auto partition = castOperator<PartitionBy<StreamElement>>(getPublisher());
 
-        for (int i = 0; i < opList.size(); i++) {
+        for (auto i = 0u; i < opList.size(); i++) {
           auto op = opList[i];
           partition->connectChannelsForPartition(i,
             op->getInputDataChannel(),
@@ -174,7 +174,7 @@ public:
       }
       else {
         auto iter = getPublishers();
-        for (int i = 0; i < opList.size() && iter != dataflow->publisherEnd(); i++) {
+        for (auto i = 0u; i < opList.size() && iter != dataflow->publisherEnd(); i++) {
           auto p = iter->get();
           auto pOp = castOperator<DataSource<StreamElement>>(p);
           CREATE_LINK(pOp, opList[i]);

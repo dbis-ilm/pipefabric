@@ -109,7 +109,7 @@ namespace pfabric {
       using json = nlohmann::json;
 
       auto j = json::parse(line->getAttribute<0>());
-      for (int i = 0; i < mKeys.size(); i++) {
+      for (auto i = 0u; i < mKeys.size(); i++) {
         if (j.find(mKeys[i]) == j.end()) {
           mData[i] = "";
           continue;

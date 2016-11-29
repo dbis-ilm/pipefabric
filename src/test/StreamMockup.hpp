@@ -163,7 +163,7 @@ private:
 
 	std::vector<InputStreamElement> inputTuples;
 	std::vector<OutputStreamElement> expectedTuples, processedTuples;
-	int tuplesProcessed;
+	unsigned int tuplesProcessed;
 	bool compareOrdered;
 	CompareFunc compareFunc;
 	mutable std::mutex mMtx;

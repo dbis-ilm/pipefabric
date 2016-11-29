@@ -45,7 +45,7 @@ Timestamp TimestampHelper::stringToTimestamp(const std::string& date) {
 	unsigned long milliseconds = std::stoi(date.substr(offs1, offs2 - offs1));
 	//tm.tm_isdst = -1;   // to determine whether daylight saving time is considered
 	// Timestamp t = time_to_epoch(&tm, -1); //faster than mktime but wrong!
-	Timestamp t = mktime(&tm);
+	Timestamp t = timegm(&tm);
 	return t * 1000000 + milliseconds * 1000;
 }
 
