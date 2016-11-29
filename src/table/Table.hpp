@@ -366,8 +366,8 @@ public:
    * @return a pair of iterators
    */
   std::pair<TableIterator, TableIterator> select(Predicate func) {
-    return make_pair(makeFilterIterator(mDataTable.begin(), func),
-                      makeFilterIterator(mDataTable.end(), func));
+    return make_pair(makeFilterIterator(mDataTable.begin(), mDataTable.end(), func),
+                      makeFilterIterator(mDataTable.end(), mDataTable.end(), func));
   }
 
   /**
@@ -385,8 +385,8 @@ public:
    */
   std::pair<TableIterator, TableIterator> select() {
     auto alwaysTrue = [](const RecordType&) { return true; };
-    return make_pair(makeFilterIterator(mDataTable.begin(), alwaysTrue),
-                      makeFilterIterator(mDataTable.end(), alwaysTrue));
+    return make_pair(makeFilterIterator(mDataTable.begin(), mDataTable.end(), alwaysTrue),
+                      makeFilterIterator(mDataTable.end(), mDataTable.end(), alwaysTrue));
   }
 
   /**

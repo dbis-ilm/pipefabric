@@ -18,7 +18,7 @@
  * along with this program; see the file LICENSE.
  * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
  */
- 
+
 #ifndef FilterIterator_hpp_
 #define FilterIterator_hpp_
 
@@ -41,10 +41,12 @@ public:
   typedef std::function<bool(const typename Iter::value_type::second_type&)> Predicate;
 
   explicit FilterIterator() {}
-  explicit FilterIterator(Iter j, Predicate p) : i(j), pred(p) {}
+  explicit FilterIterator(Iter j, Iter e, Predicate p) : i(j), beg(j), end(e), pred(p) {}
   FilterIterator& operator++() {
-    while (! pred(i->second)) ++i;
-    ++i;
+    if (i == end) return *this;
+
+    while (! pred(i->second) && i != end) ++i;
+    if (i != end) ++i;
     return *this;
   }
   FilterIterator operator++(int) { auto tmp = *this; ++(*this); return tmp; }
@@ -56,13 +58,13 @@ public:
   typename Iter::value_type::second_type* operator->() { return &i->second; }
 
 protected:
-  Iter i;
+  Iter i, beg, end;
   Predicate pred;
 };
 
 template <typename Iter>
-inline FilterIterator<Iter> makeFilterIterator(Iter j,
-  typename FilterIterator<Iter>::Predicate p) { return FilterIterator<Iter>(j, p); }
+inline FilterIterator<Iter> makeFilterIterator(Iter j, Iter e,
+  typename FilterIterator<Iter>::Predicate p) { return FilterIterator<Iter>(j, e, p); }
 
 }
 

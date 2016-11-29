@@ -158,6 +158,6 @@ TEST_CASE("Creating a table with a given schema, inserting and deleting data", "
     });
     for (auto i = handle.first; i != handle.second; i++)
       num++;
-      REQUIRE(num == testTable->size() / 2);
+    REQUIRE(num == testTable->size() / 2);
   }
 }

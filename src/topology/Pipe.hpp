@@ -293,6 +293,8 @@ public:
                         const unsigned int sz,
                         const unsigned int ei = 0) throw (TableException) {
       typedef typename Window<T>::TimestampExtractorFunc ExtractorFunc;
+      assert(partitioningState == NoPartitioning);
+
       // we use a try block because the type cast of the timestamp extractor
       // could fail
       try {
@@ -332,6 +334,8 @@ public:
     Pipe tumblingWindow(const WindowParams::WinType& wt,
                          const unsigned int sz) throw (TableException) {
       typedef typename Window<T>::TimestampExtractorFunc ExtractorFunc;
+      assert(partitioningState == NoPartitioning);
+
       try {
         ExtractorFunc fn;
         std::shared_ptr<TumblingWindow<T> > op;
@@ -371,6 +375,7 @@ public:
     Pipe print(std::ostream& os = std::cout,
                 typename ConsoleWriter<T>::FormatterFunc ffun = ConsoleWriter<T>::defaultFormatter)
                 throw (TopologyException) {
+      assert(partitioningState == NoPartitioning);
       auto op = std::make_shared<ConsoleWriter<T> >(os, ffun);
       auto pOp = castOperator<DataSource<T>>(getPublisher());
       /*
@@ -403,6 +408,7 @@ public:
     Pipe saveToFile(const std::string& fname,
                      typename FileWriter<T>::FormatterFunc ffun = ConsoleWriter<T>::defaultFormatter)
                      throw (TopologyException) {
+      assert(partitioningState == NoPartitioning);
       auto op = std::make_shared<FileWriter<T> >(fname, ffun);
       auto pOp = castOperator<DataSource<T>>(getPublisher());
         CREATE_LINK(pOp, op);
@@ -431,6 +437,7 @@ public:
    Pipe sendZMQ(const std::string& path, ZMQParams::SinkType stype = ZMQParams::PublisherSink,
        ZMQParams::EncodingMode mode = ZMQParams::BinaryMode)
        throw (TopologyException) {
+         assert(partitioningState == NoPartitioning);
       auto op = std::make_shared<ZMQSink<T> >(path, stype, mode);
       auto pOp = castOperator<DataSource<T>>(getPublisher());
       CREATE_LINK(pOp, op);
@@ -454,6 +461,7 @@ public:
      */
     template <class T>
     Pipe extract(char sep) throw (TopologyException) {
+      assert(partitioningState == NoPartitioning);
       auto op = std::make_shared<TupleExtractor<T> >(sep);
       auto iter = addPublisher<TupleExtractor<T>, DataSource<TStringPtr> >(op);
       return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
@@ -472,6 +480,7 @@ public:
      */
     template <class T>
     Pipe extractJson(const std::initializer_list<std::string>& keys) throw (TopologyException) {
+      assert(partitioningState == NoPartitioning);
       std::vector<std::string> keyList(keys);
       auto op = std::make_shared<JsonExtractor<T> >(keyList);
       auto iter = addPublisher<JsonExtractor<T>, DataSource<TStringPtr> >(op);
@@ -487,6 +496,7 @@ public:
      */
     template <class T>
     Pipe deserialize() throw (TopologyException) {
+      assert(partitioningState == NoPartitioning);
       auto op = std::make_shared<TupleDeserializer<T> >();
       auto iter = addPublisher<TupleDeserializer<T>, DataSource<TBufPtr> >(op);
       return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
@@ -541,6 +551,8 @@ public:
      template <typename T>
      Pipe notify(typename Notify<T>::CallbackFunc func,
                  typename Notify<T>::PunctuationCallbackFunc pfunc = nullptr) throw (TopologyException) {
+        assert(partitioningState == NoPartitioning);
+
        auto op = std::make_shared<Notify<T> >(func, pfunc);
        auto iter = addPublisher<Notify<T>, DataSource<T> >(op);
        return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
@@ -560,6 +572,7 @@ public:
      */
     template <typename T>
     Pipe queue() throw (TopologyException) {
+      assert(partitioningState == NoPartitioning);
       auto op = std::make_shared<Queue<T> >();
       auto iter = addPublisher<Queue<T>, DataSource<T> >(op);
       return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
@@ -579,6 +592,7 @@ public:
     */
     template <typename T>
     Pipe toStream(Dataflow::BaseOpPtr stream) throw (TopologyException) {
+      assert(partitioningState == NoPartitioning);
       auto queueOp = castOperator<Queue<T>>(stream);
       auto pOp = castOperator<DataSource<T>>(getPublisher());
       CREATE_LINK(pOp, queueOp);
@@ -742,6 +756,7 @@ public:
                      typename Aggregation<Tin, Tout, AggrState>::IterateFunc iterFun,
                      AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0)
                      throw (TopologyException) {
+        assert(partitioningState == NoPartitioning);
        auto op = std::make_shared<Aggregation<Tin, Tout, AggrState> >(finalFun, iterFun,
             tType, tInterval);
        auto iter = addPublisher<Aggregation<Tin, Tout, AggrState>, DataSource<Tin> >(op);
@@ -813,6 +828,7 @@ public:
                     typename GroupedAggregation<Tin, Tout, AggrState, KeyType>::IterateFunc iterFun,
                     AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0)
                     throw (TopologyException) {
+      assert(partitioningState == NoPartitioning);
       try {
         typedef std::function<KeyType(const Tin&)> KeyExtractorFunc;
         KeyExtractorFunc keyFunc = boost::any_cast<KeyExtractorFunc>(keyExtractor);
@@ -880,6 +896,7 @@ public:
      */
     template <typename Tin, typename Tout, typename RelatedValueType>
     Pipe matcher(CEPState<Tin, RelatedValueType>& expr) throw (TopologyException) {
+      assert(partitioningState == NoPartitioning);
     	auto op = std::make_shared<Matcher<Tin, Tout, RelatedValueType>>(
 				Matcher<Tin, Tout, RelatedValueType>::FirstMatch);
     	op->constructNFA(expr);
@@ -913,6 +930,7 @@ public:
     template <typename T1, typename T2, typename KeyType = DefaultKeyType>
     Pipe join(Pipe& otherPipe,
                typename SHJoin<T1, T2, KeyType>::JoinPredicateFunc pred) throw (TopologyException) {
+      assert(partitioningState == NoPartitioning);
       try {
         typedef std::function<KeyType(const T1&)> LKeyExtractorFunc;
 	      typedef std::function<KeyType(const T2&)> RKeyExtractorFunc;
@@ -962,6 +980,7 @@ public:
     template <typename T, typename KeyType = DefaultKeyType>
     Pipe toTable(std::shared_ptr<Table<T, KeyType>> tbl, bool autoCommit = true) throw (TopologyException) {
       typedef std::function<KeyType(const T&)> KeyExtractorFunc;
+      assert(partitioningState == NoPartitioning);
 
       try {
         KeyExtractorFunc keyFunc = boost::any_cast<KeyExtractorFunc>(keyExtractor);
@@ -1005,6 +1024,7 @@ public:
       std::function<std::pair<RecordType, bool>(const T&, bool, const RecordType&)> updateFunc)
           throw (TopologyException) {
       typedef std::function<KeyType(const T&)> KeyExtractorFunc;
+      assert(partitioningState == NoPartitioning);
 
       try {
         KeyExtractorFunc keyFunc = boost::any_cast<KeyExtractorFunc>(keyExtractor);
