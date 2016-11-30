@@ -524,7 +524,7 @@ public:
       }
       else {
         std::vector<std::shared_ptr<Where<T>>> ops;
-        for (int i = 0; i < numPartitions; i++) {
+        for (auto i = 0u; i < numPartitions; i++) {
           ops.push_back(std::make_shared<Where<T> >(func));
         }
         auto iter = addPartitionedPublisher<Where<T>, T>(ops);
@@ -624,7 +624,7 @@ public:
       }
       else {
         std::vector<std::shared_ptr<Map<Tin, Tout>>> ops;
-        for (int i = 0; i < numPartitions; i++) {
+        for (auto i = 0u; i < numPartitions; i++) {
           ops.push_back(std::make_shared<Map<Tin, Tout>>(func));
         }
         auto iter = addPartitionedPublisher<Map<Tin, Tout>, Tin>(ops);
@@ -659,7 +659,7 @@ public:
       }
       else {
         std::vector<std::shared_ptr<StatefulMap<Tin, Tout, State>>> ops;
-        for (int i = 0; i < numPartitions; i++) {
+        for (auto i = 0u; i < numPartitions; i++) {
           ops.push_back(std::make_shared<StatefulMap<Tin, Tout, State>>(func));
         }
         auto iter = addPartitionedPublisher<StatefulMap<Tin, Tout, State>, Tin>(ops);
@@ -1121,7 +1121,7 @@ public:
       }
       else {
         std::vector<std::shared_ptr<Barrier<T>>> ops;
-        for (int i = 0; i < numPartitions; i++) {
+        for (auto i = 0u; i < numPartitions; i++) {
           ops.push_back(std::make_shared<Barrier<T> >(cVar, mtx, f));
         }
         auto iter = addPartitionedPublisher<Barrier<T>, T>(ops);
