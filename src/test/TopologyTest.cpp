@@ -140,9 +140,9 @@ TEST_CASE("Building and running a topology with ToTable", "[Topology]") {
 
   for (int i = 0; i < 10; i++) {
     auto tp = testTable->getByKey(i);
-    REQUIRE(tp->getAttribute<0>() == i);
-    REQUIRE(tp->getAttribute<1>() == "This is a string field");
-    REQUIRE(tp->getAttribute<2>() == i * 100 + 0.5);
+    REQUIRE(get<0>(tp) == i);
+    REQUIRE(get<1>(tp) == "This is a string field");
+    REQUIRE(get<2>(tp) == i * 100 + 0.5);
   }
 }
 
@@ -159,18 +159,18 @@ TEST_CASE("Building and running a topology with partitioning", "[Topology]") {
   Topology t;
   auto s = t.newStreamFromFile("file.csv")
     .extract<T1>(',')
-    .partitionBy<T1>([](auto tp) { return getAttribute<0>(tp) % 5; }, 5)
-    .where<T1>([](auto tp, bool outdated) { return getAttribute<0>(tp) % 2 == 0; } )
-    .map<T1,T2>([](auto tp, bool outdated) -> T2 { return makeTuplePtr(getAttribute<0>(tp)); } )
+    .partitionBy<T1>([](auto tp) { return get<0>(tp) % 5; }, 5)
+    .where<T1>([](auto tp, bool outdated) { return get<0>(tp) % 2 == 0; } )
+    .map<T1,T2>([](auto tp, bool outdated) -> T2 { return makeTuplePtr(get<0>(tp)); } )
     .merge<T2>()
     .notify<T2>([&](auto tp, bool outdated) {
       std::lock_guard<std::mutex> lock(r_mutex);
-      int v = getAttribute<0>(tp);
+      int v = get<0>(tp);
       results.push_back(v);
     });
 
   std::cout << "start topology" << std::endl;
-  t.start(false);
+  t.start();
 
   using namespace std::chrono_literals;
   std::this_thread::sleep_for(2s);
@@ -178,8 +178,7 @@ TEST_CASE("Building and running a topology with partitioning", "[Topology]") {
   REQUIRE(results.size() == 500);
 
   std::sort(results.begin(), results.end());
-  for (int i = 0; i < results.size(); i++) {
+  for (auto i = 0u; i < results.size(); i++) {
     REQUIRE(results[i] == i * 2);
   }
 }
-

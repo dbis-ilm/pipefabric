@@ -45,7 +45,7 @@ namespace pfabric {
   template <typename T>
   class ConcurrentQueue {
   public:
-    ConcurrentQueue() = default;
+    ConcurrentQueue() : stopped_(false) {}
     ConcurrentQueue(const ConcurrentQueue&) = delete;            // disable copying
     ConcurrentQueue& operator=(const ConcurrentQueue&) = delete; // disable assignment
 
@@ -144,6 +144,7 @@ namespace pfabric {
 		 * std::thread class.
 		 */
 		void operator()() {
+      std::cout << "(0) thread: " << std::this_thread::get_id() << std::endl;
 			while (!(*mInterrupted)) {
 				mDequeueCallback(*this);
 			}
@@ -216,6 +217,7 @@ namespace pfabric {
       if (!mQueue.pop(tp))
         return;
 
+      std::cout << "(1) thread: " << std::this_thread::get_id() << std::endl;
       if (std::get<0>(tp) == Punctuation::None)
 			  this->getOutputDataChannel().publish(std::get<1>(tp), std::get<2>(tp));
       else
