@@ -169,7 +169,6 @@ TEST_CASE("Building and running a topology with partitioning", "[Topology]") {
       results.push_back(v);
     });
 
-  std::cout << "start topology" << std::endl;
   t.start();
 
   using namespace std::chrono_literals;
@@ -180,5 +179,40 @@ TEST_CASE("Building and running a topology with partitioning", "[Topology]") {
   std::sort(results.begin(), results.end());
   for (auto i = 0u; i < results.size(); i++) {
     REQUIRE(results[i] == i * 2);
+  }
+}
+
+TEST_CASE("Building and running a topology with batcher", "[Topology]") {
+  typedef TuplePtr<Tuple<int, std::string, double> > T1;
+  typedef TuplePtr<Tuple<int> > T2;
+  typedef BatchPtr<T2> B2;
+
+  TestDataGenerator tgen("file.csv");
+  tgen.writeData(1000);
+
+  std::vector<int> results;
+  std::mutex r_mutex;
+
+  Topology t;
+  auto s = t.newStreamFromFile("file.csv")
+    .extract<T1>(',')
+    .map<T1,T2>([](auto tp, bool outdated) -> T2 { return makeTuplePtr(get<0>(tp)); } )
+    .batch<T2>(100)
+    .notify<B2>([&](auto tp, bool outdated) {
+      std::lock_guard<std::mutex> lock(r_mutex);
+      auto vec = get<0>(tp);
+      REQUIRE(vec.size() == 100);
+      for (auto& v : vec) {
+        results.push_back(get<0>(v.first));
+      }
+    });
+  t.start();
+
+  using namespace std::chrono_literals;
+  std::this_thread::sleep_for(2s);
+
+  REQUIRE(results.size() == 1000);
+  for (std::size_t i = 0; i < results.size(); i++) {
+    REQUIRE(results[i] == i);
   }
 }

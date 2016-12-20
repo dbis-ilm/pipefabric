@@ -51,6 +51,7 @@
 #include "qop/Merge.hpp"
 #include "qop/PartitionBy.hpp"
 #include "qop/Barrier.hpp"
+#include "qop/Batcher.hpp"
 #include "cep/Matcher.hpp"
 #include "qop/ZMQSink.hpp"
 #include "topology/Dataflow.hpp"
@@ -487,6 +488,15 @@ public:
       return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
     }
 
+    /**
+     * TODO
+     */
+    template <class T>
+    Pipe batch(std::size_t bsize) throw (TopologyException) {
+      auto op = std::make_shared<Batcher<T> >(bsize);
+      auto iter = addPublisher<Batcher<T>, DataSource<T> >(op);
+      return Pipe(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+    }
     /**
      * @brief
      *
