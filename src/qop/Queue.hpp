@@ -22,6 +22,7 @@
 #define Queue_hpp_
 
 #include <thread>
+#include <atomic>
 
 #include <boost/signals2.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
