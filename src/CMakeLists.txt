@@ -29,12 +29,19 @@ option( USE_BOOST_SPIRIT_PARSER
     ON
 )
 
+# Force using intel compiler
+#include(CMakeForceCompiler)
+#CMAKE_FORCE_C_COMPILER(icc "Intel C Compiler")
+#CMAKE_FORCE_CXX_COMPILER(icpc "Intel C++ Compiler")
+
 # C++ compiler flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated -Wno-unused-local-typedefs -g -O3")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated -g -O3")
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-#pragma-messages")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedefs -Wno-#pragma-messages")
 elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -Wno-unused")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedefs -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -Wno-unused")
+elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Intel")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd488 -wd597")
 endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused -Wno-uninitialized")
@@ -207,3 +214,6 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/"
 
 add_subdirectory(demo)
 add_subdirectory(debs2016)
+
+# show used compiler
+message("Using Compiler: ${CMAKE_CXX_COMPILER_ID}.")
