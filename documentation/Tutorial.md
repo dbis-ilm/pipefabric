@@ -64,7 +64,7 @@ After starting the program with `./RestDemo` we can send some data via `curl`:
 
 ```C++
 curl -H "Content-Type: application/json" \
-     -X POST -d '{"key": "xyz", "data": "1.0"}' \
+     -X POST -d '{"key": "10", "data": "1.0"}' \
      http://localhost:8099/publish
 ```
 

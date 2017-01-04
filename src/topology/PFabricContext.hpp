@@ -91,9 +91,22 @@ public:
     if (it != mTableSet.end())
       throw TableException("table already exists");
 
-    // create a new table and regiter it
+    // create a new table and register it
     auto tbl = std::make_shared<Table<RecordType, KeyType>>();
     mTableSet[tblName] = tbl;
+    return tbl;
+  }
+
+  template <typename RecordType, typename KeyType = DefaultKeyType>
+  std::shared_ptr<Table<RecordType, KeyType>> createTable(const TableInfo& tblInfo) throw (TableException) {
+    // first we check whether the table exists already
+    auto it = mTableSet.find(tblInfo.tableName());
+    if (it != mTableSet.end())
+      throw TableException("table already exists");
+
+    // create a new table and register it
+    auto tbl = std::make_shared<Table<RecordType, KeyType>>(tblInfo);
+    mTableSet[tblInfo.tableName()] = tbl;
     return tbl;
   }
 
@@ -124,8 +137,11 @@ public:
     else
       // otherwise we just return an empty pointer
       // TODO: shouldn't we throw an exception here???
+      std::cout << "table '" << tblName << "' not found" << std::endl;
       return std::shared_ptr<Table<RecordType, KeyType>>();
   }
+
+  TableInfoPtr getTableInfo(const std::string& tblName);
 
   /**
    * @brief Creates a new stream with the given name and schema.

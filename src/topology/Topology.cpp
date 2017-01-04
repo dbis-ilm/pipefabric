@@ -27,6 +27,7 @@ using namespace pfabric;
 
 Topology::~Topology() {
   // delete all pipes we have created
+  std::cout << "Topology::~Topology()" << std::endl;
   for (auto i : pipes) {
     delete i;
   }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-16 The PipeFabric team,
+ * Copyright (c) 2014-17 The PipeFabric team,
  *                       All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
@@ -37,6 +37,7 @@
 #include "fmt/format.h"
 
 #include "table/FilterIterator.hpp"
+#include "table/TableInfo.hpp"
 
 namespace pfabric {
 
@@ -98,7 +99,23 @@ class BaseTable {
 protected:
   BaseTable() {}
 
+  /**
+   * Constructor for creating an empty table with a given schema.
+   */
+  BaseTable(const TableInfo& tInfo) : mTableInfo(std::make_shared<TableInfo>(tInfo)) {}
+
+public:
   virtual ~BaseTable() {}
+
+  /**
+   * Return a pointer to the TableInfo object describing the schema of the table.
+   *
+   * @return a pointer to the corresponding TableInfo object
+   */
+  TableInfoPtr tableInfo() { return mTableInfo; }
+
+protected:
+  TableInfoPtr mTableInfo;    //< explicit schema information (can be empty)
 };
 
 /**
@@ -142,6 +159,11 @@ public:
    * Constructor for creating an empty table.
    */
   Table() {}
+
+  /**
+   * Constructor for creating an empty table with a given schema.
+   */
+  Table(const TableInfo& tInfo) : BaseTable(tInfo) {}
 
   /**
    * Destructor for table.

@@ -156,11 +156,13 @@ add_library(pfabric_core SHARED
   topology/Topology.cpp
   topology/Dataflow.cpp
   topology/PFabricContext.cpp
+  table/TableInfo.cpp
   ${ZEROMQ_SOURCES}
   # we need this as dependency to download the sources from github
   ${THIRD_PARTY_DIR}/json
   ${THIRD_PARTY_DIR}/fmt
   ${THIRD_PARTY_DIR}/SimpleWeb
+   ${THIRD_PARTY_DIR}/pegtl
 )
 
 
@@ -214,6 +216,7 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/"
 
 add_subdirectory(demo)
 add_subdirectory(debs2016)
+add_subdirectory(qcomp)
 
 # show used compiler
 message("Using Compiler: ${CMAKE_CXX_COMPILER_ID}.")

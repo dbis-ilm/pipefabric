@@ -52,9 +52,10 @@ add_custom_command(
                 ${SimpleWeb_SOURCE_DIR}
                 ${THIRD_PARTY_DIR}/SimpleWeb)
 
+# Google Benchmark framework
 download_project(PROJ               benchmark
                 GIT_REPOSITORY      https://github.com/google/benchmark.git
                 GIT_TAG             master
                 UPDATE_DISCONNECTED 1
-#                QUIET
+                QUIET
 )
