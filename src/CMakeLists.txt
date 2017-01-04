@@ -162,7 +162,6 @@ add_library(pfabric_core SHARED
   ${THIRD_PARTY_DIR}/json
   ${THIRD_PARTY_DIR}/fmt
   ${THIRD_PARTY_DIR}/SimpleWeb
-   ${THIRD_PARTY_DIR}/pegtl
 )
 
 
