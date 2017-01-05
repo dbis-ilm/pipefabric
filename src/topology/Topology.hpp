@@ -38,6 +38,7 @@
 #include "qop/ToTable.hpp"
 #include "qop/FromTable.hpp"
 #include "qop/SelectFromTable.hpp"
+#include "qop/StreamGenerator.hpp"
 
 #include "topology/Pipe.hpp"
 #include "topology/Dataflow.hpp"
@@ -263,6 +264,27 @@ namespace pfabric {
     Pipe selectFromTable(std::shared_ptr<Table<T, KeyType>> tbl,
         typename Table<T, KeyType>::Predicate pred = nullptr) {
       auto op = std::make_shared<SelectFromTable<T, KeyType>>(tbl, pred);
+      registerStartupFunction([=]() -> unsigned long { return op->start(); });
+      return Pipe(dataflow, dataflow->addPublisher(op));
+    }
+
+    /**
+     * @brief Create a StreamGenerator operator as data source.
+     *
+     * Create a new StreamGenerator operator that produces a stream of tuples
+     * created using the given generator function.
+     *
+     * @tparam T the type of the stream element
+     * @param gen
+     *    a generator function for creating the tuples
+     * @param num
+     *    the number of tuples to be created
+     * @return
+     *    a new pipe where the generator acts as the source
+     */
+    template<typename T>
+    Pipe streamFromGenerator(typename StreamGenerator<T>::Generator gen, unsigned long num) {
+      auto op = std::make_shared<StreamGenerator<T>>(gen, num);
       registerStartupFunction([=]() -> unsigned long { return op->start(); });
       return Pipe(dataflow, dataflow->addPublisher(op));
     }

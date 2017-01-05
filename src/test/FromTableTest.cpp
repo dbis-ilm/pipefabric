@@ -21,7 +21,7 @@ typedef Tuple< int, int, int > MyTuple;
 typedef TuplePtr< MyTuple > MyTuplePtr;
 
 /**
- * A simple test of the projection operator.
+ * A simple test of the FromTable operator.
  */
 TEST_CASE("Producing a data stream from inserts into a table", "[FromTable]") {
   typedef Table<MyTuplePtr, int> MyTable;
