@@ -68,4 +68,4 @@ RUN cd /home/${CONTAINER_USER} && \
 git clone http://dbgit.prakinf.tu-ilmenau.de/code/pfabric.git && \
 cd pfabric && mkdir build && cd build && \
 export BOOST_ROOT=/usr/local/boost; \
-cmake ../src && make
+cmake ../src && make VERBOSE=1

@@ -51,7 +51,9 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused -Wno-uninitialized")
 if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -ldl")
+set(DYLIB_LIBRARY "-ldl")
+else()
+set(DYLIB_LIBRARY "")
 endif()
 
 #############################
@@ -114,6 +116,7 @@ set(BOOST_LIBRARIES
 		${Boost_TIMER_LIBRARY}
 		${Boost_THREAD_LIBRARY}
 		${Boost_REGEX_LIBRARY}
+	${DYLIB_LIBRARY}
 )
 
 ######################
