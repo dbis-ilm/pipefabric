@@ -31,9 +31,9 @@ std::string TableInfo::typeSignature() const {
 }
 
 int TableInfo::findColumnByName(const std::string& colName) const {
-  for (int i = 0; i < mColumns.size(); i++) {
+  for (std::size_t i = 0; i < mColumns.size(); i++) {
     if (mColumns[i].mColName == colName)
-      return i;
+      return (int)i;
   }
   return -1;
 }

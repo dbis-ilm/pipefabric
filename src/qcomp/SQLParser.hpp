@@ -110,7 +110,7 @@ namespace pfabric {
 
   inline std::ostream& operator<<(std::ostream& out, const SelectClause& c) {
     out << "SELECT ";
-    for (int i = 0; i < c.columnList_.size(); i++) {
+    for (std::size_t i = 0; i < c.columnList_.size(); i++) {
       if (i > 0) out << ", ";
       out << c.columnList_[i];
     }
