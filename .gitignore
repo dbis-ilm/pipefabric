@@ -422,6 +422,8 @@ UpgradeLog*.htm
 # Microsoft Fakes
 FakesAssemblies/
 
+# VSCode
+.vscode/
 
 
 ###################################
@@ -507,7 +509,7 @@ $RECYCLE.BIN/
 
 # ignore everything in the build directory
 # (explicitly included here because separate .gitignore inside that directory)
-!/build/
+/build/
 
 # ignore everything in the generated documentation directory
 # (commented out because separate .gitignore inside that directory)
