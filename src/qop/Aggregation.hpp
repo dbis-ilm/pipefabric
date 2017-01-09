@@ -42,8 +42,8 @@ namespace pfabric {
    * This operator implements the calculation of aggregates over a data streams. For each incoming tuple the
    * aggregates are computed incrementally using the IterateFunc function. The final aggregation
    * results calculated by an FinalFunc function are either produced periodically or at the end
-   * of the stream. This class implements the non-realtime variant of aggregation, i.e., the slen
-   * interval is derived from the timestamps of the incoming tuples instead of the realtime clock.
+   * of the stream. The temporal behaviour is defined by the trigger type (all, timestamp, count - see
+   * PipeFabricTypes.hpp)  and the trigger interval.
    *
    * @tparam InputStreamElement
    *    the data stream element type consumed by the aggregation

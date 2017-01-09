@@ -18,30 +18,24 @@
  * along with this program; see the file LICENSE.
  * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
  */
+
+#ifndef QueryCompileException_hpp_
+#define QueryCompileException_hpp_
+
 #include <string>
-#include "PFabricContext.hpp"
+#include <exception>
 
-using namespace pfabric;
+#include "fmt/format.h"
 
-PFabricContext::PFabricContext() {
-}
+class QueryCompileException : public std::exception {
+  std::string msg;
 
-PFabricContext::~PFabricContext() {}
+public:
+    QueryCompileException(const char *s = "") : msg(s) {}
 
-PFabricContext::TopologyPtr PFabricContext::createTopology() {
-  return std::make_shared<Topology>();
-}
-
-TableInfoPtr PFabricContext::getTableInfo(const std::string& tblName) {
-    // look for the table
-    auto it = mTableSet.find(tblName);
-    if (it != mTableSet.end()) {
-      // if found then we return it
-      return it->second->tableInfo();
+    virtual const char* what() const throw() {
+      return fmt::format("QueryCompileException: {}", msg).c_str();
     }
-    else {
-      // TODO: shouldn't we throw an exception here???
-      std::cout << "table not found: '" << tblName << "' : " << mTableSet.size() << std::endl;
-      return std::shared_ptr<TableInfo>();
-    }
-  }
+};
+
+#endif

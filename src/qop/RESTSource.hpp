@@ -37,8 +37,16 @@
 
 namespace pfabric {
 
+  /**
+   * @brief RESTSource is a source operator for receiving tuples via a REST interface.
+   *
+   * A RESTSource is an operator producing a stream of tuples which are received
+   * via a REST interface. The operator produces a stream of @c TStringPtr elements,
+   * where each element corresponds to a single REST call.
+   */
   class RESTSource : public DataSource<TStringPtr> {
   public:
+    //< the REST request method
     enum RESTMethod {
       GET_METHOD = 0,
       POST_METHOD = 1,
@@ -48,6 +56,20 @@ namespace pfabric {
 
     PFABRIC_SOURCE_TYPEDEFS(TStringPtr);
 
+    /**
+     * @brief Create a new instance of the RESTSource operator.
+     *
+     * Create a new RESTSource operator for receiving stream tuples via REST.
+     *
+     * @param port
+     *        the network port for listing
+     * @param path
+     *        the URI (the local part path) for the REST interface
+     * @param method
+     *        the REST method (GET, POST, PUT, DELETE)
+     * @param numThreads
+     *        the number of threads starting for serving the requests
+     */
     RESTSource(unsigned int port, const std::string& path, RESTMethod method, unsigned short numThreads = 1);
 
     /**
@@ -55,14 +77,23 @@ namespace pfabric {
      */
     ~RESTSource();
 
+    /**
+     * Start the operator by listing at the given port and URI.
+     *
+     * @return always 0
+     */
     unsigned long start();
+
+    /**
+     * Stop the processing.
+     */
     void stop();
 
   protected:
     typedef SimpleWeb::Server<SimpleWeb::HTTP> HttpServer;
 
-    static std::shared_ptr<HttpServer> server;
-    static std::once_flag onlyOne;
+    static std::shared_ptr<HttpServer> server; //< the HTTP server instance
+    static std::once_flag onlyOne;             //< make sure we start the server only once
 
     void createHttpServer(unsigned int port, unsigned short numThreads = 1);
     void addRessource(const std::string& path, RESTMethod method);

@@ -109,7 +109,7 @@ public:
 	 * @return as above
 	 */
 	ForwardEdge<Tin, Tout, Tdep>* getForwardEdgeByIndex(int index) const {
-		assert(index < forwardEdges.size());
+		assert((std::size_t)index < forwardEdges.size());
 		return forwardEdges.at(index).get();
 	}
 	/**

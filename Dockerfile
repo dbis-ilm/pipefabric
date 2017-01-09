@@ -45,10 +45,10 @@ tar xvzof cmake-3.6.2.tar.gz && rm cmake-3.6.2.tar.gz
 RUN cd cmake-3.6.2 && ./configure && make && make install
 
 # Download and install the most recent version of the Boost libraries
-RUN wget https://sourceforge.net/projects/boost/files/boost/1.62.0/boost_1_62_0.tar.gz; \
- tar xvzof boost_1_62_0.tar.gz; \
-rm boost_1_62_0.tar.gz;
-RUN cd boost_1_62_0 && ./bootstrap.sh --prefix=/usr/local/boost && mkdir /usr/local/boost && ./b2 install
+RUN wget https://sourceforge.net/projects/boost/files/boost/1.63.0/boost_1_63_0.tar.gz; \
+ tar xvzof boost_1_63_0.tar.gz; \
+rm boost_1_63_0.tar.gz;
+RUN cd boost_1_63_0 && ./bootstrap.sh --prefix=/usr/local/boost && mkdir /usr/local/boost && ./b2 install
 
 # Cleanup
 RUN rm -fr /boost_1_62_0 zeromq-4.1.5 cmake-3.6.2
@@ -68,4 +68,4 @@ RUN cd /home/${CONTAINER_USER} && \
 git clone http://dbgit.prakinf.tu-ilmenau.de/code/pfabric.git && \
 cd pfabric && mkdir build && cd build && \
 export BOOST_ROOT=/usr/local/boost; \
-cmake ../src && make
+cmake ../src && make VERBOSE=1

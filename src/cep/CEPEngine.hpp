@@ -348,7 +348,7 @@ int CEPEngine<TinPtr, ToutPtr, TdepPtr>::checkPredicate(const TinPtr& event,
 
 template<class TinPtr, class ToutPtr, class Tdep>
 void CEPEngine<TinPtr, ToutPtr, Tdep>:: runGCstructures() {
-	for (int i = 0; i < this->deletedStructures.size(); i++) {
+	for (std::size_t i = 0; i < this->deletedStructures.size(); i++) {
 		const typename NFAStructure<TinPtr, ToutPtr, Tdep>::NFAStructurePtr& str = this->deletedStructures.front();
 		auto par = str->getEqualityValue();
 		typename ValueIDMultimap<typename NFAStructure<TinPtr, ToutPtr, Tdep>::NFAStructurePtr, TinPtr>::MultimapPair iterPair =

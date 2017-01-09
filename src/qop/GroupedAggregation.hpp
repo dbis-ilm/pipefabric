@@ -36,20 +36,24 @@
 namespace pfabric {
 
 /**
- * @brief A non-realtime grouped aggregation operator for streams of tuples.
+ * @brief A grouped aggregation operator for streams of tuples.
  *
- * TODO Discuss: Is locking correctly implemented? Can it be omitted for non-realtime
- *               aggregations?
+ * This operator implements the calculation of grouped aggregates over a data streams.
+ * For each incoming tuple the group is determined by its key and the corresponding
+ * aggregates are computed incrementally using the IterateFunc function. The final aggregation
+ * results calculated by an FinalFunc function are either produced periodically or at the end
+ * of the stream. The temporal behaviour is defined by the trigger type (all, timestamp, count - see
+ * PipeFabricTypes.hpp)  and the trigger interval.
  *
  * @tparam InputStreamElement
  *    the data stream element type consumed by the aggregation
  * @tparam OutputStreamElement
  *    the data stream element type produced by the aggregation
- * @tparam AggregateStatePtr
+ * @tparam AggregateState
  *    an element type to maintain the state of a single aggregation tuple that is used
  *    to construct the OutputStreamElement
- * @tparam AggregationImpl
- *    the actual aggregation implementation for CRTP
+ * @tparam KeyType
+ *    the data type for the key column
  */
 template<
 	typename InputStreamElement,
@@ -65,9 +69,10 @@ class GroupedAggregation :
 protected:
     PFABRIC_UNARY_TRANSFORM_TYPEDEFS(InputStreamElement, OutputStreamElement);
 
-		typedef std::function<Timestamp(const InputStreamElement&)> TimestampExtractorFunc;
+	/// the function for extracting the timestamp from a tuple
+	typedef std::function<Timestamp(const InputStreamElement&)> TimestampExtractorFunc;
 
-	/// TODO Doc
+	/// the type for the hash table to store group keys + aggregate states
 	typedef boost::unordered_map< KeyType, AggregateStatePtr > HashTable;
 
 	/// the function for calculating a grouping key for an incoming stream element
@@ -106,17 +111,30 @@ protected:
 
 public:
 
-	/**
-	 * @brief TODO Doc
-	 *
-	 * @param aggrs
-	 * @param groupby_fun
-	 * @param final_fun
-	 * @param it_fun
-	 * @param slen
-	 * @param pmask
-	 * @param fullPublish
-	 */
+/**
+	* @brief Create a new instance of the GroupedAggregation operator.
+	*
+	* Create a new instance of the operator for computing aggregates per groups.
+	* The behaviour is defined by the trigger type (all, timestamp, count - see PipeFabricTypes.hpp)
+	* and the trigger interval.
+	*
+	* @param groupby_fun
+	*    a function pointer for getting the group id
+	* @param final_fun
+	*    a function pointer to the aggregation function
+	* @param it_fun
+	*    a function pointer to an iteration function called for each incoming tuple
+	* @param tType
+	*    the trigger type specifying when an aggregation tuple is produced
+	*    (TriggerAll = for each incoming tuple,
+	*     TriggerByCount = as soon as a number of tuples (tInterval) are processed,
+	*     TriggerByTime = after every tInterval seconds,
+	*     TriggerByTimestamp = as for TriggerByTime but based on timestamp of the tuples
+	*                          and not based on real time)
+	* @param tInterval
+	*    the time interval in seconds to produce aggregation tuples (for trigger by timestamp)
+	*    or in the number of tuples (for trigger by count)
+	*/
 	GroupedAggregation(GroupByFunc groupby_fun,
 					FinalFunc final_fun,
 					IterateFunc it_fun,
@@ -129,6 +147,37 @@ public:
              new TriggerNotifier(std::bind(&GroupedAggregation::notificationCallback, this), tInterval) : nullptr),
     mLastTriggerTime(0), mTriggerType(tType), mCounter(0) {
 	}
+
+	/**
+		* @brief Create a new instance of the GroupedAggregation operator.
+		*
+		* Create a new instance of the operator for computing aggregates per groups.
+		* The behaviour is defined by the TriggerByTimestamp strategy.
+		*
+		* @param groupby_fun
+		*    a function pointer for getting the group id
+		* @param final_fun
+		*    a function pointer to the aggregation function
+		* @param it_fun
+		*    a function pointer to an iteration function called for each incoming tuple
+		* @param func
+		*    a function for extracting the timestamp value from the stream element
+ 		* @param tInterval
+		*    the time interval in seconds to produce aggregation tuples (for trigger by timestamp)
+		*/
+		GroupedAggregation(GroupByFunc groupby_fun,
+						FinalFunc final_fun,
+						IterateFunc it_fun,
+						TimestampExtractorFunc func,
+						AggregationTriggerType tType = TriggerAll,
+						const unsigned int tInterval = 0)  :
+			mGroupByFunc(groupby_fun),
+			mIterateFunc(it_fun), mFinalFunc(final_fun),
+			mTimestampExtractor(func),
+	    mTriggerInterval( tInterval ),
+	    mNotifier(nullptr),
+	    mLastTriggerTime(0), mTriggerType(TriggerByTimestamp), mCounter(0) {
+		}
 
 	/**
 	 * @brief Bind the callback for the data channel.
@@ -147,8 +196,6 @@ private:
 
 	/**
 	 * This method is invoked when a data stream element arrives.
-	 *
-	 * TODO doc
 	 *
 	 * @param[in] data
 	 *    the incoming stream element
@@ -274,7 +321,6 @@ private:
     void updateAggregationGroup(const KeyType& grpKey, const InputStreamElement& data,
                                 const bool outdated, const Lock& lock) {
       auto groupEntry = mAggregateTable.find(grpKey);
-      // BOOST_ASSERT_MSG(groupEntry != mAggregateTable.end(), "fatal: group not found in updateAggregationGroup");
 
       AggregateStatePtr aggrState = groupEntry->second;
       const Timestamp elementTime = mTimestampExtractor != nullptr ? mTimestampExtractor(data) : 0;
@@ -296,10 +342,9 @@ private:
       }
 
       // 4. purge the aggregate if the group vanishes
-      if(outdatedAggregate) {
+      if (outdatedAggregate) {
         // we remove the entry from the hashtable if all tuples belonging to this
         // aggregate are outdated - counting algorithm
-        // std::cout << "erase tuple: " << hIter->second << " for group: " << data << std::endl;
         mAggregateTable.erase(groupEntry);
       }
   }
@@ -345,10 +390,8 @@ private:
 	 */
 	void produceAggregate(const AggregateStatePtr& state, const Timestamp& timestamp,
 		const bool outdated, const Lock& lock) {
-//		std::cout << "producing final aggregate" << std::endl;
 		boost::ignore_unused(lock); // don't need it, just make sure that it exists
 		auto tn = mFinalFunc(state);
-//		std::cout << "publishing final aggregate" << std::endl;
 		this->getOutputDataChannel().publish(tn, outdated);
 	}
 
@@ -356,19 +399,7 @@ private:
 protected:
 
 	/**
-	 * @brief Generate a @c SlideExpired @c Punctuation.
-	 *
-	 * When the operator's sliding window expires, all aggregation results produced
-	 * so far will be propagated to subscribing operators. Further, a punctuation
-	 * event is generated to notify following operators about that event.
-	 *
-	 * This method must be available for real-time aggregations in order to let
-	 * the external thread process sliding window expirations.
-	 *
-	 * @param[in] timestamp
-	 *    the timestamp for the punctuation
-	 * @param[in] lock
-	 *    a reference to the lock protecting the aggregation state
+	 * TODO
 	 */
   void notificationCallback() {
     const bool outdated = false;

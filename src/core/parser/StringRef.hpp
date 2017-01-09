@@ -47,7 +47,7 @@ struct StringRef {
 		return begin_;
 	}
 
-	const char* const begin() const {
+	const char* begin() const {
 		return begin_;
 	}
 
@@ -55,7 +55,7 @@ struct StringRef {
 		return begin_ + size_;
 	}
 
-	const char* const end() const {
+	const char* end() const {
 		return begin_ + size_;
 	}
 
