@@ -23,7 +23,7 @@ typedef TuplePtr< MyTuple > MyTuplePtr;
  * A simple test of the projection operator.
  */
 TEST_CASE("Writing a data stream to a table", "[ToTable]") {
-  auto testTable = std::make_shared<Table<MyTuplePtr, int>>();
+  auto testTable = std::make_shared<Table<MyTuple, int>>();
 
 	std::vector<MyTuplePtr> input = {
 		makeTuplePtr(0, 0, 0),
@@ -43,8 +43,8 @@ TEST_CASE("Writing a data stream to a table", "[ToTable]") {
 
   for (int i = 0; i < 3; i++) {
     auto tp = testTable->getByKey(i);
-    REQUIRE(tp->getAttribute<0>() == i);
-    REQUIRE(tp->getAttribute<1>() == i);
-    REQUIRE(tp->getAttribute<2>() == i * 10);
+    REQUIRE(get<0>(tp) == i);
+    REQUIRE(get<1>(tp) == i);
+    REQUIRE(get<2>(tp) == i * 10);
   }
 }

@@ -5,7 +5,6 @@
 
 #include <vector>
 
-#include "core/Tuple.hpp"
 #include "pfabric.hpp"
 
 #include "table/LDBTable.hpp"
@@ -16,9 +15,12 @@ using namespace pfabric;
 
 typedef Tuple<unsigned long, int, std::string, double> MyTuple;
 
+template <typename RecordType, typename KeyType>
+using LTable = LDBTable<RecordType, KeyType>;
+
 TEST_CASE("Creating a table with a given schema and inserting data",
           "[LDBTable]") {
-  auto testTable = std::make_shared<LDBTable<MyTuple, int>>("MyTestTable1");
+  auto testTable = std::make_shared<LTable<MyTuple, int>>("MyTestTable1");
   for (int i = 0; i < 10000; i++) {
     auto tp = MyTuple((unsigned long)i, i + 100, fmt::format("String#{}", i),
                       i / 100.0);
@@ -38,7 +40,7 @@ TEST_CASE("Creating a table with a given schema and inserting data",
 
 TEST_CASE("Creating a table with a given schema and deleting data",
           "[LDBTable]") {
-  auto testTable = std::make_shared<LDBTable<MyTuple, int>>("MyTestTable2");
+  auto testTable = std::make_shared<LTable<MyTuple, int>>("MyTestTable2");
   for (int i = 0; i < 10000; i++) {
     auto tp = MyTuple((unsigned long)i, i + 100, fmt::format("String#{}", i),
                       i / 100.0);
@@ -65,7 +67,7 @@ TEST_CASE("Creating a table with a given schema and deleting data",
 TEST_CASE(
     "Creating a table with a given schema and deleting data using a predicate",
     "[LDBTable]") {
-  auto testTable = std::make_shared<LDBTable<MyTuple, int>>("MyTestTable3");
+  auto testTable = std::make_shared<LTable<MyTuple, int>>("MyTestTable3");
   for (int i = 0; i < 10000; i++) {
     auto tp = MyTuple((unsigned long)i, i + 100, fmt::format("String#{}", i),
                       i / 100.0);
@@ -90,7 +92,7 @@ TEST_CASE(
 }
 
 TEST_CASE("updating some data by key in a table", "[LDBTable]") {
-  auto testTable = std::make_shared<LDBTable<MyTuple, int>>("MyTestTable4");
+  auto testTable = std::make_shared<LTable<MyTuple, int>>("MyTestTable4");
   for (int i = 0; i < 10000; i++) {
     auto tp = MyTuple((unsigned long)i, i + 100, fmt::format("String#{}", i),
                       i / 100.0);
@@ -109,7 +111,7 @@ TEST_CASE("updating some data by key in a table", "[LDBTable]") {
 }
 
 TEST_CASE("updating some data by predicate in a table", "[LDBTable]") {
-  auto testTable = std::make_shared<LDBTable<MyTuple, int>>("MyTestTable5");
+  auto testTable = std::make_shared<LTable<MyTuple, int>>("MyTestTable5");
   for (int i = 0; i < 10000; i++) {
     auto tp = MyTuple((unsigned long)i, i + 100, fmt::format("String#{}", i),
                       i / 100.0);
@@ -128,7 +130,7 @@ TEST_CASE("updating some data by predicate in a table", "[LDBTable]") {
 }
 
 TEST_CASE("observing inserts, deletes, and updates on a table", "[LDBTable]") {
-  auto testTable = std::make_shared<LDBTable<MyTuple, int>>("MyTestTable6");
+  auto testTable = std::make_shared<LTable<MyTuple, int>>("MyTestTable6");
   for (int i = 0; i < 10000; i++) {
     auto tp = MyTuple((unsigned long)i, i + 100, fmt::format("String#{}", i),
                       i / 100.0);
@@ -168,7 +170,7 @@ TEST_CASE("observing inserts, deletes, and updates on a table", "[LDBTable]") {
 }
 
 TEST_CASE("scanning the whole table", "[LDBTable]") {
-  auto testTable = std::make_shared<LDBTable<MyTuple, int>>("MyTestTable7");
+  auto testTable = std::make_shared<LTable<MyTuple, int>>("MyTestTable7");
   for (int i = 0; i < 10000; i++) {
     auto tp = MyTuple((unsigned long)i, i + 100, fmt::format("String#{}", i),
                       i / 100.0);
@@ -185,7 +187,7 @@ TEST_CASE("scanning the whole table", "[LDBTable]") {
 }
 
 TEST_CASE("scanning the table with a predicate", "[LDBTable]") {
-  auto testTable = std::make_shared<LDBTable<MyTuple, int>>("MyTestTable8");
+  auto testTable = std::make_shared<LTable<MyTuple, int>>("MyTestTable8");
   for (int i = 0; i < 10000; i++) {
     auto tp = MyTuple((unsigned long)i, i + 100, fmt::format("String#{}", i),
                       i / 100.0);

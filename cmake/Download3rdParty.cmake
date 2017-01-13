@@ -59,3 +59,23 @@ download_project(PROJ               benchmark
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
+
+# LevelDB key-value store
+download_project(PROJ               leveldb
+                GIT_REPOSITORY      https://github.com/google/leveldb
+                GIT_TAG             master
+                UPDATE_DISCONNECTED 1
+                QUIET
+)
+add_custom_command(
+        OUTPUT ${THIRD_PARTY_DIR}/leveldb
+        COMMAND ${CMAKE_COMMAND} -E chdir ${leveldb_SOURCE_DIR} make
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/leveldb/include
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/leveldb/lib
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${leveldb_SOURCE_DIR}/include
+                ${THIRD_PARTY_DIR}/leveldb/include
+        COMMAND ${CMAKE_COMMAND} -E copy
+                ${leveldb_SOURCE_DIR}/out-static/libleveldb.a
+                ${THIRD_PARTY_DIR}/leveldb/lib
+)

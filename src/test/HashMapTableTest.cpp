@@ -6,17 +6,20 @@
 
 #include "pfabric.hpp"
 #include "core/Tuple.hpp"
-#include "table/Table.hpp"
+#include "table/HashMapTable.hpp"
 #include "fmt/format.h"
 
 using namespace pfabric;
 
-typedef TuplePtr<Tuple<unsigned long, int, std::string, double>> MyTuplePtr;
+typedef Tuple<unsigned long, int, std::string, double> MyTuple;
+
+template <typename RecordType, typename KeyType = DefaultKeyType>
+using HTable = HashMapTable<RecordType, KeyType>;
 
 TEST_CASE("Creating a table with a given schema, inserting and deleting data", "[Table]") {
-  auto testTable = std::make_shared<Table<MyTuplePtr>> ();
+  auto testTable = std::make_shared<HTable<MyTuple>> ();
   for (int i = 0; i < 10000; i++) {
-    auto tp = makeTuplePtr((unsigned long) i, i + 100, fmt::format("String#{}", i), i / 100.0);
+    auto tp =MyTuple((unsigned long) i, i + 100, fmt::format("String#{}", i), i / 100.0);
     testTable->insert(i, tp);
   }
 
@@ -52,7 +55,7 @@ TEST_CASE("Creating a table with a given schema, inserting and deleting data", "
 
   SECTION("deleting data using a predicate") {
     REQUIRE(testTable->size() == 10000);
-    auto num = testTable->deleteWhere([](const MyTuplePtr& tp) -> bool {
+    auto num = testTable->deleteWhere([](const MyTuple& tp) -> bool {
       return get<0>(tp) % 100 == 0;
     });
     REQUIRE(num == 100);
@@ -72,9 +75,8 @@ TEST_CASE("Creating a table with a given schema, inserting and deleting data", "
   SECTION("updating some data by key") {
     REQUIRE(testTable->size() == 10000);
     for (int i = 100; i < 10000; i += 100) {
-      testTable->updateByKey(i, [](const MyTuplePtr& tp) -> MyTuplePtr {
-          return makeTuplePtr(get<0>(tp), get<1>(tp) + 100,
-                              get<2>(tp), get<3>(tp));
+      testTable->updateByKey(i, [](MyTuple& tp) {
+          get<1>(tp) += 100;
       });
     }
     for (int i = 100; i < 10000; i += 100) {
@@ -86,12 +88,11 @@ TEST_CASE("Creating a table with a given schema, inserting and deleting data", "
   SECTION("updating some data by predicate") {
     REQUIRE(testTable->size() == 10000);
     testTable->updateWhere(
-      [](const MyTuplePtr& tp) -> bool {
+      [](const MyTuple& tp) -> bool {
         return get<0>(tp) % 100 == 0;
       },
-      [](const MyTuplePtr& tp) -> MyTuplePtr {
-        return makeTuplePtr(get<0>(tp), get<1>(tp) + 100,
-                            get<2>(tp), get<3>(tp));
+      [](MyTuple& tp) {
+        get<1>(tp) += 100;
     });
     for (int i = 0; i < 10000; i += 100) {
       auto tp = testTable->getByKey(i);
@@ -105,7 +106,7 @@ TEST_CASE("Creating a table with a given schema, inserting and deleting data", "
         deleteDetected = false,
         updateDetected = false;
 
-    auto observer = [&insertDetected, &deleteDetected, &updateDetected](const MyTuplePtr& rec,
+    auto observer = [&insertDetected, &deleteDetected, &updateDetected](const MyTuple& rec,
       TableParams::ModificationMode mode) {
       switch (mode) {
       case TableParams::Insert:
@@ -125,15 +126,14 @@ TEST_CASE("Creating a table with a given schema, inserting and deleting data", "
       }
     };
     testTable->registerObserver(observer, TableParams::Immediate);
-    testTable->insert(20000, makeTuplePtr(20000lu, 20, std::string("A String"), 100.0));
+    testTable->insert(20000, MyTuple(20000lu, 20, std::string("A String"), 100.0));
     REQUIRE(insertDetected == true);
 
     testTable->deleteByKey(20000);
     REQUIRE(deleteDetected == true);
 
-    testTable->updateByKey(5000, [](const MyTuplePtr& tp) -> MyTuplePtr {
-        return makeTuplePtr(get<0>(tp), get<1>(tp) + 100,
-                            get<2>(tp), get<3>(tp));
+    testTable->updateByKey(5000, [](MyTuple& tp) {
+        get<1>(tp) += 100;
     });
     REQUIRE(updateDetected == true);
   }
@@ -142,8 +142,8 @@ TEST_CASE("Creating a table with a given schema, inserting and deleting data", "
     REQUIRE(testTable->size() == 10000);
 
     unsigned int num = 0;
-    auto handle = testTable->select();
-    for (auto i = handle.first; i != handle.second; i++)
+    auto iter = testTable->select();
+    for (; iter.isValid(); iter++)
       num++;
 
     REQUIRE(num == testTable->size());
@@ -153,11 +153,11 @@ TEST_CASE("Creating a table with a given schema, inserting and deleting data", "
     REQUIRE(testTable->size() == 10000);
 
     unsigned int num = 0;
-    auto handle = testTable->select([](const MyTuplePtr& tp) {
+    auto iter = testTable->select([](const MyTuple& tp) {
       return get<0>(tp) % 2 == 0;
     });
-    for (auto i = handle.first; i != handle.second; i++) {
-      REQUIRE(get<0>(*i) % 2 == 0);
+    for (; iter.isValid(); iter++) {
+      REQUIRE(get<0>(*iter) % 2 == 0);
       num++;
     }
     REQUIRE(num == testTable->size() / 2);

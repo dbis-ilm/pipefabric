@@ -1,10 +1,10 @@
-#include <boost/variant.hpp>
 #include <boost/dll/import.hpp>
+#include <boost/variant.hpp>
 
-#include "TopologyBuilder.hpp"
-#include "QueryCompiler.hpp"
 #include "Plan.hpp"
+#include "QueryCompiler.hpp"
 #include "SQLParser.hpp"
+#include "TopologyBuilder.hpp"
 #include "UniqueNameGenerator.hpp"
 
 namespace dll = boost::dll;
@@ -12,12 +12,7 @@ namespace dll = boost::dll;
 using namespace pfabric;
 
 std::map<std::string, std::string> cppOperatorMap = {
-  {"and", "&&"},
-  {"or", "||"}, 
-  {"not", "!"},
-  {"=", "=="},
-  {"<>", "!="}
-};
+    {"and", "&&"}, {"or", "||"}, {"not", "!"}, {"=", "=="}, {"<>", "!="}};
 
 const std::string cppOperator(const std::string& op) {
   auto it = cppOperatorMap.find(op);
@@ -25,7 +20,7 @@ const std::string cppOperator(const std::string& op) {
 }
 
 class GenExpressionVisitor : public boost::static_visitor<> {
-public:
+ public:
   GenExpressionVisitor(std::ostringstream& os) : ostrm(os) {}
 
   void operator()(sql::Column& col) const {
@@ -35,25 +30,26 @@ public:
   void operator()(sql::Nil&) const {}
   void operator()(sql::Literal& l) const { ostrm << l; }
 
-  void operator()(sql::Expression& expr) const { 
-    boost::apply_visitor(*this, expr.head_); 
+  void operator()(sql::Expression& expr) const {
+    boost::apply_visitor(*this, expr.head_);
     for (auto& op : expr.tail_) {
       ostrm << " " << cppOperator(op.operator_) << " ";
       boost::apply_visitor(*this, op.operand_);
     }
   }
 
-  void operator()(sql::RightAssocExpression& expr) const { 
-    boost::apply_visitor(*this, expr.left_); 
+  void operator()(sql::RightAssocExpression& expr) const {
+    boost::apply_visitor(*this, expr.left_);
   }
 
-private:
+ private:
   std::ostringstream& ostrm;
 };
 
 class MapColumnVisitor : public boost::static_visitor<> {
-public:
-  MapColumnVisitor(const std::map<std::string, int>& m) : columnMap(std::move(m)) { }
+ public:
+  MapColumnVisitor(const std::map<std::string, int>& m)
+      : columnMap(std::move(m)) {}
 
   template <typename T>
   void operator()(T t) const {}
@@ -62,28 +58,27 @@ public:
     col.columnPosition_ = columnMap.at(col.columnName_);
   }
 
-  void operator()(sql::Expression& expr) const { 
-    boost::apply_visitor(*this, expr.head_); 
+  void operator()(sql::Expression& expr) const {
+    boost::apply_visitor(*this, expr.head_);
     for (auto& op : expr.tail_) {
       boost::apply_visitor(*this, op.operand_);
     }
   }
-  void operator()(sql::RightAssocExpression& expr) const { 
-    boost::apply_visitor(*this, expr.left_); 
+  void operator()(sql::RightAssocExpression& expr) const {
+    boost::apply_visitor(*this, expr.left_);
   }
 
-private:
-    std::map<std::string, int> columnMap;
+ private:
+  std::map<std::string, int> columnMap;
 };
 
-void QueryCompiler::readSettings(const boost::filesystem::path& lib_path) throw(QueryCompileException) {
+void QueryCompiler::readSettings(const boost::filesystem::path& lib_path) throw(
+    QueryCompileException) {
   po::options_description desc("Options");
-    desc.add_options()
-      ("cc", po::value<std::string>(&cc), "c++ compiler")
-      ("cflags", po::value<std::string>(&cflags), "c++ flags")
-      ("ldflags", po::value<std::string>(&ldflags), "linker flags")
-      ("libs", po::value<std::string>(&libs), "linker libraries")
-    ;
+  desc.add_options()("cc", po::value<std::string>(&cc), "c++ compiler")(
+      "cflags", po::value<std::string>(&cflags), "c++ flags")(
+      "ldflags", po::value<std::string>(&ldflags), "linker flags")(
+      "libs", po::value<std::string>(&libs), "linker libraries");
   po::variables_map vm = po::variables_map();
 
   auto file = lib_path / "config.ini";
@@ -104,19 +99,19 @@ void QueryCompiler::readSettings(const boost::filesystem::path& lib_path) throw(
 }
 
 void QueryCompiler::traverse(PlanOpPtr op, QueryCompiler::TraverseFunc f) {
-  if (! op) return;
+  if (!op) return;
 
   traverse(op->mChild, f);
   traverse(op->mOtherChild, f);
 
   f(op);
 }
-    
-void QueryCompiler::checkPlan(PFabricContext& ctx, PlanPtr plan) throw(QueryCompileException) {
+
+void QueryCompiler::checkPlan(PFabricContext& ctx,
+                              PlanPtr plan) throw(QueryCompileException) {
   traverse(plan->sinkOperator(), [&](PlanOpPtr op) {
-      switch (op->mOpType) {
-      case BasePlanOp::Where_Op:
-      {
+    switch (op->mOpType) {
+      case BasePlanOp::Where_Op: {
         auto whereOp = static_pointer_cast<PlanOp<WhereInfo>>(op);
         // get schema from child
         whereOp->mOutputSchema = whereOp->mChild->mOutputSchema;
@@ -124,18 +119,17 @@ void QueryCompiler::checkPlan(PFabricContext& ctx, PlanPtr plan) throw(QueryComp
         modifyWhereExpression(whereOp);
         break;
       }
-      case BasePlanOp::Map_Op:
-      {
+      case BasePlanOp::Map_Op: {
         auto mapOp = static_pointer_cast<PlanOp<MapInfo>>(op);
         // construct outputSchema and map columnNames to integer positions
         constructMapSchema(mapOp);
         mTypeMgr.registerType(mapOp->mOutputSchema);
         break;
       }
-      case BasePlanOp::FromTable_Op:
-      {
+      case BasePlanOp::FromTable_Op: {
         auto tableOp = static_pointer_cast<PlanOp<FromTableInfo>>(op);
-        tableOp->payload().tableInfo = ctx.getTableInfo(tableOp->payload().tableName);
+        tableOp->payload().tableInfo =
+            ctx.getTableInfo(tableOp->payload().tableName);
         tableOp->mOutputSchema = *(tableOp->payload().tableInfo.get());
         mTableSet.insert(tableOp->payload().tableName);
         mTypeMgr.registerType(tableOp->mOutputSchema);
@@ -143,15 +137,17 @@ void QueryCompiler::checkPlan(PFabricContext& ctx, PlanPtr plan) throw(QueryComp
       }
       default:
         break;
-      }
-      });
+    }
+  });
 }
 
-void QueryCompiler::modifyWhereExpression(std::shared_ptr<PlanOp<WhereInfo>> whereOp) {
+void QueryCompiler::modifyWhereExpression(
+    std::shared_ptr<PlanOp<WhereInfo>> whereOp) {
   std::map<std::string, int> columnMap;
   auto inputSchema = whereOp->mChild->mOutputSchema;
   int i = 0;
-  for (auto iter = inputSchema.begin(); iter != inputSchema.end(); iter++, i++) {
+  for (auto iter = inputSchema.begin(); iter != inputSchema.end();
+       iter++, i++) {
     columnMap[iter->mColName] = i;
   }
 
@@ -164,7 +160,8 @@ void QueryCompiler::modifyWhereExpression(std::shared_ptr<PlanOp<WhereInfo>> whe
   }
 }
 
-void QueryCompiler::constructMapSchema(std::shared_ptr<PlanOp<MapInfo>> mapOp) throw(QueryCompileException) {
+void QueryCompiler::constructMapSchema(
+    std::shared_ptr<PlanOp<MapInfo>> mapOp) throw(QueryCompileException) {
   MapInfo& mInfo = mapOp->payload();
   auto inputSchema = mapOp->mChild->mOutputSchema;
   std::vector<ColumnInfo> outputColumns;
@@ -175,8 +172,7 @@ void QueryCompiler::constructMapSchema(std::shared_ptr<PlanOp<MapInfo>> mapOp) t
       mInfo.positions.push_back(pos);
 
       outputColumns.push_back(inputSchema.columnInfo(pos));
-    }
-    else {
+    } else {
       std::cout << "column '" << s << "' not found" << std::endl;
       throw QueryCompileException("unknown column");
     }
@@ -184,19 +180,17 @@ void QueryCompiler::constructMapSchema(std::shared_ptr<PlanOp<MapInfo>> mapOp) t
   mapOp->mOutputSchema.setColumns(outputColumns);
 }
 
-TopologyBuilderPtr QueryCompiler::execQuery(PFabricContext& ctx, const std::string& queryString) 
-  throw (QueryCompileException) {
+TopologyBuilderPtr QueryCompiler::execQuery(
+    PFabricContext& ctx,
+    const std::string& queryString) throw(QueryCompileException) {
   auto queryName = compileQuery(ctx, queryString);
 
   auto queryObj = queryName + "_obj_";
   TopologyBuilderPtr topology;
   std::cout << "loadling library: " << queryName << std::endl;
-  boost::filesystem::path lib_path (".");
-  topology = dll::import<TopologyBuilder>(
-    lib_path / queryName,
-    queryObj, 
-    dll::load_mode::append_decorations
-  );
+  boost::filesystem::path lib_path(".");
+  topology = dll::import<TopologyBuilder>(lib_path / queryName, queryObj,
+                                          dll::load_mode::append_decorations);
   std::cout << "creating topology..." << std::endl;
   auto t = topology->create(ctx);
   std::cout << "starting query..." << std::endl;
@@ -204,8 +198,9 @@ TopologyBuilderPtr QueryCompiler::execQuery(PFabricContext& ctx, const std::stri
   return topology;
 }
 
-std::string QueryCompiler::compileQuery(PFabricContext& ctx, const std::string& queryString) 
-  throw (QueryCompileException) {
+std::string QueryCompiler::compileQuery(
+    PFabricContext& ctx,
+    const std::string& queryString) throw(QueryCompileException) {
   SQLParser parser;
   auto query = parser.parse(queryString);
   auto plan = Plan::constructFromSQLQuery(query);
@@ -220,10 +215,12 @@ std::string QueryCompiler::compileQuery(PFabricContext& ctx, const std::string& 
   return libName;
 }
 
-void QueryCompiler::generateCode(PFabricContext& ctx, PlanPtr plan, const std::string& className) throw(QueryCompileException) {
+void QueryCompiler::generateCode(
+    PFabricContext& ctx, PlanPtr plan,
+    const std::string& className) throw(QueryCompileException) {
   std::string cppFile = className + ".cpp";
 
-  std::ofstream cppStream (cppFile);
+  std::ofstream cppStream(cppFile);
 
   generateHeader(cppStream, className);
   generateTypedefs(cppStream);
@@ -233,89 +230,90 @@ void QueryCompiler::generateCode(PFabricContext& ctx, PlanPtr plan, const std::s
   generateFooter(cppStream, className);
 }
 
-void QueryCompiler::generateHeader(std::ostream& os, const std::string& className) {
+void QueryCompiler::generateHeader(std::ostream& os,
+                                   const std::string& className) {
   os << "\
 #include \"qcomp/TopologyBuilder.hpp\"\n\
 \n\
 using namespace pfabric;\n\
 \n\
-BUILDER_CLASS(" << className << ")\n\n";
+BUILDER_CLASS("
+     << className << ")\n\n";
 }
 
 void QueryCompiler::generateTypedefs(std::ostream& os) {
   for (auto iter = mTypeMgr.begin(); iter != mTypeMgr.end(); iter++) {
     auto tInfo = iter->second;
-    os << "typedef " 
-       << tInfo.first.generateTypeDef()
-       << " " << tInfo.second << ";\n";
+    os << "typedef " << tInfo.first.generateTypeDef() << " " << tInfo.second
+       << ";\n";
   }
   os << "\n";
 }
 
-void QueryCompiler::generateBeginClassDefinition(std::ostream& os, const std::string& className) {
-  os << "PFabricContext::TopologyPtr " << className << "::create(PFabricContext& ctx) {\n";
+void QueryCompiler::generateBeginClassDefinition(std::ostream& os,
+                                                 const std::string& className) {
+  os << "PFabricContext::TopologyPtr " << className
+     << "::create(PFabricContext& ctx) {\n";
 }
 
-void QueryCompiler::generateQuery(std::ostream& os, PFabricContext& ctx, PlanPtr plan) {
+void QueryCompiler::generateQuery(std::ostream& os, PFabricContext& ctx,
+                                  PlanPtr plan) {
   // generate code for getting table objects
   for (auto tbl : mTableSet) {
     auto tblInfo = ctx.getTableInfo(tbl);
 
-    os << "\tauto " << tbl
-       << " = ctx.getTable<" << mTypeMgr.nameOfType(*tblInfo)
-       << ", " << tblInfo->typeOfKey()
+    os << "\tauto " << tbl << " = ctx.getTable<"
+       << mTypeMgr.nameOfType(*tblInfo) << ", " << tblInfo->typeOfKey()
        << ">(\"" << tbl << "\");\n";
   }
 
   os << "\ttopology = ctx.createTopology();\n";
 
   traverse(plan->sinkOperator(), [&](PlanOpPtr op) {
-      switch (op->mOpType) {
-      case BasePlanOp::Where_Op:
-      {
+    switch (op->mOpType) {
+      case BasePlanOp::Where_Op: {
         auto whereOp = static_pointer_cast<PlanOp<WhereInfo>>(op);
-        os << "\t\t.where<" 
-           << mTypeMgr.nameOfType(whereOp->mOutputSchema)
-           << ">([](auto tp, bool) -> bool {\n\t\t\treturn " 
+        os << "\t\t.where<" << mTypeMgr.nameOfType(whereOp->mOutputSchema)
+           << ">([](auto tp, bool) -> bool {\n\t\t\treturn "
            << generateWhereExpression(whereOp->payload()) << "; })\n";
         break;
       }
-      case BasePlanOp::Map_Op:
-      {
+      case BasePlanOp::Map_Op: {
         auto mapOp = static_pointer_cast<PlanOp<MapInfo>>(op);
         auto inputSchema = mapOp->mChild->mOutputSchema;
         auto resTypeName = mTypeMgr.nameOfType(mapOp->mOutputSchema);
-        os << "\t\t.map<" << mTypeMgr.nameOfType(inputSchema) << ", " 
-           << resTypeName
-           << ">([](auto tp, bool) -> " << resTypeName << " {\n"
-           << "\t\t\treturn makeTuplePtr(" << generateMapExpression(mapOp->payload()) << "); })\n";
+        os << "\t\t.map<" << mTypeMgr.nameOfType(inputSchema) << ", "
+           << resTypeName << ">([](auto tp, bool) -> " << resTypeName << " {\n"
+           << "\t\t\treturn makeTuplePtr("
+           << generateMapExpression(mapOp->payload()) << "); })\n";
         break;
       }
-      case BasePlanOp::FromTable_Op:
-      {
+      case BasePlanOp::FromTable_Op: {
         auto tableOp = static_pointer_cast<PlanOp<FromTableInfo>>(op);
-        os << "\ttopology->selectFromTable<" 
-           << mTypeMgr.nameOfType(tableOp->mOutputSchema)
-           << ", "
-           << tableOp->mOutputSchema.typeOfKey() << ">(" 
+        os << "\ttopology->selectFromTable<"
+           << mTypeMgr.nameOfType(tableOp->mOutputSchema) << ", "
+           << tableOp->mOutputSchema.typeOfKey() << ">("
            << tableOp->payload().tableName << ")\n";
         break;
       }
       default:
         break;
-      }
-      });
+    }
+  });
   auto resultSchema = plan->sinkOperator()->mOutputSchema;
   os << "\t\t.print<" << mTypeMgr.nameOfType(resultSchema) << ">();\n";
 }
 
-void QueryCompiler::generateEndClassDefinition(std::ostream& os, const std::string& className) {
+void QueryCompiler::generateEndClassDefinition(std::ostream& os,
+                                               const std::string& className) {
   os << "\treturn topology;\n}\n\n";
 }
 
-void QueryCompiler::generateFooter(std::ostream& os, const std::string& className) {
-  os << "extern \"C\" BOOST_SYMBOL_EXPORT " << className << " " << className << "_obj_;\n"
-  << className << " " << className << "_obj_;";
+void QueryCompiler::generateFooter(std::ostream& os,
+                                   const std::string& className) {
+  os << "extern \"C\" BOOST_SYMBOL_EXPORT " << className << " " << className
+     << "_obj_;\n"
+     << className << " " << className << "_obj_;";
 }
 
 std::string QueryCompiler::generateWhereExpression(const WhereInfo& wInfo) {
@@ -337,23 +335,26 @@ std::string QueryCompiler::generateMapExpression(const MapInfo& mInfo) {
   bool first = true;
 
   for (auto p : mInfo.positions) {
-    if (first) first = false; else os << ", ";
+    if (first)
+      first = false;
+    else
+      os << ", ";
     os << "get<" << p << ">(tp)";
   }
   return os.str();
 }
 
-std::string QueryCompiler::compileCppCode(const boost::filesystem::path& lib_path, const std::string& cppFileName) throw(QueryCompileException) {
+std::string QueryCompiler::compileCppCode(
+    const boost::filesystem::path& lib_path,
+    const std::string& cppFileName) throw(QueryCompileException) {
   std::ostringstream cmd;
   auto pos = cppFileName.find(".cpp");
   std::string fileName = cppFileName.substr(0, pos);
 
   cmd << cc << " " << cflags << " -Wno-#pragma-messages "
-      << "-o " << lib_path.string()  << "/lib" << fileName << ".dylib -install_name @rpath/lib"
-      << fileName << ".dylib "
-      << lib_path / fileName << ".cpp "
-      << ldflags << " " << libs << std::endl;
+      << "-o " << lib_path.string() << "/lib" << fileName
+      << ".dylib -install_name @rpath/lib" << fileName << ".dylib "
+      << lib_path / fileName << ".cpp " << ldflags << " " << libs << std::endl;
   std::system(cmd.str().c_str());
   return fileName;
 }
-

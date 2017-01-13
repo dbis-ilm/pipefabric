@@ -218,7 +218,7 @@ namespace pfabric {
      *    a new pipe where RESTSource acts as a producer.
      */
     template<typename T, typename KeyType = DefaultKeyType>
-    Pipe newStreamFromTable(std::shared_ptr<Table<T, KeyType>> tbl,
+    Pipe newStreamFromTable(std::shared_ptr<Table<typename T::element_type, KeyType>> tbl,
                              TableParams::NotificationMode mode = TableParams::Immediate) {
       auto op = std::make_shared<FromTable<T, KeyType>>(tbl, mode);
       return Pipe(dataflow, dataflow->addPublisher(op));
@@ -261,8 +261,8 @@ namespace pfabric {
      *    a new pipe where the table acts as the source
      */
     template<typename T, typename KeyType = DefaultKeyType>
-    Pipe selectFromTable(std::shared_ptr<Table<T, KeyType>> tbl,
-        typename Table<T, KeyType>::Predicate pred = nullptr) {
+    Pipe selectFromTable(std::shared_ptr<Table<typename T::element_type, KeyType>> tbl,
+        typename Table<typename T::element_type, KeyType>::Predicate pred = nullptr) {
       auto op = std::make_shared<SelectFromTable<T, KeyType>>(tbl, pred);
       registerStartupFunction([=]() -> unsigned long { return op->start(); });
       return Pipe(dataflow, dataflow->addPublisher(op));

@@ -51,7 +51,7 @@ namespace pfabric {
 
   public:
     //< Typedef for a pointer to the table.
-    typedef std::shared_ptr<Table<StreamElement, KeyType>> TablePtr;
+    typedef std::shared_ptr<Table<typename StreamElement::element_type, KeyType>> TablePtr;
 
     //< the function for deriving the key for an incoming stream element
   	typedef std::function< KeyType(const StreamElement&) > KeyFunc;
@@ -109,7 +109,7 @@ namespace pfabric {
       if (outdated)
         mTable->deleteByKey(key);
       else
-        mTable->insert(key, data);
+        mTable->insert(key, *data);
       if (mAutoCommit) {
         // TODO: perform commit
       }

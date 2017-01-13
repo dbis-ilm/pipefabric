@@ -52,7 +52,7 @@ namespace pfabric {
   template<typename StreamElement, typename KeyType = DefaultKeyType>
   class FromTable : public DataSource<StreamElement> {
   public:
-    typedef std::shared_ptr<Table<StreamElement, KeyType>> TablePtr;
+    typedef std::shared_ptr<Table<typename StreamElement::element_type, KeyType>> TablePtr;
 
     PFABRIC_SOURCE_TYPEDEFS(StreamElement);
 
@@ -66,7 +66,7 @@ namespace pfabric {
      */
     FromTable(TablePtr tbl, TableParams::NotificationMode mode = TableParams::Immediate) :
       mInterrupted(false)  {
-        tbl->registerObserver([this](const StreamElement& data, TableParams::ModificationMode m) {
+        tbl->registerObserver([this](const typename StreamElement::element_type& data, TableParams::ModificationMode m) {
           tableCallback(data, m);
         }, mode);
         mProducerThread = std::thread(&FromTable<StreamElement, KeyType>::producer, this);
@@ -94,9 +94,10 @@ namespace pfabric {
      * @param data the actual tuple from the table
      * @param mode the modification mode of the table
      */
-    void tableCallback(const StreamElement& data, TableParams::ModificationMode mode) {
+    void tableCallback(const typename StreamElement::element_type& data, TableParams::ModificationMode mode) {
       std::unique_lock<std::mutex> lock(mMtx);
-      mQueue.push_back({ data, mode == TableParams::Insert});
+      auto tup = StreamElementTraits<StreamElement>::create(data);
+      mQueue.push_back({ tup, mode == TableParams::Insert});
       mCondVar.notify_one();
     }
 

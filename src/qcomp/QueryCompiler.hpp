@@ -10,6 +10,7 @@
 #include "Plan.hpp"
 #include "QueryCompileException.hpp"
 #include "TypeManager.hpp"
+#include "TopologyBuilder.hpp"
 
 namespace po = boost::program_options;
 

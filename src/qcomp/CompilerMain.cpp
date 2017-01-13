@@ -16,7 +16,7 @@ namespace po = boost::program_options;
 typedef TuplePtr<Tuple<int, double> > InTuplePtr;
 
 PFabricContext::TopologyPtr createStreamQuery(PFabricContext& ctx) {
-  auto myTable = ctx.getTable<InTuplePtr, int>("SENSOR_DATA");
+  auto myTable = ctx.getTable<InTuplePtr::element_type, int>("SENSOR_DATA");
 
   auto topology = ctx.createTopology();
 
@@ -43,7 +43,7 @@ int main(int argc, char **argv) {
         ColumnInfo("col2", ColumnInfo::Double_Type) }, 
       ColumnInfo::Int_Type);
 
-  ctx.createTable<InTuplePtr, int>(tInfo);
+  ctx.createTable<InTuplePtr::element_type, int>(tInfo);
 
   auto sQuery = createStreamQuery(ctx);
   sQuery->start(true);

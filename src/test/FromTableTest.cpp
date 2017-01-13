@@ -24,11 +24,11 @@ typedef TuplePtr< MyTuple > MyTuplePtr;
  * A simple test of the FromTable operator.
  */
 TEST_CASE("Producing a data stream from inserts into a table", "[FromTable]") {
-  typedef Table<MyTuplePtr, int> MyTable;
+  typedef Table<MyTuple, int> MyTable;
   auto testTable = std::make_shared<MyTable>();
 
   for (int i = 0; i < 10; i++) {
-    auto tp = makeTuplePtr(i, i + 10, i + 100);
+    auto tp = MyTuple(i, i + 10, i + 100);
     testTable->insert(i, tp);
   }
 
@@ -46,7 +46,7 @@ TEST_CASE("Producing a data stream from inserts into a table", "[FromTable]") {
 	CREATE_DATA_LINK(op, mockup);
 
   for (int i = 20; i < 30; i++) {
-    auto tp = makeTuplePtr(i, i + 10, i + 100);
+    auto tp = MyTuple(i, i + 10, i + 100);
     testTable->insert(i, tp);
   }
 

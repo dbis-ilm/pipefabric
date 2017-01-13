@@ -988,7 +988,7 @@ public:
      * @return a new pipe
      */
     template <typename T, typename KeyType = DefaultKeyType>
-    Pipe toTable(std::shared_ptr<Table<T, KeyType>> tbl, bool autoCommit = true) throw (TopologyException) {
+    Pipe toTable(std::shared_ptr<Table<typename T::element_type, KeyType>> tbl, bool autoCommit = true) throw (TopologyException) {
       typedef std::function<KeyType(const T&)> KeyExtractorFunc;
       assert(partitioningState == NoPartitioning);
 
@@ -1024,14 +1024,14 @@ public:
      *    the data type representing keys in the table
      * @param[in] tbl
      *    a pointer to the table object which is updated. This table has to be
-     *    of type Table<RecordType, KeyType>
+     *    of type Table<RecordType::element_type, KeyType>
      * @param[in] updateFunc
      *    the update function which is executed for each stream tuple
      * @return a new pipe
      */
     template <typename T, typename RecordType, typename KeyType = DefaultKeyType>
-    Pipe updateTable(std::shared_ptr<Table<RecordType, KeyType>> tbl,
-      std::function<std::pair<RecordType, bool>(const T&, bool, const RecordType&)> updateFunc)
+    Pipe updateTable(std::shared_ptr<Table<typename RecordType::element_type, KeyType>> tbl,
+      std::function<bool(const T&, bool, const typename RecordType::element_type&)> updateFunc)
           throw (TopologyException) {
       typedef std::function<KeyType(const T&)> KeyExtractorFunc;
       assert(partitioningState == NoPartitioning);
@@ -1040,7 +1040,7 @@ public:
         KeyExtractorFunc keyFunc = boost::any_cast<KeyExtractorFunc>(keyExtractor);
         return map<T, T>([=](auto tp, bool outdated) {
             KeyType key = keyFunc(tp);
-            tbl->updateOrDeleteByKey(key, [=](const RecordType& old) -> std::pair<RecordType, bool> {
+            tbl->updateOrDeleteByKey(key, [=](const typename RecordType::element_type& old) -> bool {
                   return updateFunc(tp, outdated, old);
             });
             return tp;

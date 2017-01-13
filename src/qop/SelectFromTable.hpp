@@ -49,8 +49,8 @@ namespace pfabric {
   public:
     PFABRIC_SOURCE_TYPEDEFS(StreamElement);
 
-    typedef std::shared_ptr<Table<StreamElement, KeyType>> TablePtr;
-    typedef typename Table<StreamElement, KeyType>::Predicate Predicate;
+    typedef std::shared_ptr<Table<typename StreamElement::element_type, KeyType>> TablePtr;
+    typedef typename Table<typename StreamElement::element_type, KeyType>::Predicate Predicate;
 
 
     /**
@@ -71,9 +71,10 @@ namespace pfabric {
     unsigned long start() {
       unsigned long ntuples = 0;
 
-      auto handle = mPredicate == nullptr ? mTable->select() : mTable->select(mPredicate);
-      for (auto i = handle.first; i != handle.second; i++) {
-        this->getOutputDataChannel().publish(*i, false);
+      auto iter = mPredicate == nullptr ? mTable->select() : mTable->select(mPredicate);
+      for (; iter.isValid(); iter++) {
+        auto tup = StreamElementTraits<StreamElement>::create(*iter);
+        this->getOutputDataChannel().publish(tup, false);
         ntuples++;
       }
 

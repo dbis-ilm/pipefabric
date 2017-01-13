@@ -4,7 +4,7 @@ project (pipefabric)
 set(CMAKE_MACOSX_RPATH 1)
 
 set (PipeFabric_VERSION_MAJOR 0)
-set (PipeFabric_VERSION_MINOR 1)
+set (PipeFabric_VERSION_MINOR 2)
 
 include(CTest)
 
@@ -24,9 +24,15 @@ include(Download3rdParty)
 set(PIPEFABRIC_DIR "/usr/local/pfabric")
 
 # Use the boost::spirit parser for converting strings to numbers
-option( USE_BOOST_SPIRIT_PARSER
+option(USE_BOOST_SPIRIT_PARSER
     "use the boost::spirit::qi parsers for converting strings to tuple attributes"
     ON
+)
+
+# Use LevelDB key-value store for implementing tables
+option(USE_LEVELDB_TABLE
+  "use LevelDB for implementing persistent tables"
+  OFF
 )
 
 # Force using intel compiler
@@ -70,6 +76,18 @@ elseif(JEMALLOC_FOUND)
 	 set(MALLOC_LIB ${JEMALLOC_LIBRARIES})
 else()
      set(MALLOC_LIB "")
+endif()
+
+########################
+# LevelDB database library 
+########################
+#
+if (USE_LEVELDB_TABLE)
+  add_definitions(-DUSE_LEVELDB_TABLE)
+  set (LEVELDB_LIB "${THIRD_PARTY_DIR}/leveldb/lib/libleveldb.a")
+  include_directories("${THIRD_PARTY_DIR}/leveldb/include")
+else()
+  set (LEVELDB_LIB "")
 endif()
 
 ######################
@@ -166,6 +184,7 @@ add_library(pfabric_core SHARED
   ${THIRD_PARTY_DIR}/json
   ${THIRD_PARTY_DIR}/fmt
   ${THIRD_PARTY_DIR}/SimpleWeb
+  ${THIRD_PARTY_DIR}/leveldb
 )
 
 
