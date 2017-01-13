@@ -25,7 +25,7 @@ typedef TuplePtr< MyTuple > MyTuplePtr;
  */
 TEST_CASE("Producing a data stream from inserts into a table", "[FromTable]") {
   typedef Table<MyTuple, int> MyTable;
-  auto testTable = std::make_shared<MyTable>();
+  auto testTable = std::make_shared<MyTable>("MyTable");
 
   for (int i = 0; i < 10; i++) {
     auto tp = MyTuple(i, i + 10, i + 100);
@@ -53,4 +53,5 @@ TEST_CASE("Producing a data stream from inserts into a table", "[FromTable]") {
   using namespace std::chrono_literals;
   std::this_thread::sleep_for(2s);
   REQUIRE(mockup->numTuplesProcessed() == 10);
+  testTable->drop();
 }

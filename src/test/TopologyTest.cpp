@@ -123,7 +123,7 @@ TEST_CASE("Building and running a topology with ZMQ", "[Topology]") {
 TEST_CASE("Building and running a topology with ToTable", "[Topology]") {
   typedef TuplePtr<Tuple<int, std::string, double> > T1;
 
-  auto testTable = std::make_shared<Table<T1::element_type, int>>();
+  auto testTable = std::make_shared<Table<T1::element_type, int>>("TestTable");
 
   TestDataGenerator tgen("file.csv");
   tgen.writeData(10);
@@ -144,6 +144,7 @@ TEST_CASE("Building and running a topology with ToTable", "[Topology]") {
     REQUIRE(get<1>(tp) == "This is a string field");
     REQUIRE(get<2>(tp) == i * 100 + 0.5);
   }
+	testTable->drop();
 }
 
 TEST_CASE("Building and running a topology with partitioning", "[Topology]") {

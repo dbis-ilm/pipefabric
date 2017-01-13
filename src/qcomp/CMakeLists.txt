@@ -29,4 +29,5 @@ target_link_libraries(CompilerMain
   ${Boost_SYSTEM_LIBRARY}
   ${Boost_LOG_LIBRARY}
   ${Boost_THREAD_LIBRARY}
+  ${LEVELDB_LIB}
 )

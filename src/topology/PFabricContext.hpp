@@ -92,7 +92,7 @@ public:
       throw TableException("table already exists");
 
     // create a new table and register it
-    auto tbl = std::make_shared<Table<RecordType, KeyType>>();
+    auto tbl = std::make_shared<Table<RecordType, KeyType>>(tblName);
     mTableSet[tblName] = tbl;
     return tbl;
   }

@@ -142,23 +142,19 @@ class LDBTable : public BaseTable {
   // details
   typedef typename TableIterator::Predicate Predicate;
 
+  LDBTable(const TableInfo& tInfo) throw (TableException) : BaseTable(tInfo), mTableName(tInfo.tableName()) {
+    openOrCreateTable(tInfo.tableName());
+  }
+
   /**
    * Constructor for creating an empty table.
    */
   LDBTable(const std::string& tableName) throw(TableException)
       : mTableName(tableName) {
-    std::string fileName = tableName + ".db";
-    leveldb::Options options;
-    options.create_if_missing = true;
-
-    leveldb::Status status = leveldb::DB::Open(options, fileName, &db);
-    if (!status.ok()) {
-      throw TableException(status.ToString().c_str());
-    }
-    updateRecordCounter();
+    openOrCreateTable(tableName);
   }
 
-  /**
+ /**
    * Destructor for table.
    */
   ~LDBTable() {
@@ -459,6 +455,19 @@ class LDBTable : public BaseTable {
   }
 
  private:
+  void openOrCreateTable(const std::string& tableName) throw (TableException) {
+    std::string fileName = tableName + ".db";
+    leveldb::Options options;
+    options.create_if_missing = true;
+
+    leveldb::Status status = leveldb::DB::Open(options, fileName, &db);
+    if (!status.ok()) {
+      throw TableException(status.ToString().c_str());
+    }
+    updateRecordCounter();
+  }
+
+ 
   /**
    * @brief Perform the actual notification
    *

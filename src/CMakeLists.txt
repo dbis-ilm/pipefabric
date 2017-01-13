@@ -83,10 +83,12 @@ endif()
 ########################
 #
 if (USE_LEVELDB_TABLE)
+message(STATUS "using LevelDB key-value store")
   add_definitions(-DUSE_LEVELDB_TABLE)
   set (LEVELDB_LIB "${THIRD_PARTY_DIR}/leveldb/lib/libleveldb.a")
   include_directories("${THIRD_PARTY_DIR}/leveldb/include")
 else()
+message(STATUS "don't use LevelDB key-value store")
   set (LEVELDB_LIB "")
 endif()
 

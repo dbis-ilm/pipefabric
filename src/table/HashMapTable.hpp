@@ -116,7 +116,7 @@ public:
   /**
    * Constructor for creating an empty table.
    */
-  HashMapTable() {}
+  HashMapTable(const std::string& = "") {}
 
   /**
    * Constructor for creating an empty table with a given schema.
