@@ -4,6 +4,22 @@ include(DownloadProject)
 
 set(THIRD_PARTY_DIR "${PROJECT_BINARY_DIR}/3rdparty")
 
+#--------------------------------------------------------------------------------
+# the Catch framework for testing
+download_project(PROJ               Catch
+                GIT_REPOSITORY      https://github.com/philsquared/Catch
+                GIT_TAG             master
+                UPDATE_DISCONNECTED 1
+                QUIET
+)
+
+add_custom_command(
+  OUTPUT ${THIRD_PARTY_DIR}/catch
+        COMMAND ${CMAKE_COMMAND} -E copy
+                ${Catch_SOURCE_DIR}/single_include/catch.hpp
+                ${PROJECT_SOURCE_DIR}/test)
+
+#--------------------------------------------------------------------------------
 # the JSON library
 download_project(PROJ               json
                 GIT_REPOSITORY      https://github.com/nlohmann/json.git
@@ -18,6 +34,7 @@ add_custom_command(
                 ${json_SOURCE_DIR}/src/json.hpp
                 ${THIRD_PARTY_DIR}/json)
 
+#--------------------------------------------------------------------------------
 # the format library
 download_project(PROJ               Format
                 GIT_REPOSITORY      https://github.com/fmtlib/fmt.git
@@ -38,6 +55,7 @@ add_custom_command(
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DFMT_HEADER_ONLY=1")
 include_directories("${THIRD_PARTY_DIR}/fmt")
 
+#--------------------------------------------------------------------------------
 # the SimpleWeb library
 download_project(PROJ               SimpleWeb
                 GIT_REPOSITORY      https://github.com/eidheim/Simple-Web-Server.git
@@ -52,6 +70,7 @@ add_custom_command(
                 ${SimpleWeb_SOURCE_DIR}
                 ${THIRD_PARTY_DIR}/SimpleWeb)
 
+#--------------------------------------------------------------------------------
 # Google Benchmark framework
 download_project(PROJ               benchmark
                 GIT_REPOSITORY      https://github.com/google/benchmark.git
@@ -60,6 +79,7 @@ download_project(PROJ               benchmark
                 QUIET
 )
 
+#--------------------------------------------------------------------------------
 # LevelDB key-value store
 download_project(PROJ               leveldb
                 GIT_REPOSITORY      https://github.com/google/leveldb

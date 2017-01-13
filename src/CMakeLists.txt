@@ -32,7 +32,7 @@ option(USE_BOOST_SPIRIT_PARSER
 # Use LevelDB key-value store for implementing tables
 option(USE_LEVELDB_TABLE
   "use LevelDB for implementing persistent tables"
-  OFF
+  ON
 )
 
 # Force using intel compiler
@@ -187,6 +187,7 @@ add_library(pfabric_core SHARED
   ${THIRD_PARTY_DIR}/fmt
   ${THIRD_PARTY_DIR}/SimpleWeb
   ${THIRD_PARTY_DIR}/leveldb
+  ${THIRD_PARTY_DIR}/catch
 )
 
 
