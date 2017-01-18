@@ -37,6 +37,8 @@
 
 #include "rocksdb/db.h"
 
+#include "core/serialize.hpp"
+
 #include "table/BaseTable.hpp"
 #include "table/TableException.hpp"
 #include "table/TableInfo.hpp"
@@ -52,6 +54,13 @@ inline rocksdb::Slice valToSlice(const T& t) {
 template <class T>
 inline T& sliceToVal(const rocksdb::Slice& slice) {
   return *(reinterpret_cast<T*>(const_cast<char*>(slice.data())));
+}
+
+template <class T>
+inline T sliceToTuple(const rocksdb::Slice& slice) {
+  const uint8_t* ptr = reinterpret_cast<const uint8_t*>(slice.data());
+  StreamType buf(ptr, ptr + slice.size());
+  return T(buf);
 }
 }
 
@@ -159,7 +168,6 @@ class RDBTable : public BaseTable {
    */
   ~RDBTable() {
     if (db != nullptr) {
-      saveRecordCounter();
       delete db;
     }
   }
@@ -181,13 +189,10 @@ class RDBTable : public BaseTable {
    */
   void insert(KeyType key, const RecordType& rec) throw(TableException) {
     {
-      // make sure we have exclusive access
-      // std::lock_guard<std::mutex> lock(mMtx);
-
-       auto s = pfabric::detail::valToSlice(rec);
-      std::cout << "rec = " << rec << ":" << s.size() << "->" << s.ToString() << std::endl;
+      StreamType buf;
+      rec.serializeToStream(buf);
       auto status = db->Put(writeOptions, pfabric::detail::valToSlice(key),
-                            pfabric::detail::valToSlice(rec));
+                            rocksdb::Slice(reinterpret_cast<const char*>(buf.data()), buf.size()));
       if (status.ok()) numRecords++;
     }
     // after the lock is released we can inform our observers
@@ -206,8 +211,6 @@ class RDBTable : public BaseTable {
   unsigned long deleteByKey(KeyType key) {
     unsigned long nres = 0;
     {
-      // make sure we have exclusive access
-      // std::lock_guard<std::mutex> lock(mMtx);
       auto keySlice = pfabric::detail::valToSlice(key);
       std::string res;
       auto status = db->Get(readOptions, keySlice, &res);
@@ -236,9 +239,6 @@ class RDBTable : public BaseTable {
    * @return the number of deleted tuples
    */
   unsigned long deleteWhere(Predicate func) {
-    // make sure we have exclusive access
-    // std::lock_guard<std::mutex> lock(mMtx);
-
     unsigned long num = 0;
     // we perform a full scan here ...
     rocksdb::Iterator* it = db->NewIterator(rocksdb::ReadOptions());
@@ -366,13 +366,12 @@ class RDBTable : public BaseTable {
    * @return the tuple associated with the given key
    */
   const RecordType& getByKey(KeyType key) throw(TableException) {
-    // std::lock_guard<std::mutex> lock(mMtx);
     std::string resultData;
     auto status =
         db->Get(readOptions, pfabric::detail::valToSlice(key), &resultData);
     if (status.ok())
       // if we found the tuple we just return it
-      return pfabric::detail::sliceToVal<RecordType>(
+      return pfabric::detail::sliceToTuple<RecordType>(
           rocksdb::Slice(resultData.data(), resultData.size()));
     else
       // otherwise an exception is raised
@@ -493,30 +492,20 @@ class RDBTable : public BaseTable {
   }
 
   void updateRecordCounter() {
-    std::string resultData;
-    auto status =
-        db->Get(readOptions, std::string("__numRecords"), &resultData);
-    if (status.ok())
-      // if we found the tuple we just return it
-      numRecords = pfabric::detail::sliceToVal<unsigned long>(
-          rocksdb::Slice(resultData.data(), resultData.size()));
-    else
-      numRecords = 0;
+    numRecords = 0;
+    rocksdb::Iterator* it = db->NewIterator(rocksdb::ReadOptions());
+
+    for (it->SeekToFirst(); it->Valid(); it->Next()) numRecords++;
+
+    delete it;
   }
 
-  void saveRecordCounter() {
-    auto status = db->Put(writeOptions, std::string("__numRecords"),
-                          pfabric::detail::valToSlice(numRecords));
-  }
-
-  mutable std::mutex
-      mMtx;  //< a mutex for getting exclusive access to the table
   std::string mTableName;
   rocksdb::DB* db;
   rocksdb::WriteOptions writeOptions;
   rocksdb::ReadOptions readOptions;
   ObserverCallback mImmediateObservers, mDeferredObservers;
-  unsigned long numRecords = 0;
+  unsigned long numRecords;
 };
 }
 

@@ -7,7 +7,7 @@
 
 #include "pfabric.hpp"
 
-#include "table/LDBTable.hpp"
+#include "table/RDBTable.hpp"
 
 #include "fmt/format.h"
 
@@ -16,10 +16,10 @@ using namespace pfabric;
 typedef Tuple<unsigned long, int, std::string, double> MyTuple;
 
 template <typename RecordType, typename KeyType>
-using LTable = LDBTable<RecordType, KeyType>;
+using LTable = RDBTable<RecordType, KeyType>;
 
 TEST_CASE("Creating a table with a given schema and inserting data",
-          "[LDBTable]") {
+          "[RDBTable]") {
   auto testTable = std::make_shared<LTable<MyTuple, int>>("MyTestTable1");
   for (int i = 0; i < 10000; i++) {
     auto tp = MyTuple((unsigned long)i, i + 100, fmt::format("String#{}", i),
@@ -27,7 +27,7 @@ TEST_CASE("Creating a table with a given schema and inserting data",
     testTable->insert(i, tp);
   }
 
-  auto iter =testTable->_db()->NewIterator(leveldb::ReadOptions());
+  auto iter =testTable->_db()->NewIterator(rocksdb::ReadOptions());
   std::cout << "los gehts..." << std::endl;
   for (iter->SeekToFirst(); iter->Valid(); iter->Next()) {
     auto tup = pfabric::detail::sliceToVal<MyTuple>(iter->value());
@@ -47,7 +47,7 @@ TEST_CASE("Creating a table with a given schema and inserting data",
 }
 
 TEST_CASE("Creating a table with a given schema and deleting data",
-          "[LDBTable]") {
+          "[RDBTable]") {
   auto testTable = std::make_shared<LTable<MyTuple, int>>("MyTestTable2");
   for (int i = 0; i < 10000; i++) {
     auto tp = MyTuple((unsigned long)i, i + 100, fmt::format("String#{}", i),
@@ -74,7 +74,7 @@ TEST_CASE("Creating a table with a given schema and deleting data",
 
 TEST_CASE(
     "Creating a table with a given schema and deleting data using a predicate",
-    "[LDBTable]") {
+    "[RDBTable]") {
   auto testTable = std::make_shared<LTable<MyTuple, int>>("MyTestTable3");
   for (int i = 0; i < 10000; i++) {
     auto tp = MyTuple((unsigned long)i, i + 100, fmt::format("String#{}", i),
@@ -99,7 +99,7 @@ TEST_CASE(
   testTable->drop();
 }
 
-TEST_CASE("updating some data by key in a table", "[LDBTable]") {
+TEST_CASE("updating some data by key in a table", "[RDBTable]") {
   auto testTable = std::make_shared<LTable<MyTuple, int>>("MyTestTable4");
   for (int i = 0; i < 10000; i++) {
     auto tp = MyTuple((unsigned long)i, i + 100, fmt::format("String#{}", i),
@@ -118,7 +118,7 @@ TEST_CASE("updating some data by key in a table", "[LDBTable]") {
   testTable->drop();
 }
 
-TEST_CASE("updating some data by predicate in a table", "[LDBTable]") {
+TEST_CASE("updating some data by predicate in a table", "[RDBTable]") {
   auto testTable = std::make_shared<LTable<MyTuple, int>>("MyTestTable5");
   for (int i = 0; i < 10000; i++) {
     auto tp = MyTuple((unsigned long)i, i + 100, fmt::format("String#{}", i),
@@ -137,7 +137,7 @@ TEST_CASE("updating some data by predicate in a table", "[LDBTable]") {
   testTable->drop();
 }
 
-TEST_CASE("observing inserts, deletes, and updates on a table", "[LDBTable]") {
+TEST_CASE("observing inserts, deletes, and updates on a table", "[RDBTable]") {
   auto testTable = std::make_shared<LTable<MyTuple, int>>("MyTestTable6");
   for (int i = 0; i < 10000; i++) {
     auto tp = MyTuple((unsigned long)i, i + 100, fmt::format("String#{}", i),
@@ -177,7 +177,7 @@ TEST_CASE("observing inserts, deletes, and updates on a table", "[LDBTable]") {
   testTable->drop();
 }
 
-TEST_CASE("scanning the whole table", "[LDBTable]") {
+TEST_CASE("scanning the whole table", "[RDBTable]") {
   auto testTable = std::make_shared<LTable<MyTuple, int>>("MyTestTable7");
   for (int i = 0; i < 10000; i++) {
     auto tp = MyTuple((unsigned long)i, i + 100, fmt::format("String#{}", i),
@@ -194,7 +194,7 @@ TEST_CASE("scanning the whole table", "[LDBTable]") {
   testTable->drop();
 }
 
-TEST_CASE("scanning the table with a predicate", "[LDBTable]") {
+TEST_CASE("scanning the table with a predicate", "[RDBTable]") {
   auto testTable = std::make_shared<LTable<MyTuple, int>>("MyTestTable8");
   for (int i = 0; i < 10000; i++) {
     auto tp = MyTuple((unsigned long)i, i + 100, fmt::format("String#{}", i),

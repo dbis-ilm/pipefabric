@@ -67,7 +67,11 @@ TEST_CASE("Testing storing tuples in RocksDB", "[RocksDB]") {
   rocksdb::Iterator* it = db->NewIterator(rocksdb::ReadOptions());
 
   for (it->SeekToFirst(); it->Valid(); it->Next()) {
+    int k = sliceToVal<int>(it->key());
     auto tup = sliceToTuple<MyTuple>(it->value());
+    auto expected = MyTuple((unsigned long)k + 1, (k + 1) * 100,
+                       fmt::format("String #{0}", k), k * 12.345);
+    REQUIRE(tup == expected);
     cout << sliceToVal<int>(it->key()) << " : " << tup << endl;
   }
 
