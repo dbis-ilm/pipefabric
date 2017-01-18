@@ -19,8 +19,8 @@
  * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
  */
 
-#ifndef LDBTable_hpp_
-#define LDBTable_hpp_
+#ifndef RDBTable_hpp_
+#define RDBTable_hpp_
 
 #include <exception>
 #include <functional>
@@ -35,7 +35,7 @@
 
 #include "fmt/format.h"
 
-#include "leveldb/db.h"
+#include "rocksdb/db.h"
 
 #include "table/BaseTable.hpp"
 #include "table/TableException.hpp"
@@ -45,27 +45,27 @@ namespace pfabric {
 
 namespace detail {
 template <class T>
-inline leveldb::Slice valToSlice(const T& t) {
-  return leveldb::Slice(reinterpret_cast<const char*>(&t), sizeof(t));
+inline rocksdb::Slice valToSlice(const T& t) {
+  return rocksdb::Slice(reinterpret_cast<const char*>(&t), sizeof(t));
 }
 
 template <class T>
-inline T& sliceToVal(const leveldb::Slice& slice) {
+inline T& sliceToVal(const rocksdb::Slice& slice) {
   return *(reinterpret_cast<T*>(const_cast<char*>(slice.data())));
 }
 }
 
 template <typename RecordType>
-class LDBTableIterator {
-  inline RecordType& fromSlice(leveldb::Slice s) {
+class RDBTableIterator {
+  inline RecordType& fromSlice(rocksdb::Slice s) {
     return pfabric::detail::sliceToVal<RecordType>(s);
   }
 
  public:
   typedef std::function<bool(const RecordType&)> Predicate;
 
-  explicit LDBTableIterator() {}
-  explicit LDBTableIterator(leveldb::Iterator* i, Predicate p) : pred(p) {
+  explicit RDBTableIterator() {}
+  explicit RDBTableIterator(rocksdb::Iterator* i, Predicate p) : pred(p) {
     iter.reset(i);
     iter->SeekToFirst();
     // make sure the initial iterator position refers to an entry satisfying
@@ -73,13 +73,13 @@ class LDBTableIterator {
     while (iter->Valid() && ! pred(fromSlice(iter->value()))) iter->Next();
   }
 
-  LDBTableIterator operator++() {
+  RDBTableIterator operator++() {
     iter->Next();
     while (iter->Valid() && ! pred(fromSlice(iter->value()))) iter->Next();
     return *this;
   }
 
-  LDBTableIterator operator++(int) {
+  RDBTableIterator operator++(int) {
     auto tmp = *this;
     ++(*this);
     return tmp;
@@ -90,14 +90,14 @@ class LDBTableIterator {
   RecordType* operator->() { return &fromSlice(iter->value()); }
 
  protected:
-  std::shared_ptr<leveldb::Iterator> iter;
+  std::shared_ptr<rocksdb::Iterator> iter;
   Predicate pred;
 };
 
 template <typename RecordType>
-inline LDBTableIterator<RecordType> makeLDBTableIterator(
-    leveldb::Iterator* i, typename LDBTableIterator<RecordType>::Predicate p) {
-  return LDBTableIterator<RecordType>(i, p);
+inline RDBTableIterator<RecordType> makeRDBTableIterator(
+    rocksdb::Iterator* i, typename RDBTableIterator<RecordType>::Predicate p) {
+  return RDBTableIterator<RecordType>(i, p);
 }
 
 /**
@@ -114,7 +114,7 @@ inline LDBTableIterator<RecordType> makeLDBTableIterator(
  *         the data type of the key column (default = int)
  */
 template <typename RecordType, typename KeyType = DefaultKeyType>
-class LDBTable : public BaseTable {
+class RDBTable : public BaseTable {
  public:
   //< typedef for a predicate evaluated using a scan
   // typedef std::function<bool(const RecordType&)> Predicate;
@@ -136,20 +136,20 @@ class LDBTable : public BaseTable {
       ObserverCallback;
 
   //< typedef for an iterator to scan the table
-  typedef LDBTableIterator<RecordType> TableIterator;
+  typedef RDBTableIterator<RecordType> TableIterator;
 
   //< typedef for a predicate evaluated using a scan: see @TableIterator for
   // details
   typedef typename TableIterator::Predicate Predicate;
 
-  LDBTable(const TableInfo& tInfo) throw (TableException) : BaseTable(tInfo), mTableName(tInfo.tableName()) {
+  RDBTable(const TableInfo& tInfo) throw (TableException) : BaseTable(tInfo), mTableName(tInfo.tableName()) {
     openOrCreateTable(tInfo.tableName());
   }
 
   /**
    * Constructor for creating an empty table.
    */
-  LDBTable(const std::string& tableName) throw(TableException)
+  RDBTable(const std::string& tableName) throw(TableException)
       : mTableName(tableName) {
     openOrCreateTable(tableName);
   }
@@ -157,7 +157,7 @@ class LDBTable : public BaseTable {
  /**
    * Destructor for table.
    */
-  ~LDBTable() {
+  ~RDBTable() {
     if (db != nullptr) {
       saveRecordCounter();
       delete db;
@@ -184,6 +184,8 @@ class LDBTable : public BaseTable {
       // make sure we have exclusive access
       // std::lock_guard<std::mutex> lock(mMtx);
 
+       auto s = pfabric::detail::valToSlice(rec);
+      std::cout << "rec = " << rec << ":" << s.size() << "->" << s.ToString() << std::endl;
       auto status = db->Put(writeOptions, pfabric::detail::valToSlice(key),
                             pfabric::detail::valToSlice(rec));
       if (status.ok()) numRecords++;
@@ -212,7 +214,7 @@ class LDBTable : public BaseTable {
       if (status.ok()) {
         // if the key exists: notify our observers
         notifyObservers(pfabric::detail::sliceToVal<RecordType>(
-                            leveldb::Slice(res.data(), res.size())),
+                            rocksdb::Slice(res.data(), res.size())),
                         TableParams::Delete, TableParams::Immediate);
         // and delete the tuples
         status = db->Delete(writeOptions, keySlice);
@@ -239,7 +241,7 @@ class LDBTable : public BaseTable {
 
     unsigned long num = 0;
     // we perform a full scan here ...
-    leveldb::Iterator* it = db->NewIterator(leveldb::ReadOptions());
+    rocksdb::Iterator* it = db->NewIterator(rocksdb::ReadOptions());
     for (it->SeekToFirst(); it->Valid(); it->Next()) {
       auto tup = pfabric::detail::sliceToVal<RecordType>(it->value());
       // and check the predicate
@@ -273,7 +275,7 @@ class LDBTable : public BaseTable {
     if (status.ok()) {
       // if the key exists: notify our observers
       auto rec = pfabric::detail::sliceToVal<RecordType>(
-          leveldb::Slice(resultData.data(), resultData.size()));
+          rocksdb::Slice(resultData.data(), resultData.size()));
       TableParams::ModificationMode mode = TableParams::Update;
       unsigned long num = 1;
 
@@ -315,7 +317,7 @@ class LDBTable : public BaseTable {
     if (status.ok()) {
       // if the key exists: notify our observers
       auto rec = pfabric::detail::sliceToVal<RecordType>(
-          leveldb::Slice(resultData.data(), resultData.size()));
+          rocksdb::Slice(resultData.data(), resultData.size()));
       ufunc(rec);
       status = db->Put(writeOptions, pfabric::detail::valToSlice(key),
                             pfabric::detail::valToSlice(rec));
@@ -339,7 +341,7 @@ class LDBTable : public BaseTable {
   unsigned long updateWhere(Predicate pfunc, UpdaterFunc ufunc) {
     unsigned long num = 0;
     // we perform a full table scan
-    leveldb::Iterator* it = db->NewIterator(leveldb::ReadOptions());
+    rocksdb::Iterator* it = db->NewIterator(rocksdb::ReadOptions());
     for (it->SeekToFirst(); it->Valid(); it->Next()) {
       auto tup = pfabric::detail::sliceToVal<RecordType>(it->value());
       // and check the predicate
@@ -371,7 +373,7 @@ class LDBTable : public BaseTable {
     if (status.ok())
       // if we found the tuple we just return it
       return pfabric::detail::sliceToVal<RecordType>(
-          leveldb::Slice(resultData.data(), resultData.size()));
+          rocksdb::Slice(resultData.data(), resultData.size()));
     else
       // otherwise an exception is raised
       throw TableException("key not found");
@@ -396,8 +398,8 @@ class LDBTable : public BaseTable {
    * @return a pair of iterators
    */
   TableIterator select(Predicate func) {
-    return makeLDBTableIterator<RecordType>(
-        db->NewIterator(leveldb::ReadOptions()), func);
+    return makeRDBTableIterator<RecordType>(
+        db->NewIterator(rocksdb::ReadOptions()), func);
   }
 
   /**
@@ -415,8 +417,8 @@ class LDBTable : public BaseTable {
    */
   TableIterator select() {
     auto alwaysTrue = [](const RecordType&) { return true; };
-    return makeLDBTableIterator<RecordType>(
-        db->NewIterator(leveldb::ReadOptions()), alwaysTrue);
+    return makeRDBTableIterator<RecordType>(
+        db->NewIterator(rocksdb::ReadOptions()), alwaysTrue);
   }
 
   /**
@@ -454,13 +456,15 @@ class LDBTable : public BaseTable {
     }
   }
 
+  rocksdb::DB* _db() { return db; }
+
  private:
   void openOrCreateTable(const std::string& tableName) throw (TableException) {
     std::string fileName = tableName + ".db";
-    leveldb::Options options;
+    rocksdb::Options options;
     options.create_if_missing = true;
 
-    leveldb::Status status = leveldb::DB::Open(options, fileName, &db);
+    rocksdb::Status status = rocksdb::DB::Open(options, fileName, &db);
     if (!status.ok()) {
       throw TableException(status.ToString().c_str());
     }
@@ -495,7 +499,7 @@ class LDBTable : public BaseTable {
     if (status.ok())
       // if we found the tuple we just return it
       numRecords = pfabric::detail::sliceToVal<unsigned long>(
-          leveldb::Slice(resultData.data(), resultData.size()));
+          rocksdb::Slice(resultData.data(), resultData.size()));
     else
       numRecords = 0;
   }
@@ -508,12 +512,13 @@ class LDBTable : public BaseTable {
   mutable std::mutex
       mMtx;  //< a mutex for getting exclusive access to the table
   std::string mTableName;
-  leveldb::DB* db;
-  leveldb::WriteOptions writeOptions;
-  leveldb::ReadOptions readOptions;
+  rocksdb::DB* db;
+  rocksdb::WriteOptions writeOptions;
+  rocksdb::ReadOptions readOptions;
   ObserverCallback mImmediateObservers, mDeferredObservers;
   unsigned long numRecords = 0;
 };
 }
 
 #endif
+

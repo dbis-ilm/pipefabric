@@ -40,13 +40,13 @@
 #include "table/TableException.hpp"
 #include "table/BaseTable.hpp"
 
-#if defined(USE_LEVELDB_TABLE)
+#if defined(USE_ROCKSDB_TABLE)
 
-#include "LDBTable.hpp"
+#include "RDBTable.hpp"
 
 namespace pfabric {
 template <typename RecordType, typename KeyType = DefaultKeyType>
-using Table = pfabric::LDBTable<RecordType, KeyType>;
+using Table = pfabric::RDBTable<RecordType, KeyType>;
 }
 
 #else

@@ -29,9 +29,9 @@ option(USE_BOOST_SPIRIT_PARSER
     ON
 )
 
-# Use LevelDB key-value store for implementing tables
-option(USE_LEVELDB_TABLE
-  "use LevelDB for implementing persistent tables"
+# Use RocksDB key-value store for implementing tables
+option(USE_ROCKSDB_TABLE
+  "use RocksDB for implementing persistent tables"
   ON
 )
 
@@ -79,17 +79,29 @@ else()
 endif()
 
 ########################
-# LevelDB database library 
+# RocksDB database library 
 ########################
 #
-if (USE_LEVELDB_TABLE)
-message(STATUS "using LevelDB key-value store")
-  add_definitions(-DUSE_LEVELDB_TABLE)
-  set (LEVELDB_LIB "${THIRD_PARTY_DIR}/leveldb/lib/libleveldb.a")
-  include_directories("${THIRD_PARTY_DIR}/leveldb/include")
+if (USE_ROCKSDB_TABLE)
+  message(STATUS "using RocksDB key-value store")
+  add_definitions(-DUSE_ROCKSDB_TABLE)
+  set (ROCKSDB_LIB "${THIRD_PARTY_DIR}/rocksdb/lib/librocksdb.a")
+  include_directories("${THIRD_PARTY_DIR}/rocksdb/include")
+
+  find_package( BZIP2 REQUIRED )
+  if ( BZIP2_FOUND )
+    #  include_directories( ${BZIP2_INCLUDE_DIRS} )
+    set (ROCKSDB_LIB ${ROCKSDB_LIB} ${BZIP2_LIBRARIES})
+  endif( BZIP2_FOUND )
+
+  find_package( ZLIB REQUIRED )
+  if ( ZLIB_FOUND )
+    #  include_directories( ${BZIP2_INCLUDE_DIRS} )
+    set (ROCKSDB_LIB ${ROCKSDB_LIB} ${ZLIB_LIBRARIES})
+  endif( ZLIB_FOUND )
 else()
-message(STATUS "don't use LevelDB key-value store")
-  set (LEVELDB_LIB "")
+  message(STATUS "don't use RocksDB key-value store")
+  set (ROCKSDB_LIB "")
 endif()
 
 ######################
@@ -186,7 +198,7 @@ add_library(pfabric_core SHARED
   ${THIRD_PARTY_DIR}/json
   ${THIRD_PARTY_DIR}/fmt
   ${THIRD_PARTY_DIR}/SimpleWeb
-  ${THIRD_PARTY_DIR}/leveldb
+  ${THIRD_PARTY_DIR}/rocksdb
   ${THIRD_PARTY_DIR}/catch
 )
 

@@ -2,7 +2,7 @@
 
 FROM ubuntu:14.04
 MAINTAINER Kai-Uwe Sattler <kus@tu-ilmenau.de>
-ENV CONTAINER_USER="cxxdev"
+ENV CONTAINER_USER="pf"
 
 RUN apt-get update && apt-get -y upgrade && apt-get -y install wget
 
@@ -51,7 +51,7 @@ rm boost_1_63_0.tar.gz;
 RUN cd boost_1_63_0 && ./bootstrap.sh --prefix=/usr/local/boost && mkdir /usr/local/boost && ./b2 install
 
 # Cleanup
-RUN rm -fr /boost_1_62_0 zeromq-4.1.5 cmake-3.6.2
+RUN rm -fr /boost_1_63_0 zeromq-4.1.5 cmake-3.6.2
 
 # Add non-root user for container but give it sudo access.
 # Password is the same as the username
@@ -68,4 +68,6 @@ RUN cd /home/${CONTAINER_USER} && \
 git clone http://dbgit.prakinf.tu-ilmenau.de/code/pfabric.git && \
 cd pfabric && mkdir build && cd build && \
 export BOOST_ROOT=/usr/local/boost; \
-cmake ../src && make VERBOSE=1
+cmake ../src 
+
+# RUN cd /home/${CONTAINER_USER}/pfabric/build && make VERBOSE=1 && make test

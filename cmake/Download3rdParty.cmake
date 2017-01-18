@@ -80,22 +80,22 @@ download_project(PROJ               benchmark
 )
 
 #--------------------------------------------------------------------------------
-# LevelDB key-value store
-download_project(PROJ               leveldb
-                GIT_REPOSITORY      https://github.com/google/leveldb
+# RocksDB key-value store
+download_project(PROJ               rocksdb
+                GIT_REPOSITORY      https://github.com/facebook/rocksdb
                 GIT_TAG             master
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
 add_custom_command(
-        OUTPUT ${THIRD_PARTY_DIR}/leveldb
-        COMMAND ${CMAKE_COMMAND} -E chdir ${leveldb_SOURCE_DIR} make
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/leveldb/include
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/leveldb/lib
+        OUTPUT ${THIRD_PARTY_DIR}/rocksdb
+        COMMAND ${CMAKE_COMMAND} -E chdir ${rocksdb_SOURCE_DIR} make static_lib
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/rocksdb/include
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/rocksdb/lib
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-                ${leveldb_SOURCE_DIR}/include
-                ${THIRD_PARTY_DIR}/leveldb/include
+                ${rocksdb_SOURCE_DIR}/include
+                ${THIRD_PARTY_DIR}/rocksdb/include
         COMMAND ${CMAKE_COMMAND} -E copy
-                ${leveldb_SOURCE_DIR}/out-static/libleveldb.a
-                ${THIRD_PARTY_DIR}/leveldb/lib
+                ${rocksdb_SOURCE_DIR}/librocksdb.a
+                ${THIRD_PARTY_DIR}/rocksdb/lib
 )

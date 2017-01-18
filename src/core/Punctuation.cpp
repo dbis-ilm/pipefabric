@@ -45,7 +45,7 @@ void Punctuation::print(std::ostream& os) const {
 	os << "|" << /*mData << */ "]";
 }
 
-void Punctuation::serializeToStream(StreamType& res) {
+void Punctuation::serializeToStream(StreamType& res) const {
 	serialize(TupleType::Punctuation, res);
 	serialize(mTstamp, res);
 	serialize(mPtype, res);

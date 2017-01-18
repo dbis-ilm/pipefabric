@@ -311,7 +311,7 @@ public:
 	 *
 	 * @param res a predefined stream for storing the serialized data.
 	 */
-	void serializeToStream(StreamType& res) override {
+	void serializeToStream(StreamType& res) const override {
 		serialize(TupleType::Normal, res);  // serialize the type of this tuple
 		serialize(data(), res);
 		serialize(mNulls, res);

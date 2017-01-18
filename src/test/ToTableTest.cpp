@@ -16,7 +16,7 @@
 
 using namespace pfabric;
 
-typedef Tuple< int, int, int > MyTuple;
+typedef Tuple< int, std::string, int > MyTuple;
 typedef TuplePtr< MyTuple > MyTuplePtr;
 
 /**
@@ -26,9 +26,9 @@ TEST_CASE("Writing a data stream to a table", "[ToTable]") {
   auto testTable = std::make_shared<Table<MyTuple, int>>("myTable");
 
 	std::vector<MyTuplePtr> input = {
-		makeTuplePtr(0, 0, 0),
-		makeTuplePtr (1, 1, 10),
-		makeTuplePtr(2, 2, 20) };
+		makeTuplePtr(0, std::string("String #1"), 0),
+		makeTuplePtr (1, std::string("String #2"), 10),
+		makeTuplePtr(2, std::string("String #3"), 20) };
 
 	auto mockup = std::make_shared< StreamMockup<MyTuplePtr, MyTuplePtr> >(input, input);
 
@@ -44,7 +44,7 @@ TEST_CASE("Writing a data stream to a table", "[ToTable]") {
   for (int i = 0; i < 3; i++) {
     auto tp = testTable->getByKey(i);
     REQUIRE(get<0>(tp) == i);
-    REQUIRE(get<1>(tp) == i);
+    REQUIRE(get<1>(tp) == fmt::format("String #{0}", i+1));
     REQUIRE(get<2>(tp) == i * 10);
   }
   testTable->drop();

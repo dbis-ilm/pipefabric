@@ -29,7 +29,7 @@ namespace pfabric {
 class ElementSerializable {
 public:
 	virtual void deserializeFromStream(StreamType& res) = 0;
-	virtual void serializeToStream(StreamType& res) = 0;
+	virtual void serializeToStream(StreamType& res) const = 0;
 	virtual ~ElementSerializable() {} // to remove compiler warning
 };
 }

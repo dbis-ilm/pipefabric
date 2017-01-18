@@ -105,7 +105,7 @@ public:
 	 */
 	void print(std::ostream& os) const;
 
-	void serializeToStream(StreamType& res) override;
+	void serializeToStream(StreamType& res) const override;
 	void deserializeFromStream(StreamType& res) override;
 
 	void writeToStream(std::ostream& os);

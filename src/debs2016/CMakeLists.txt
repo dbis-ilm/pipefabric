@@ -11,7 +11,7 @@ target_link_libraries(query1
      ${Boost_LOG_LIBRARY}
      ${Boost_FILESYSTEM_LIBRARY}
      ${Boost_THREAD_LIBRARY}
-     ${LEVELDB_LIB}
+     ${ROCKSDB_LIB}
  )
 
  do_test(DEBSTest)
