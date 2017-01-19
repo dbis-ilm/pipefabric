@@ -45,10 +45,9 @@ namespace pfabric {
 template <typename Iter>
 class HashMapIterator {
 public:
-  typedef typename Iter::value_type::second_type& reference;
-  typename Iter::value_type::second_type* pointer;
+  typedef typename Iter::value_type::second_type RecordType;
 
-  typedef std::function<bool(const typename Iter::value_type::second_type&)> Predicate;
+  typedef std::function<bool(const RecordType&)> Predicate;
 
   explicit HashMapIterator() {}
   explicit HashMapIterator(Iter j, Iter e, Predicate p) : i(j), end(e), pred(p) {
@@ -65,8 +64,10 @@ public:
 
   HashMapIterator operator++(int) { auto tmp = *this; ++(*this); return tmp; }
   bool isValid() const { return i != end; }
-  typename Iter::value_type::second_type& operator*() { return i->second; }
-  typename Iter::value_type::second_type* operator->() { return &i->second; }
+  TuplePtr<RecordType> operator*() { 
+    return TuplePtr<RecordType> (new RecordType(i->second));
+  }
+  // typename Iter::value_type::second_type* operator->() { return &i->second; }
 
 protected:
   Iter i, end;
@@ -311,14 +312,16 @@ public:
    * @param key the key value
    * @return the tuple associated with the given key
    */
-  const RecordType& getByKey(KeyType key) throw (TableException) {
+  const TuplePtr<RecordType> getByKey(KeyType key) throw (TableException) {
     // make sure we have exclusive access
     std::lock_guard<std::mutex> lock(mMtx);
 
     auto res = mDataTable.find(key);
-    if (res != mDataTable.end())
-      // if we found the tuple we just return it
-      return res->second;
+    if (res != mDataTable.end()) {
+      // if we found the tuple we return a TuplePtr containing a copy of it
+      TuplePtr<RecordType> tptr (new RecordType(res->second));
+      return tptr;
+    }
     else
       // otherwise an exception is raised
       throw TableException("key not found");
