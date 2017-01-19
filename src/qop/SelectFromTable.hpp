@@ -73,7 +73,7 @@ namespace pfabric {
 
       auto iter = mPredicate == nullptr ? mTable->select() : mTable->select(mPredicate);
       for (; iter.isValid(); iter++) {
-        auto tup = StreamElementTraits<StreamElement>::create(*iter);
+        auto tup = *iter;
         this->getOutputDataChannel().publish(tup, false);
         ntuples++;
       }

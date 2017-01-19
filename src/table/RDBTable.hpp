@@ -57,6 +57,13 @@ inline T& sliceToVal(const rocksdb::Slice& slice) {
 }
 
 template <class T>
+inline T* sliceToTuplePtr(const rocksdb::Slice& slice) {
+  const uint8_t* ptr = reinterpret_cast<const uint8_t*>(slice.data());
+  StreamType buf(ptr, ptr + slice.size());
+  return new T(buf);
+}
+
+template <class T>
 inline T sliceToTuple(const rocksdb::Slice& slice) {
   const uint8_t* ptr = reinterpret_cast<const uint8_t*>(slice.data());
   StreamType buf(ptr, ptr + slice.size());
@@ -66,12 +73,13 @@ inline T sliceToTuple(const rocksdb::Slice& slice) {
 
 template <typename RecordType>
 class RDBTableIterator {
-  inline RecordType& fromSlice(rocksdb::Slice s) {
-    return pfabric::detail::sliceToVal<RecordType>(s);
-  }
+  //  inline RecordType* fromSlice(const rocksdb::Slice& s) {
+  //    return pfabric::detail::sliceToTuplePtr<RecordType>(s);
+  //  }
 
  public:
   typedef std::function<bool(const RecordType&)> Predicate;
+  typedef TuplePtr<RecordType> RecordTypePtr;
 
   explicit RDBTableIterator() {}
   explicit RDBTableIterator(rocksdb::Iterator* i, Predicate p) : pred(p) {
@@ -79,12 +87,16 @@ class RDBTableIterator {
     iter->SeekToFirst();
     // make sure the initial iterator position refers to an entry satisfying
     // the predicate
-    while (iter->Valid() && ! pred(fromSlice(iter->value()))) iter->Next();
+    while (iter->Valid() &&
+           !pred(pfabric::detail::sliceToTuple<RecordType>(iter->value())))
+      iter->Next();
   }
 
   RDBTableIterator operator++() {
     iter->Next();
-    while (iter->Valid() && ! pred(fromSlice(iter->value()))) iter->Next();
+    while (iter->Valid() &&
+           !pred(pfabric::detail::sliceToTuple<RecordType>(iter->value())))
+      iter->Next();
     return *this;
   }
 
@@ -95,8 +107,12 @@ class RDBTableIterator {
   }
 
   bool isValid() const { return iter->Valid(); }
-  RecordType& operator*() { return fromSlice(iter->value()); }
-  RecordType* operator->() { return &fromSlice(iter->value()); }
+  RecordTypePtr operator*() {
+    TuplePtr<RecordType> tptr;
+    tptr.reset(pfabric::detail::sliceToTuplePtr<RecordType>(iter->value()));
+    return tptr;
+  }
+  //  RecordType* operator->() { return &fromSlice(iter->value()); }
 
  protected:
   std::shared_ptr<rocksdb::Iterator> iter;
@@ -151,7 +167,8 @@ class RDBTable : public BaseTable {
   // details
   typedef typename TableIterator::Predicate Predicate;
 
-  RDBTable(const TableInfo& tInfo) throw (TableException) : BaseTable(tInfo), mTableName(tInfo.tableName()) {
+  RDBTable(const TableInfo& tInfo) throw(TableException)
+      : BaseTable(tInfo), mTableName(tInfo.tableName()) {
     openOrCreateTable(tInfo.tableName());
   }
 
@@ -163,9 +180,9 @@ class RDBTable : public BaseTable {
     openOrCreateTable(tableName);
   }
 
- /**
-   * Destructor for table.
-   */
+  /**
+    * Destructor for table.
+    */
   ~RDBTable() {
     if (db != nullptr) {
       delete db;
@@ -191,8 +208,10 @@ class RDBTable : public BaseTable {
     {
       StreamType buf;
       rec.serializeToStream(buf);
-      auto status = db->Put(writeOptions, pfabric::detail::valToSlice(key),
-                            rocksdb::Slice(reinterpret_cast<const char*>(buf.data()), buf.size()));
+      auto status =
+          db->Put(writeOptions, pfabric::detail::valToSlice(key),
+                  rocksdb::Slice(reinterpret_cast<const char*>(buf.data()),
+                                 buf.size()));
       if (status.ok()) numRecords++;
     }
     // after the lock is released we can inform our observers
@@ -216,7 +235,7 @@ class RDBTable : public BaseTable {
       auto status = db->Get(readOptions, keySlice, &res);
       if (status.ok()) {
         // if the key exists: notify our observers
-        notifyObservers(pfabric::detail::sliceToVal<RecordType>(
+        notifyObservers(pfabric::detail::sliceToTuple<RecordType>(
                             rocksdb::Slice(res.data(), res.size())),
                         TableParams::Delete, TableParams::Immediate);
         // and delete the tuples
@@ -243,7 +262,7 @@ class RDBTable : public BaseTable {
     // we perform a full scan here ...
     rocksdb::Iterator* it = db->NewIterator(rocksdb::ReadOptions());
     for (it->SeekToFirst(); it->Valid(); it->Next()) {
-      auto tup = pfabric::detail::sliceToVal<RecordType>(it->value());
+      auto tup = pfabric::detail::sliceToTuple<RecordType>(it->value());
       // and check the predicate
       if (func(tup)) {
         notifyObservers(tup, TableParams::Delete, TableParams::Immediate);
@@ -260,11 +279,13 @@ class RDBTable : public BaseTable {
    * @brief Update or delete the tuple specified by the given key.
    *
    * Update or delete the tuple in the table associated with the given key.
-   * The actual modification is done by the updater function specified as parameter.
+   * The actual modification is done by the updater function specified as
+   * parameter.
    *
    * @param key the key of the tuple to be modified
    * @param func a function performing the modification by returning a modified
-   *        tuple + a bool value indicating whether the tuple shall be kept (=true)
+   *        tuple + a bool value indicating whether the tuple shall be kept
+   * (=true)
    *        or deleted (=false)
    * @return the number of modified tuples
    */
@@ -273,20 +294,25 @@ class RDBTable : public BaseTable {
     std::string resultData;
     auto status = db->Get(readOptions, keySlice, &resultData);
     if (status.ok()) {
-      // if the key exists: notify our observers
-      auto rec = pfabric::detail::sliceToVal<RecordType>(
-          rocksdb::Slice(resultData.data(), resultData.size()));
       TableParams::ModificationMode mode = TableParams::Update;
       unsigned long num = 1;
 
+      // if the key exists: notify our observers
+      auto rec = pfabric::detail::sliceToTuple<RecordType>(
+          rocksdb::Slice(resultData.data(), resultData.size()));
       // perform the update
       auto res = ufunc(rec);
 
       // check whether we have to perform an update ...
-      if (!res)
-        status = db->Put(writeOptions, pfabric::detail::valToSlice(key),
-                            pfabric::detail::valToSlice(rec));
-      else {
+      if (!res) {
+
+        StreamType buf;
+        rec.serializeToStream(buf);
+        status =
+            db->Put(writeOptions, keySlice,
+                    rocksdb::Slice(reinterpret_cast<const char*>(buf.data()),
+                                   buf.size()));
+      } else {
         // or a delete
         status = db->Delete(writeOptions, keySlice);
         num = status.ok() ? 1 : 0;
@@ -303,7 +329,8 @@ class RDBTable : public BaseTable {
    * @brief Update the tuple specified by the given key.
    *
    * Update the tuple in the table associated with the given key.
-   * The actual modification is done by the updater function specified as parameter.
+   * The actual modification is done by the updater function specified as
+   * parameter.
    *
    * @param key the key of the tuple to be modified
    * @param func a function performing the modification by returning a modified
@@ -316,11 +343,15 @@ class RDBTable : public BaseTable {
     auto status = db->Get(readOptions, keySlice, &resultData);
     if (status.ok()) {
       // if the key exists: notify our observers
-      auto rec = pfabric::detail::sliceToVal<RecordType>(
+      auto rec = pfabric::detail::sliceToTuple<RecordType>(
           rocksdb::Slice(resultData.data(), resultData.size()));
       ufunc(rec);
-      status = db->Put(writeOptions, pfabric::detail::valToSlice(key),
-                            pfabric::detail::valToSlice(rec));
+      StreamType buf;
+      rec.serializeToStream(buf);
+      auto status =
+          db->Put(writeOptions, keySlice,
+                  rocksdb::Slice(reinterpret_cast<const char*>(buf.data()),
+                                 buf.size()));
       notifyObservers(rec, TableParams::Update, TableParams::Immediate);
       return 1;
     }
@@ -331,7 +362,8 @@ class RDBTable : public BaseTable {
    * @brief Update all tuples satisfying the given predicate.
     *
    * Update all tuples in the table which satisfy the given predicate.
-   * The actual modification is done by the updater function specified as parameter.
+   * The actual modification is done by the updater function specified as
+   * parameter.
    *
    * @param pfunc a predicate func returning true for a tuple to be modified
    * @param func a function performing the modification by returning a modified
@@ -343,12 +375,16 @@ class RDBTable : public BaseTable {
     // we perform a full table scan
     rocksdb::Iterator* it = db->NewIterator(rocksdb::ReadOptions());
     for (it->SeekToFirst(); it->Valid(); it->Next()) {
-      auto tup = pfabric::detail::sliceToVal<RecordType>(it->value());
+      auto tup = pfabric::detail::sliceToTuple<RecordType>(it->value());
       // and check the predicate
       if (pfunc(tup)) {
         ufunc(tup);
-        auto status = db->Put(writeOptions, it->key(),
-                            pfabric::detail::valToSlice(tup));
+        StreamType buf;
+        tup.serializeToStream(buf);
+        auto status =
+            db->Put(writeOptions, it->key(),
+                    rocksdb::Slice(reinterpret_cast<const char*>(buf.data()),
+                                   buf.size()));
         notifyObservers(tup, TableParams::Update, TableParams::Immediate);
       }
     }
@@ -365,15 +401,17 @@ class RDBTable : public BaseTable {
    * @param key the key value
    * @return the tuple associated with the given key
    */
-  const RecordType& getByKey(KeyType key) throw(TableException) {
+  TuplePtr<RecordType> getByKey(KeyType key) throw(TableException) {
     std::string resultData;
     auto status =
         db->Get(readOptions, pfabric::detail::valToSlice(key), &resultData);
-    if (status.ok())
+    if (status.ok()) {
       // if we found the tuple we just return it
-      return pfabric::detail::sliceToTuple<RecordType>(
-          rocksdb::Slice(resultData.data(), resultData.size()));
-    else
+      TuplePtr<RecordType> tptr;
+      tptr.reset(pfabric::detail::sliceToTuplePtr<RecordType>(
+          rocksdb::Slice(resultData.data(), resultData.size())));
+      return tptr;
+    } else
       // otherwise an exception is raised
       throw TableException("key not found");
   }
@@ -458,7 +496,7 @@ class RDBTable : public BaseTable {
   rocksdb::DB* _db() { return db; }
 
  private:
-  void openOrCreateTable(const std::string& tableName) throw (TableException) {
+  void openOrCreateTable(const std::string& tableName) throw(TableException) {
     std::string fileName = tableName + ".db";
     rocksdb::Options options;
     options.create_if_missing = true;
@@ -470,7 +508,6 @@ class RDBTable : public BaseTable {
     updateRecordCounter();
   }
 
- 
   /**
    * @brief Perform the actual notification
    *
@@ -510,4 +547,3 @@ class RDBTable : public BaseTable {
 }
 
 #endif
-

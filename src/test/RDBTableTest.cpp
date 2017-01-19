@@ -27,14 +27,6 @@ TEST_CASE("Creating a table with a given schema and inserting data",
     testTable->insert(i, tp);
   }
 
-  auto iter =testTable->_db()->NewIterator(rocksdb::ReadOptions());
-  std::cout << "los gehts..." << std::endl;
-  for (iter->SeekToFirst(); iter->Valid(); iter->Next()) {
-    auto tup = pfabric::detail::sliceToVal<MyTuple>(iter->value());
-
-    std::cout << "--> tp = " << tup << std::endl;
-}
-
   REQUIRE(testTable->size() == 10000);
   for (unsigned long i = 0; i < 10000; i++) {
     auto tp = testTable->getByKey(i);
