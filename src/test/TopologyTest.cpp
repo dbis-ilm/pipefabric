@@ -217,3 +217,32 @@ TEST_CASE("Building and running a topology with batcher", "[Topology]") {
     REQUIRE(results[i] == i);
   }
 }
+
+TEST_CASE("Building and running a topology with stream generator", "[StreamGenerator]") {
+    typedef TuplePtr<Tuple<int,int,int>> MyTuplePtr;
+
+    auto testTable = std::make_shared<Table<MyTuplePtr::element_type, int>>("StreamGenTable");
+
+    StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {
+        return makeTuplePtr((int)n, (int)n + 10, (int)n + 100); });
+    unsigned long num = 1000;
+
+    Topology t;
+    auto s = t.streamFromGenerator<MyTuplePtr>(streamGen, num)
+			//No .extract needed?
+            .keyBy<MyTuplePtr, int>([](auto tp) { return get<0>(tp); })
+            .toTable<MyTuplePtr, int>(testTable);
+
+    t.start(false);
+
+    REQUIRE(testTable->size() == num);
+
+    for (unsigned int i = 0; i < num; i++) {
+      auto tp = testTable->getByKey(i);
+      REQUIRE(get<0>(tp) == i);
+      REQUIRE(get<1>(tp) == i+10);
+      REQUIRE(get<2>(tp) == i+100);
+    }
+
+    testTable->drop();
+}
