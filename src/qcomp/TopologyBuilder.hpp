@@ -14,6 +14,9 @@ public:
   }
 };
 
+typedef boost::shared_ptr<TopologyBuilder> TopologyBuilderPtr;
+
+ 
 }
 
 #define BUILDER_CLASS(ClassName) \

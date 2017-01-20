@@ -4,6 +4,7 @@
 #
 add_library(pfabric_qcomp SHARED
   Plan.cpp
+  PlanCache.cpp
   QueryCompiler.cpp
   TypeManager.cpp
   UniqueNameGenerator.cpp

@@ -183,18 +183,30 @@ void QueryCompiler::constructMapSchema(
 TopologyBuilderPtr QueryCompiler::execQuery(
     PFabricContext& ctx,
     const std::string& queryString) throw(QueryCompileException) {
-  auto queryName = compileQuery(ctx, queryString);
-
-  auto queryObj = queryName + "_obj_";
   TopologyBuilderPtr topology;
-  std::cout << "loadling library: " << queryName << std::endl;
-  boost::filesystem::path lib_path(".");
-  topology = dll::import<TopologyBuilder>(lib_path / queryName, queryObj,
-                                          dll::load_mode::append_decorations);
-  std::cout << "creating topology..." << std::endl;
-  auto t = topology->create(ctx);
-  std::cout << "starting query..." << std::endl;
-  t->start(false);
+
+  try {
+    const CacheEntry& entry = mCache.findPlanForQuery(queryString);
+    topology = entry.builder;
+    entry.topology->start(false);
+
+  } catch (std::out_of_range) {
+    auto queryName = compileQuery(ctx, queryString);
+
+    auto queryObj = queryName + "_obj_";
+    std::cout << "loadling library: " << queryName << std::endl;
+    boost::filesystem::path lib_path(".");
+    topology = dll::import<TopologyBuilder>(lib_path / queryName, queryObj,
+                                           dll::load_mode::append_decorations);
+    std::cout << "creating topology..." << std::endl;
+    auto t = topology->create(ctx);
+    std::cout << "starting query..." << std::endl;
+
+    CacheEntry entry(topology, t, queryName);
+    mCache.addToCache(queryString, entry);
+
+    t->start(false);
+  }
   return topology;
 }
 
@@ -263,7 +275,7 @@ void QueryCompiler::generateQuery(std::ostream& os, PFabricContext& ctx,
     auto tblInfo = ctx.getTableInfo(tbl);
 
     os << "\tauto " << tbl << " = ctx.getTable<"
-       << mTypeMgr.nameOfType(*tblInfo) << ", " << tblInfo->typeOfKey()
+       << mTypeMgr.nameOfType(*tblInfo) << "::element_type, " << tblInfo->typeOfKey()
        << ">(\"" << tbl << "\");\n";
   }
 

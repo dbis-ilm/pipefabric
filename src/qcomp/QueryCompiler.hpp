@@ -11,14 +11,13 @@
 #include "QueryCompileException.hpp"
 #include "TypeManager.hpp"
 #include "TopologyBuilder.hpp"
+#include "PlanCache.hpp"
 
 namespace po = boost::program_options;
 
 namespace pfabric {
 
-  typedef boost::shared_ptr<TopologyBuilder> TopologyBuilderPtr;
-
-  class QueryCompiler {
+ class QueryCompiler {
     typedef std::function<void(PlanOpPtr)> TraverseFunc;
 
   public:
@@ -52,6 +51,7 @@ namespace pfabric {
     std::string cc, cflags, ldflags, libs;
     std::set<std::string> mTableSet;
     TypeManager mTypeMgr;
+    PlanCache mCache;
   };
 }
 
