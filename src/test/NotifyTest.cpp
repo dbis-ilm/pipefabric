@@ -45,8 +45,10 @@ TEST_CASE("Invoking callbacks on a tuple stream", "[Notify]") {
 
 	mockup->start();
 
+	auto lambda = [] (auto a, auto b) { return a->data() == b->data(); };
+
 	REQUIRE(std::equal(callbackTuples.begin(),
 										callbackTuples.begin() + 3,
 										expected.begin(),
-										[] (auto a, auto b) { return a->data() == b->data(); }));
+										lambda));
 }
