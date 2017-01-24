@@ -27,7 +27,7 @@
 #include "core/PFabricTypes.hpp"
 #include "table/Table.hpp"
 #include "qop/Queue.hpp"
-#include "topology/Topology.hpp"
+#include "dsl/Topology.hpp"
 
 namespace pfabric {
 

@@ -189,9 +189,9 @@ add_library(pfabric_core SHARED
   qop/RESTSource.cpp
   qop/Window.cpp
   qop/TriggerNotifier.cpp
-  topology/Topology.cpp
-  topology/Dataflow.cpp
-  topology/PFabricContext.cpp
+  dsl/Topology.cpp
+  dsl/Dataflow.cpp
+  dsl/PFabricContext.cpp
   table/TableInfo.cpp
   ${ZEROMQ_SOURCES}
   # we need this as dependency to download the sources from github
@@ -224,6 +224,18 @@ target_link_libraries(pfabric_cep
 
 #-----------------------------------------------------------------------------------------
 #
+# Experimental SQL query compiler
+#
+add_subdirectory(qcomp)
+
+#-----------------------------------------------------------------------------------------
+#
+# Demo project
+#
+add_subdirectory(demo)
+
+#-----------------------------------------------------------------------------------------
+#
 # Unit tests using Catch
 #
 add_library(Catch INTERFACE)
@@ -250,10 +262,6 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/"
    PATTERN "*.hpp"
    PATTERN "*.h"
 )
-
-add_subdirectory(demo)
-add_subdirectory(debs2016)
-add_subdirectory(qcomp)
 
 # show used compiler
 message("Using Compiler: ${CMAKE_CXX_COMPILER_ID}.")

@@ -54,8 +54,8 @@
 #include "qop/Batcher.hpp"
 #include "cep/Matcher.hpp"
 #include "qop/ZMQSink.hpp"
-#include "topology/Dataflow.hpp"
-#include "topology/TopologyException.hpp"
+#include "dsl/Dataflow.hpp"
+#include "dsl/TopologyException.hpp"
 
 namespace pfabric {
 

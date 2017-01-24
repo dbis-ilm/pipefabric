@@ -40,8 +40,8 @@
 #include "qop/SelectFromTable.hpp"
 #include "qop/StreamGenerator.hpp"
 
-#include "topology/Pipe.hpp"
-#include "topology/Dataflow.hpp"
+#include "dsl/Pipe.hpp"
+#include "dsl/Dataflow.hpp"
 
 namespace pfabric {
 

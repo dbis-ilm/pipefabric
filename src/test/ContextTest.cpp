@@ -11,7 +11,7 @@
 #include "TestDataGenerator.hpp"
 #include "core/Tuple.hpp"
 #include "table/Table.hpp"
-#include "topology/PFabricContext.hpp"
+#include "dsl/PFabricContext.hpp"
 
 using namespace pfabric;
 

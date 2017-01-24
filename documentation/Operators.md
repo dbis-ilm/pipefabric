@@ -35,6 +35,10 @@ This is an operator for receiving tuples via REST. Each call of the REST service
 
 `Pipe Topology::fromStream<T>(stream)`
 
+#### fromGenerator ####
+
+`Pipe Topology::fromGenerator<T>()`
+
 ### Operators applicable to a stream ###
 
 #### where ####

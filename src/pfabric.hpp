@@ -25,8 +25,8 @@
 #include "core/PFabricTypes.hpp"
 #include "core/Tuple.hpp"
 #include "core/StreamElementTraits.hpp"
-#include "topology/PFabricContext.hpp"
-#include "topology/Topology.hpp"
-#include "topology/Pipe.hpp"
+#include "dsl/PFabricContext.hpp"
+#include "dsl/Topology.hpp"
+#include "dsl/Pipe.hpp"
 
 #endif

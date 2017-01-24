@@ -17,8 +17,8 @@
 #include "cep/NFAController.hpp"
 #include "cep/dsl/CEPState.hpp"
 
-#include "topology/Topology.hpp"
-#include "topology/Pipe.hpp"
+#include "dsl/Topology.hpp"
+#include "dsl/Pipe.hpp"
 
 #include "StreamMockup.hpp"
 

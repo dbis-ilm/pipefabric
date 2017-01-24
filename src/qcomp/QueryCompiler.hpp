@@ -6,7 +6,7 @@
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 
-#include "topology/PFabricContext.hpp"
+#include "dsl/PFabricContext.hpp"
 #include "Plan.hpp"
 #include "QueryCompileException.hpp"
 #include "TypeManager.hpp"

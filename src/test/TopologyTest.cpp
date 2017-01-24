@@ -17,8 +17,8 @@
 
 #include "table/Table.hpp"
 
-#include "topology/Topology.hpp"
-#include "topology/Pipe.hpp"
+#include "dsl/Topology.hpp"
+#include "dsl/Pipe.hpp"
 
 using namespace pfabric;
 using namespace ns_types;
