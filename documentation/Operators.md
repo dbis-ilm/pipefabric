@@ -10,7 +10,8 @@ PipeFabric provides two classes of operators
 
 `Pipe Topology::newStreamFromFile(const std::string& fname)`
 
-This operator reads the file with the given name `fname` and produces a stream of tuples where each line corresponds to one tuple containing only of a single string attribute (`TStringPtr`).
+This operator reads the file with the given name `fname` and produces a stream of tuples where each line corresponds to one tuple 
+containing only of a single string attribute (`TStringPtr`).
 
 ```
 Topology t;
@@ -21,7 +22,8 @@ auto s = t.newStreamFromFile("data.csv")
 
 `Pipe Topology::newStreamFromREST(p, m, num)`
 
-This is an operator for receiving tuples via REST. Each call of the REST service produces a single tuple (consisting of a single string). The parameters define the URI of the service (`p`), the method (e.g. GET or POST) (`m`) as well as the number of threads started to handle the requests.
+This is an operator for receiving tuples via REST. Each call of the REST service produces a single tuple (consisting of a single string). 
+The parameters define the URI of the service (`p`), the method (e.g. GET or POST) (`m`) as well as the number of threads started to handle the requests.
 
 #### newStreamFromZMQ ####
 
@@ -77,9 +79,31 @@ auto s = t.newStreamFromFile("data.csv")
 
 #### statefulMap ####
 
-`Pipe Pipe::statefulMap<Tin,Tout,State>(f)`
+`Pipe Pipe::statefulMap<Tin,Tout,State>(std::function<Tout(const Tin&, bool, std::shared_ptr<State>)> func)`
 
-This operator implements a stateful projection where each tuple of type `Tin` is converted into a tuple of type `Tout` using the function `f` and taking the state into account which can be updated during processing.
+This operator implements a stateful projection where each tuple of type `Tin` is converted into a tuple of type `Tout` using the 
+function `func` and taking the state into account which can be updated during processing. The `state` type can be any class that maintains
+a state and is accepted as argument to the map function `func`.
+
+```
+typedef TuplePtr<Tuple<int,int,int>> Tin;
+typedef TuplePtr<Tuple<int, int>> Tout;
+
+struct MyState {
+        MyState() : cnt(0), sum(0) {}
+        int cnt, sum;
+};
+
+Topology t;
+auto s = t.newStreamFromFile("data.csv")
+          .extract<Tin>(',')
+          .statefulMap<Tin, Tout, MyState>([](auto tp, bool, std::shared_ptr<MyState> state) { 
+              state->cnt++;
+              state->sum += get<2>(tp);
+              return makeTuplePtr(state->cnt, state->sum); 
+          } )
+```
+
 
 #### print ####
 
@@ -100,9 +124,17 @@ auto s = t.newStreamFromFile("data.csv")
 
 #### extract #####
 
-`extract<T>(c)`
+`Pipe Pipe::extract<T>(char sep)`
 
-This operator processes a stream of strings, splits each tuple using the given separator character and constructs tuples of type `T`.
+This operator processes a stream of strings, splits each tuple using the given separator character and constructs `sep` tuples of type `T`.
+
+```
+typedef TuplePtr<Tuple<int,int,int>> Tin;
+
+Topology t;
+auto s = t.newStreamFromFile("data.csv")
+          .extract<Tin>(',');
+```
 
 #### extractJson ####
 
@@ -119,7 +151,8 @@ This operator processes a stream of JSON strings and constructs tuples of type `
 `keyBy<T,Num,K>()`
 `keyBy<T,K>(f)`
 
-assigns the function `f` for deriving (or calculating) a key of type `K` of the input tuples which are of type `T`. Note, that the `K` parameter has the default value of `unsigned long`.
+assigns the function `f` for deriving (or calculating) a key of type `K` of the input tuples which are of type `T`. Note, 
+that the `K` parameter has the default value of `unsigned long`.
 
 #### assignTimestamps ####
 
@@ -131,7 +164,9 @@ assigns the function `f` for deriving (or calculating) a timestamp for each inpu
 #### slidingWindow ####
 
 `slidingWindow<T>(w, sz, sd)`
-defines a sliding window of the given type and size on the stream. The window type `w` can be row or range for which `sz` specifies the size. In case of a range (time-based) window the `assignTimestamp` operator has to defined before.
+
+defines a sliding window of the given type and size on the stream. The window type `w` can be row or range for which `sz` specifies the size. 
+In case of a range (time-based) window the `assignTimestamp` operator has to defined before.
 
 #### tumblingWindow ####
 
@@ -141,13 +176,16 @@ defines a sliding window of the given type and size on the stream. The window ty
 
 `Pipe Pipe::queue<T>()`
 
-This operator decouple two operators in the dataflow. The upstream part inserts tuples of type `T` into the queue which is processed by a separate thread to retrieve tuples from the queue and sent them downstream. In this way, the upstream part is not blocked anymore.
+This operator decouple two operators in the dataflow. The upstream part inserts tuples of type `T` into the queue which is processed by a 
+separate thread to retrieve tuples from the queue and sent them downstream. In this way, the upstream part is not blocked anymore.
 
 #### aggregate ####
 
 `aggregate<Tin, Tout, State>(m, interval)`
 
-calculates a set of aggregates over the stream of type `Tin`, possibly supported by a window. The aggregates a represented by tuples of type `Tout`. `aggregate` needs a helper class of type parameter `State`. The parameters are the mode `m` for triggering the  aggregate calculation, and an optional interval time for producing aggregate values (`interval`).
+calculates a set of aggregates over the stream of type `Tin`, possibly supported by a window. The aggregates a represented by tuples 
+of type `Tout`. `aggregate` needs a helper class of type parameter `State`. The parameters are the mode `m` for triggering the 
+aggregate calculation, and an optional interval time for producing aggregate values (`interval`).
 
 
 #### groubBy #####
@@ -181,7 +219,9 @@ calculates a set of aggregates over the stream of type `Tin`, possibly supported
 
 `Pipe Pipe::toTable<T,K>(TablePtr tbl, bool autoCommit)`
 
-This operator stores tuples from the input stream of type `T` with key type `K` into the table `tbl` and forwards them to its subscribers. `TablePtr` is of type `std::shared_ptr<Table<T, K> >`. Outdated tuples are handled as deletes, non-outdated tuples either as insert (if the key does not exist yet) or update (otherwise). The parameter `autoCommit` determines the autocommit mode.
+This operator stores tuples from the input stream of type `T` with key type `K` into the table `tbl` and forwards them to its 
+subscribers. `TablePtr` is of type `std::shared_ptr<Table<T, K> >`. Outdated tuples are handled as deletes, non-outdated tuples 
+either as insert (if the key does not exist yet) or update (otherwise). The parameter `autoCommit` determines the autocommit mode.
 
 #### updateTable ####
 
