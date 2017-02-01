@@ -14,8 +14,8 @@ download_project(PROJ               Catch
 )
 
 add_custom_command(
-  OUTPUT ${THIRD_PARTY_DIR}/catch
-        COMMAND ${CMAKE_COMMAND} -E copy
+  		OUTPUT ${THIRD_PARTY_DIR}/catch
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 ${Catch_SOURCE_DIR}/single_include/catch.hpp
                 ${PROJECT_SOURCE_DIR}/test)
 
@@ -89,7 +89,7 @@ download_project(PROJ               rocksdb
 )
 add_custom_command(
         OUTPUT ${THIRD_PARTY_DIR}/rocksdb
-        COMMAND ${CMAKE_COMMAND} -E chdir ${rocksdb_SOURCE_DIR} make static_lib
+        COMMAND ${CMAKE_COMMAND} -E chdir ${rocksdb_SOURCE_DIR} $(MAKE) static_lib
         COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/rocksdb/include
         COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/rocksdb/lib
         COMMAND ${CMAKE_COMMAND} -E copy_directory
