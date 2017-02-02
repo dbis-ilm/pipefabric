@@ -22,9 +22,9 @@ PFabricContext::TopologyPtr createStreamQuery(PFabricContext& ctx) {
 
   auto s = topology->newStreamFromREST(8099, "^/publish$", RESTSource::POST_METHOD)
     .extractJson<InTuplePtr>({"key", "data"})
-    .keyBy<InTuplePtr, 0, int>()
+    .keyBy<0, int>()
     // .print<InTuplePtr>();
-    .toTable<InTuplePtr, int>(myTable);
+    .toTable<int>(myTable);
 
   return topology;
 }

@@ -36,12 +36,12 @@ TEST_CASE("Building and running a simple topology", "[Topology]") {
   Topology t;
   auto s1 = t.newStreamFromFile("file.csv")
     .extract<T1>(',')
-    .where<T1>([](auto tp, bool outdated) { return getAttribute<0>(tp) % 2 == 0; } )
-    .map<T1,T2>([](auto tp, bool outdated) -> T2 {
+    .where([](auto tp, bool outdated) { return getAttribute<0>(tp) % 2 == 0; } )
+    .map<T2>([](auto tp, bool outdated) -> T2 {
       return makeTuplePtr(getAttribute<2>(tp), getAttribute<0>(tp));
     })
-    .assignTimestamps<T2>([](auto tp) { return getAttribute<1>(tp); })
-    .print<T2>(strm);
+    .assignTimestamps([](auto tp) { return getAttribute<1>(tp); })
+    .print(strm);
 
   t.start();
   t.wait();
@@ -68,13 +68,13 @@ TEST_CASE("Building and running a topology with joins", "[Topology]") {
   Topology t;
   auto s1 = t.newStreamFromFile("file2.csv")
     .extract<T1>(',')
-    .keyBy<T1, int>([](auto tp) { return getAttribute<0>(tp); });
+    .keyBy<int>([](auto tp) { return getAttribute<0>(tp); });
 
   auto s2 = t.newStreamFromFile("file1.csv")
     .extract<T1>(',')
-    .keyBy<T1, int>([](auto tp) { return getAttribute<0>(tp); })
-    .join<T1, T1, int>(s1, [](auto tp1, auto tp2) { return true; })
-    .print<T2>(strm);
+    .keyBy<int>([](auto tp) { return getAttribute<0>(tp); })
+    .join<T1, int>(s1, [](auto tp1, auto tp2) { return true; })
+    .print(strm);
 
   t.start(false);
 
@@ -91,9 +91,9 @@ TEST_CASE("Building and running a topology with ZMQ", "[Topology]") {
   std::stringstream strm;
 
   Topology t;
-  auto s = t.newStreamFromZMQ("tcp://localhost:5678")
+  auto s = t.newAsciiStreamFromZMQ("tcp://localhost:5678")
     .extract<T1>(',')
-    .print<T1>(strm);
+    .print(strm);
 
   t.start(false);
 
@@ -131,8 +131,8 @@ TEST_CASE("Building and running a topology with ToTable", "[Topology]") {
   Topology t;
   auto s = t.newStreamFromFile("file.csv")
     .extract<T1>(',')
-    .keyBy<T1, int>([](auto tp) { return getAttribute<0>(tp); })
-    .toTable<T1, int>(testTable);
+    .keyBy<int>([](auto tp) { return getAttribute<0>(tp); })
+    .toTable<int>(testTable);
 
   t.start(false);
 
@@ -160,11 +160,11 @@ TEST_CASE("Building and running a topology with partitioning", "[Topology]") {
   Topology t;
   auto s = t.newStreamFromFile("file.csv")
     .extract<T1>(',')
-    .partitionBy<T1>([](auto tp) { return get<0>(tp) % 5; }, 5)
-    .where<T1>([](auto tp, bool outdated) { return get<0>(tp) % 2 == 0; } )
-    .map<T1,T2>([](auto tp, bool outdated) -> T2 { return makeTuplePtr(get<0>(tp)); } )
-    .merge<T2>()
-    .notify<T2>([&](auto tp, bool outdated) {
+    .partitionBy([](auto tp) { return get<0>(tp) % 5; }, 5)
+    .where([](auto tp, bool outdated) { return get<0>(tp) % 2 == 0; } )
+    .map<T2>([](auto tp, bool outdated) -> T2 { return makeTuplePtr(get<0>(tp)); } )
+    .merge()
+    .notify([&](auto tp, bool outdated) {
       std::lock_guard<std::mutex> lock(r_mutex);
       int v = get<0>(tp);
       results.push_back(v);
@@ -197,9 +197,9 @@ TEST_CASE("Building and running a topology with batcher", "[Topology]") {
   Topology t;
   auto s = t.newStreamFromFile("file.csv")
     .extract<T1>(',')
-    .map<T1,T2>([](auto tp, bool outdated) -> T2 { return makeTuplePtr(get<0>(tp)); } )
-    .batch<T2>(100)
-    .notify<B2>([&](auto tp, bool outdated) {
+    .map<T2>([](auto tp, bool outdated) -> T2 { return makeTuplePtr(get<0>(tp)); } )
+    .batch(100)
+    .notify([&](auto tp, bool outdated) {
       std::lock_guard<std::mutex> lock(r_mutex);
       auto vec = get<0>(tp);
       REQUIRE(vec.size() == 100);
@@ -229,9 +229,8 @@ TEST_CASE("Building and running a topology with stream generator", "[StreamGener
 
     Topology t;
     auto s = t.streamFromGenerator<MyTuplePtr>(streamGen, num)
-			//No .extract needed?
-            .keyBy<MyTuplePtr, int>([](auto tp) { return get<0>(tp); })
-            .toTable<MyTuplePtr, int>(testTable);
+            .keyBy<int>([](auto tp) { return get<0>(tp); })
+            .toTable<int>(testTable);
 
     t.start(false);
 

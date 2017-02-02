@@ -32,8 +32,8 @@ TEST_CASE("Building and running a topology via the context", "[Context]") {
 
     auto s = t->newStreamFromFile("file.csv")
                  .extract<T1>(',')
-                 .keyBy<T1, int>([](auto tp) { return getAttribute<0>(tp); })
-                 .toTable<T1, int>(testTable);
+                 .keyBy<int>([](auto tp) { return getAttribute<0>(tp); })
+                 .toTable<int>(testTable);
 
     t->start(false);
   }
@@ -68,8 +68,8 @@ TEST_CASE("Building and running a topology with SelectFromTable",
 
     auto s = t->newStreamFromFile("file.csv")
                  .extract<T1>(',')
-                 .keyBy<T1, int>([](auto tp) { return getAttribute<0>(tp); })
-                 .toTable<T1, int>(testTable);
+                 .keyBy<int>([](auto tp) { return getAttribute<0>(tp); })
+                 .toTable<int>(testTable);
 
     t->start(false);
     REQUIRE(testTable->size() == 100);
@@ -79,7 +79,7 @@ TEST_CASE("Building and running a topology with SelectFromTable",
     unsigned int num = 0;
     auto t = ctx.createTopology();
 
-    auto s = t->selectFromTable<T1>(testTable).notify<T1>(
+    auto s = t->selectFromTable<T1>(testTable).notify(
         [&](auto tp, bool outdated) { num++; });
 
     t->start(false);

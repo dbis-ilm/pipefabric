@@ -158,8 +158,8 @@ TEST_CASE("Verifying the correct behavior of the CEP operator using Topology", "
 	Topology t;
 	auto s = t.newStreamFromFile(inputFile)
 	    		.extract<InTuplePtr>(',')
-				.matchByNFA<InTuplePtr, OutTuplePtr, RelatedTuplePtr>(nfa)
-				.print<OutTuplePtr>(strm);
+				.matchByNFA<OutTuplePtr, RelatedTuplePtr>(nfa)
+				.print(strm);
 
 	t.start(false);
 	REQUIRE(strm.str() == expected);
@@ -181,8 +181,8 @@ TEST_CASE("Verifying the correct behavior of the CEP operator using Topology & D
 	Topology t;
 	auto s = t.newStreamFromFile(inputFile)
 	    		.extract<InTuplePtr>(',')
-				  .matcher<InTuplePtr, OutTuplePtr, RelatedTuplePtr>(a >> b >> c >> d)
-				  .print<OutTuplePtr>(strm);
+				  .matcher<OutTuplePtr, RelatedTuplePtr>(a >> b >> c >> d)
+				  .print(strm);
 
 	t.start(false);
 	REQUIRE(strm.str() == expected);

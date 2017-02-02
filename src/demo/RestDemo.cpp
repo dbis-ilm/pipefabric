@@ -23,9 +23,9 @@ int main(int argc, char **argv) {
 
   auto s = t->newStreamFromREST(8099, "^/publish$", RESTSource::POST_METHOD)
     .extractJson<InTuplePtr>({"key", "data"})
-    .slidingWindow<InTuplePtr>(WindowParams::RowWindow, 10)
-    .aggregate<InTuplePtr, ResultTuplePtr, MyAggrState>()
-    .notify<ResultTuplePtr>([&](auto tp, bool outdated) { std::cout << tp << std::endl; });
+    .slidingWindow(WindowParams::RowWindow, 10)
+    .aggregate<ResultTuplePtr, MyAggrState>()
+    .notify([&](auto tp, bool outdated) { std::cout << tp << std::endl; });
 //    .print<ResultTuplePtr>(std::cout);
 
   t->start();
