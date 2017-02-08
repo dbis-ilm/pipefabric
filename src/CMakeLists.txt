@@ -15,6 +15,15 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/../cmake
 # the project.
 include(Download3rdParty)
 
+# Provide compile commands file to source directory (for YCM)
+SET( CMAKE_EXPORT_COMPILE_COMMANDS ON )
+IF( EXISTS "${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json" )
+  EXECUTE_PROCESS( COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
+    ${CMAKE_CURRENT_SOURCE_DIR}/compile_commands.json
+  )
+ENDIF()
+
 #############################
 # customization section
 #############################
@@ -25,14 +34,20 @@ set(PIPEFABRIC_DIR "/usr/local/pfabric")
 
 # Use the boost::spirit parser for converting strings to numbers
 option(USE_BOOST_SPIRIT_PARSER
-    "use the boost::spirit::qi parsers for converting strings to tuple attributes"
-    ON
+	"use the boost::spirit::qi parsers for converting strings to tuple attributes"
+	ON
 )
 
 # Use RocksDB key-value store for implementing tables
 option(USE_ROCKSDB_TABLE
-  "use RocksDB for implementing persistent tables"
-  ON
+	"use RocksDB for implementing persistent tables"
+	OFF
+)
+
+# Use Non-Volatile Memory Library for implementing tables
+option(USE_NVML_TABLE
+	"use nvml for implementing persistent memory tables"
+	ON
 )
 
 # Force using intel compiler
@@ -103,6 +118,29 @@ else()
   message(STATUS "don't use RocksDB key-value store")
   set (ROCKSDB_LIB "")
 endif()
+
+########################
+# Non-Volatile Memory Library
+########################
+#
+if (USE_NVML_TABLE)
+	message(STATUS "using NVML based persistent table")
+	add_definitions(-DUSE_NVML_TABLE)
+	set (NVML_LIBRARIES
+				"${THIRD_PARTY_DIR}/nvml/lib/libpmemblk.a"
+				"${THIRD_PARTY_DIR}/nvml/lib/libpmemlog.a"
+				"${THIRD_PARTY_DIR}/nvml/lib/libpmemobj.a"
+				"${THIRD_PARTY_DIR}/nvml/lib/libpmempool.a"
+				"${THIRD_PARTY_DIR}/nvml/lib/libpmem.a"
+#				"${THIRD_PARTY_DIR}/nvml/lib/libvmem.a"
+#				"${THIRD_PARTY_DIR}/nvml/lib/libvmmalloc.a"
+	)
+  include_directories("${THIRD_PARTY_DIR}/nvml/include")
+else()
+	message(STATUS "don't use NVML based persistent table")
+	set (NVML_LIBRARIES "")
+endif()
+
 
 ######################
 # Boost C++ library
@@ -199,6 +237,7 @@ add_library(pfabric_core SHARED
   ${THIRD_PARTY_DIR}/fmt
   ${THIRD_PARTY_DIR}/SimpleWeb
   ${THIRD_PARTY_DIR}/rocksdb
+  ${THIRD_PARTY_DIR}/nvml
   ${THIRD_PARTY_DIR}/catch
 )
 

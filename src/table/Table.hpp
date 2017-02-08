@@ -49,6 +49,15 @@ template <typename RecordType, typename KeyType = DefaultKeyType>
 using Table = pfabric::RDBTable<RecordType, KeyType>;
 }
 
+#elif defined(USE_NVML_TABLE)
+
+#include "NVMTable.hpp"
+
+namespace pfabric {
+template <typename RecordType, typename KeyType = DefaultKeyType>
+using Table = pfabric::NVMTable<RecordType, KeyType>;
+}
+
 #else
 
 #include "HashMapTable.hpp"

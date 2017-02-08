@@ -10,6 +10,7 @@ macro( build_executable arg )
       pfabric_core
       ${Boost_SYSTEM_LIBRARY}
       ${ROCKSDB_LIB}
+      ${NVML_LIBRARIES}
       ${MALLOC_LIB}
     )
 endmacro( build_executable )

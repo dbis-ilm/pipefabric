@@ -99,3 +99,21 @@ add_custom_command(
                 ${rocksdb_SOURCE_DIR}/librocksdb.a
                 ${THIRD_PARTY_DIR}/rocksdb/lib
 )
+
+#--------------------------------------------------------------------------------
+# Non-Volatile Memory Library (pmem.io)
+download_project(PROJ               nvml
+                GIT_REPOSITORY      https://github.com/pmem/nvml.git
+                GIT_TAG             master
+                UPDATE_DISCONNECTED 1
+                QUIET
+)
+add_custom_command(
+        OUTPUT ${THIRD_PARTY_DIR}/nvml
+        COMMAND ${CMAKE_COMMAND} -E chdir ${nvml_SOURCE_DIR} $(MAKE)
+				COMMAND ${CMAKE_COMMAND} -E chdir ${nvml_SOURCE_DIR} $(MAKE) install prefix=${THIRD_PARTY_DIR}/nvml
+				#COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/nvml/include
+				#COMMAND ${CMAKE_COMMAND} -E copy_directory
+				#				 ${nvml_SOURCE_DIR}/src/include
+				#        ${THIRD_PARTY_DIR}/nvml/include
+)
