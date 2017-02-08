@@ -925,7 +925,8 @@ namespace pfabric {
      *      condition of the hash join
      * @return a new pipe
      */
-    template <typename T2, typename KeyType = DefaultKeyType>
+ //   template <typename T2, typename KeyType = DefaultKeyType>
+    template <typename KeyType = DefaultKeyType, typename T2>
     Pipe<typename SHJoin<T, T2, KeyType>::ResultElement> join(Pipe<T2>& otherPipe,
                typename SHJoin<T, T2, KeyType>::JoinPredicateFunc pred) throw (TopologyException) {
       assert(partitioningState == NoPartitioning);
