@@ -368,7 +368,7 @@ private:
 		for (const auto groupEntry : mAggregateTable) {
 			const AggregateStatePtr& aggrState = groupEntry.second;
 
-      produceAggregate(aggrState, timestamp, outdated, lock);
+      //produceAggregate(aggrState, timestamp, outdated, lock);
 		}
 	}
 

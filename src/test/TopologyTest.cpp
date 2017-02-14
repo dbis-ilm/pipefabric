@@ -246,3 +246,26 @@ TEST_CASE("Building and running a topology with stream generator", "[StreamGener
 
     testTable->drop();
 }
+
+TEST_CASE("Building and running a topology with grouping", "[GroupBy]") {
+    typedef TuplePtr<Tuple<int, double> > T1;
+    typedef TuplePtr<Tuple<double> > T2;
+    typedef Aggregator1<T1, AggrSum<double>, 1> AggrStateSum;
+
+    StreamGenerator<T1>::Generator streamGen ([](unsigned long n) -> T1 {
+		if (n<5) return makeTuplePtr(0, (double)n + 0.5);
+	    else return makeTuplePtr((int)n, (double)n + 0.5); });
+    unsigned long num = 10;
+
+	std::stringstream strm;
+	std::string expected = "0.5\n2\n4.5\n8\n12.5\n5.5\n6.5\n7.5\n8.5\n9.5\n";
+
+    Topology t;
+    auto s = t.streamFromGenerator<T1>(streamGen, num)
+        .keyBy<int>([](auto tp) { return get<0>(tp); })
+        .groupBy<T2, AggrStateSum, int>()
+	.print(strm);
+	t.start(false);
+
+	REQUIRE(strm.str() == expected);
+}
