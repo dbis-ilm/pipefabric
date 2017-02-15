@@ -87,6 +87,7 @@ protected:
 	 */
 	typedef typename std::remove_reference< OutputStreamElement >::type FinalAggregationResult;
 
+public:
 	/**
 	 * @brief The aggregation function which produces the final (or periodic) aggregation result.
 	 *
@@ -101,7 +102,7 @@ protected:
 	 */
 	typedef std::function< void(const InputStreamElement&, AggregateStatePtr, const bool)> IterateFunc;
 
-
+protected:
 	/// a mutex for protecting aggregation processing from concurrent sources
 	typedef boost::mutex AggregationMutex;
 

@@ -784,11 +784,11 @@ namespace pfabric {
       *    the interval for producing aggregate tuples
       * @return a new pipe
       */
-     /*template <typename Tout, typename AggrState, typename KeyType = DefaultKeyType>
-     Pipe<Tout>& groupBy(AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0)
+     template <typename Tout, typename AggrState, typename KeyType = DefaultKeyType>
+     Pipe<Tout> groupBy(AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0)
       throw (TopologyException) {
        return groupBy<Tout, AggrState, KeyType>(AggrState::finalize, AggrState::iterate, tType, tInterval);
-    }*/
+    }
 
     /**
      * @brief Creates an operator for calculating grouped aggregates over the entire stream.
@@ -822,8 +822,8 @@ namespace pfabric {
      */
     template <typename Tout, typename AggrState, typename KeyType = DefaultKeyType>
     Pipe<Tout> groupBy(//std::shared_ptr<AggrState> aggrStatePtr,
-                    //typename GroupedAggregation<T, Tout, AggrState, KeyType>::FinalFunc finalFun,
-                    //typename GroupedAggregation<T, Tout, AggrState, KeyType>::IterateFunc iterFun,
+                    typename GroupedAggregation<T, Tout, AggrState, KeyType>::FinalFunc finalFun,
+                    typename GroupedAggregation<T, Tout, AggrState, KeyType>::IterateFunc iterFun,
                     AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0)
                     throw (TopologyException) {
       assert(partitioningState == NoPartitioning);
@@ -833,8 +833,8 @@ namespace pfabric {
 
         auto op =
           std::make_shared<GroupedAggregation<T, Tout, AggrState, KeyType> >(//aggrStatePtr,
-              //keyFunc, finalFun, iterFun, tType, tInterval);
-		keyFunc, AggrState::finalize, AggrState::iterate, tType, tInterval);
+              keyFunc, finalFun, iterFun, tType, tInterval);
+//		keyFunc, AggrState::finalize, AggrState::iterate, tType, tInterval);
         auto iter = addPublisher<GroupedAggregation<T, Tout, AggrState, KeyType>, DataSource<T> >(op);
         return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
       } catch (boost::bad_any_cast &e) {
