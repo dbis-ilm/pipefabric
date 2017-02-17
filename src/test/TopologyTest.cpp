@@ -73,7 +73,6 @@ TEST_CASE("Building and running a topology with joins", "[Topology]") {
   auto s2 = t.newStreamFromFile("file1.csv")
     .extract<T1>(',')
     .keyBy<int>([](auto tp) { return getAttribute<0>(tp); })
-    //.join<T1, int>(s1, [](auto tp1, auto tp2) { return true; })
     .join<int>(s1, [](auto tp1, auto tp2) { return true; })
     .print(strm);
 
