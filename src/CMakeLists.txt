@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.2)
 project (pipefabric)
 
 set(CMAKE_MACOSX_RPATH 1)
@@ -108,7 +108,7 @@ endif()
 # Boost C++ library
 ######################
 #
-SET(BOOST_MIN_VERSION "1.61.0")
+SET(BOOST_MIN_VERSION "1.60.0")
 find_package(Boost ${BOOST_MIN_VERSION} REQUIRED COMPONENTS
     program_options
     system
