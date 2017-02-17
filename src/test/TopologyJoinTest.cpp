@@ -60,6 +60,9 @@ TEST_CASE("Building and running a topology with a join on one partitioned stream
     });
     unsigned long num = 1000;
 
+    std::vector<std::vector<unsigned long>> results;
+    //std::mutex r_mutex;
+
     Topology t;
     auto s2 = t.streamFromGenerator<MyTuplePtr>(streamGen, num)
             .keyBy<0>();
@@ -69,15 +72,31 @@ TEST_CASE("Building and running a topology with a join on one partitioned stream
             .partitionBy([](auto tp) { return get<1>(tp) % 5; }, 5)
             .join(s2, [](auto tp1, auto tp2) { return get<1>(tp1) == get<1>(tp2); })
             .merge()
-            .print();
+            .notify([&](auto tp, bool outdated) {
+                //std::lock_guard<std::mutex> lock(r_mutex);
+
+                std::vector<unsigned long> tmp_vec;
+                tmp_vec.push_back(get<0>(tp));
+                tmp_vec.push_back(get<1>(tp));
+                tmp_vec.push_back(get<2>(tp));
+                tmp_vec.push_back(get<3>(tp));
+
+                results.push_back(tmp_vec);
+            });
+            //.print();
 
     t.start(false);
 
-  using namespace std::chrono_literals;
-  std::this_thread::sleep_for(2s);
+    using namespace std::chrono_literals;
+    std::this_thread::sleep_for(2s);
 
-    // REQUIRE(false);
+    REQUIRE(results.size() == num);
+
+    for (auto i=0u; i<num; i++) {
+        REQUIRE(results[i][0] == results[i][2]);
+        REQUIRE(results[i][1] == results[i][3]);
+    }
 }
 
-TEST_CASE("Building and running a topology with a join on two partitioned streams", "[Topology]") {
-}
+//TEST_CASE("Building and running a topology with a join on two partitioned streams", "[Topology]") {
+//}
