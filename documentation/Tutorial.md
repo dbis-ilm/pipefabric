@@ -51,9 +51,9 @@ int main(int argc, char **argv) {
 
   auto s = t->newStreamFromREST(8099, "^/publish$", RESTSource::POST_METHOD)
     .extractJson<InTuplePtr>({"key", "data"})
-    .slidingWindow<InTuplePtr>(WindowParams::RowWindow, 10)
-    .aggregate<InTuplePtr, ResultTuplePtr, MyAggrState> ()
-    .print<ResultTuplePtr>(std::cout);
+    .slidingWindow(WindowParams::RowWindow, 10)
+    .aggregate<ResultTuplePtr, MyAggrState> ()
+    .print(std::cout);
 
   t->start();
   t->wait();
