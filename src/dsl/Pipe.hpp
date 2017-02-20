@@ -198,6 +198,7 @@ class Pipe {
           connectChannels(otherOp->getOutputPunctuationChannel(),
                           op->getInputPunctuationChannel());
         } else {
+          assert(false);
           // TODO: check partitioning state
           // make sure we have the same number of partitions
           // if FirstInPartitioning
@@ -221,12 +222,13 @@ class Pipe {
                         opList[i]->getInputPunctuationChannel());
         // connect to right input channels
         if (otherPartitioningState == NoPartitioning) {
-        connectChannels(otherOp->getOutputDataChannel(),
-                        opList[i]->getRightInputDataChannel());
-        connectChannels(otherOp->getOutputPunctuationChannel(),
-                        opList[i]->getInputPunctuationChannel());
+          connectChannels(otherOp->getOutputDataChannel(),
+                          opList[i]->getRightInputDataChannel());
+          connectChannels(otherOp->getOutputPunctuationChannel(),
+                          opList[i]->getInputPunctuationChannel());
         } else {
           // TODO
+          assert(false);
         }
         iter++;
       }
@@ -964,13 +966,24 @@ class Pipe {
       typename Aggregation<T, Tout, AggrState>::IterateFunc iterFun,
       AggregationTriggerType tType = TriggerAll,
       const unsigned int tInterval = 0) throw(TopologyException) {
-    assert(partitioningState == NoPartitioning);
-    auto op = std::make_shared<Aggregation<T, Tout, AggrState>>(
-        finalFun, iterFun, tType, tInterval);
-    auto iter =
-        addPublisher<Aggregation<T, Tout, AggrState>, DataSource<T>>(op);
-    return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
-                      partitioningState, numPartitions);
+    if (partitioningState == NoPartitioning) {
+      auto op = std::make_shared<Aggregation<T, Tout, AggrState>>(
+          finalFun, iterFun, tType, tInterval);
+      auto iter =
+          addPublisher<Aggregation<T, Tout, AggrState>, DataSource<T>>(op);
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+                        partitioningState, numPartitions);
+    } else {
+      std::vector<std::shared_ptr<Aggregation<T, Tout, AggrState>>> ops;
+      for (auto i = 0u; i < numPartitions; i++) {
+        ops.push_back(std::make_shared<Aggregation<T, Tout, AggrState>>(
+            finalFun, iterFun, tType, tInterval));
+      }
+      auto iter =
+          addPartitionedPublisher<Aggregation<T, Tout, AggrState>, T>(ops);
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+                        partitioningState, numPartitions);
+    }
   }
 
   /**
@@ -1050,19 +1063,34 @@ class Pipe {
           iterFun,
       AggregationTriggerType tType = TriggerAll,
       const unsigned int tInterval = 0) throw(TopologyException) {
-    assert(partitioningState == NoPartitioning);
     try {
       typedef std::function<KeyType(const T&)> KeyExtractorFunc;
       KeyExtractorFunc keyFunc =
           boost::any_cast<KeyExtractorFunc>(keyExtractor);
 
-      auto op =
-          std::make_shared<GroupedAggregation<T, Tout, AggrState, KeyType>>(
-              keyFunc, finalFun, iterFun, tType, tInterval);
-      auto iter = addPublisher<GroupedAggregation<T, Tout, AggrState, KeyType>,
-                               DataSource<T>>(op);
-      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
-                        partitioningState, numPartitions);
+      if (partitioningState == NoPartitioning) {
+        auto op =
+            std::make_shared<GroupedAggregation<T, Tout, AggrState, KeyType>>(
+                keyFunc, finalFun, iterFun, tType, tInterval);
+        auto iter =
+            addPublisher<GroupedAggregation<T, Tout, AggrState, KeyType>,
+                         DataSource<T>>(op);
+        return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+                          partitioningState, numPartitions);
+      } else {
+        std::vector<
+            std::shared_ptr<GroupedAggregation<T, Tout, AggrState, KeyType>>>
+            ops;
+        for (auto i = 0u; i < numPartitions; i++) {
+          ops.push_back(
+              std::make_shared<GroupedAggregation<T, Tout, AggrState, KeyType>>(
+                  keyFunc, finalFun, iterFun, tType, tInterval));
+        }
+        auto iter =
+            addPartitionedPublisher<GroupedAggregation<T, Tout, AggrState, KeyType>, T>(ops);
+        return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+                          partitioningState, numPartitions);
+      }
     } catch (boost::bad_any_cast& e) {
       throw TopologyException("No KeyExtractor defined for groupBy.");
     }
