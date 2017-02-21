@@ -19,7 +19,7 @@
 using namespace pfabric;
 using namespace ns_types;
 
-TEST_CASE("Building and running a topology with joins", "[Topology]") {
+TEST_CASE("Building and running a topology with joins", "[Unpartitioned Join]") {
   typedef TuplePtr<Tuple<int, std::string, double> > T1;
   typedef TuplePtr<Tuple<int, std::string, double, int, std::string, double> > T2;
 
@@ -52,51 +52,89 @@ TEST_CASE("Building and running a topology with joins", "[Topology]") {
   REQUIRE(strm.str() == expected);
 }
 
-TEST_CASE("Building and running a topology with a join on one partitioned stream", "[Topology]") {
-    typedef TuplePtr<Tuple<unsigned long, unsigned long>> MyTuplePtr;
+TEST_CASE("Building and running a topology with a join on one partitioned stream", 
+          "[Partitioned and unpartitioned Join]") {
+  typedef TuplePtr<Tuple<unsigned long, unsigned long>> MyTuplePtr;
 
-    StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {
-        return makeTuplePtr(n, n % 100); 
+  StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {
+    return makeTuplePtr(n, n % 100); 
+  });
+  unsigned long num = 1000;
+
+  std::vector<std::vector<unsigned long>> results;
+
+  Topology t;
+  auto s2 = t.streamFromGenerator<MyTuplePtr>(streamGen, num)
+    .keyBy<0>();
+
+  auto s1 = t.streamFromGenerator<MyTuplePtr>(streamGen, num)
+    .keyBy<0>()
+    .partitionBy([](auto tp) { return get<1>(tp) % 5; }, 5)
+    .join(s2, [](auto tp1, auto tp2) { return get<1>(tp1) == get<1>(tp2); })
+    .merge()
+    .notify([&](auto tp, bool outdated) {
+        std::vector<unsigned long> tmp_vec;
+        tmp_vec.push_back(get<0>(tp));
+        tmp_vec.push_back(get<1>(tp));
+        tmp_vec.push_back(get<2>(tp));
+        tmp_vec.push_back(get<3>(tp));
+
+        results.push_back(tmp_vec);
     });
-    unsigned long num = 1000;
+    //.print();
 
-    std::vector<std::vector<unsigned long>> results;
-    //std::mutex r_mutex;
+  t.start(false);
 
-    Topology t;
-    auto s2 = t.streamFromGenerator<MyTuplePtr>(streamGen, num)
-            .keyBy<0>();
+  std::this_thread::sleep_for(2s);
 
-    auto s1 = t.streamFromGenerator<MyTuplePtr>(streamGen, num)
-            .keyBy<0>()
-            .partitionBy([](auto tp) { return get<1>(tp) % 5; }, 5)
-            .join(s2, [](auto tp1, auto tp2) { return get<1>(tp1) == get<1>(tp2); })
-            .merge()
-            .notify([&](auto tp, bool outdated) {
-                //std::lock_guard<std::mutex> lock(r_mutex);
+  REQUIRE(results.size() == num);
 
-                std::vector<unsigned long> tmp_vec;
-                tmp_vec.push_back(get<0>(tp));
-                tmp_vec.push_back(get<1>(tp));
-                tmp_vec.push_back(get<2>(tp));
-                tmp_vec.push_back(get<3>(tp));
-
-                results.push_back(tmp_vec);
-            });
-            //.print();
-
-    t.start(false);
-
-    using namespace std::chrono_literals;
-    std::this_thread::sleep_for(2s);
-
-    REQUIRE(results.size() == num);
-
-    for (auto i=0u; i<num; i++) {
-        REQUIRE(results[i][0] == results[i][2]);
-        REQUIRE(results[i][1] == results[i][3]);
-    }
+  for (auto i=0u; i<num; i++) {
+    REQUIRE(results[i][0] == results[i][2]);
+    REQUIRE(results[i][1] == results[i][3]);
+  }
 }
 
-//TEST_CASE("Building and running a topology with a join on two partitioned streams", "[Topology]") {
-//}
+/*TEST_CASE("Building and running a topology with a join on two partitioned streams", 
+          "[Partitioned Join]") {
+  typedef TuplePtr<Tuple<unsigned long, unsigned long>> MyTuplePtr;
+
+  StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {
+    return makeTuplePtr(n, n % 100); 
+  });
+  unsigned long num = 1000;
+
+  std::vector<std::vector<unsigned long>> results;
+
+  Topology t;
+  auto s2 = t.streamFromGenerator<MyTuplePtr>(streamGen, num)
+    .partitionBy([](auto tp) { return get<1>(tp) % 5; }, 5)
+    .keyBy<0>();
+
+  auto s1 = t.streamFromGenerator<MyTuplePtr>(streamGen, num)
+    .keyBy<0>()
+    .partitionBy([](auto tp) { return get<1>(tp) % 5; }, 5)
+    .join(s2, [](auto tp1, auto tp2) { return get<1>(tp1) == get<1>(tp2); })
+    .merge()
+    .notify([&](auto tp, bool outdated) {
+        std::vector<unsigned long> tmp_vec;
+        tmp_vec.push_back(get<0>(tp));
+        tmp_vec.push_back(get<1>(tp));
+        tmp_vec.push_back(get<2>(tp));
+        tmp_vec.push_back(get<3>(tp));
+
+        results.push_back(tmp_vec);
+    });
+    //.print();
+
+  t.start(false);
+
+  std::this_thread::sleep_for(2s);
+
+  REQUIRE(results.size() == num);
+
+  for (auto i=0u; i<num; i++) {
+    REQUIRE(results[i][0] == results[i][2]);
+    REQUIRE(results[i][1] == results[i][3]);
+  }
+}*/
