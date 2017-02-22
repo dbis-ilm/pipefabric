@@ -80,22 +80,24 @@ download_project(PROJ               benchmark
 )
 
 #--------------------------------------------------------------------------------
+if(USE_ROCKSDB_TABLE)
 # RocksDB key-value store
 download_project(PROJ               rocksdb
-                GIT_REPOSITORY      https://github.com/facebook/rocksdb
-                GIT_TAG             master
-                UPDATE_DISCONNECTED 1
-                QUIET
+	            GIT_REPOSITORY      https://github.com/facebook/rocksdb
+	            GIT_TAG             master
+	            UPDATE_DISCONNECTED 1
+	            QUIET
 )
 add_custom_command(
-        OUTPUT ${THIRD_PARTY_DIR}/rocksdb
-        COMMAND ${CMAKE_COMMAND} -E chdir ${rocksdb_SOURCE_DIR} $(MAKE) static_lib
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/rocksdb/include
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/rocksdb/lib
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-                ${rocksdb_SOURCE_DIR}/include
-                ${THIRD_PARTY_DIR}/rocksdb/include
-        COMMAND ${CMAKE_COMMAND} -E copy
-                ${rocksdb_SOURCE_DIR}/librocksdb.a
-                ${THIRD_PARTY_DIR}/rocksdb/lib
+	    OUTPUT ${THIRD_PARTY_DIR}/rocksdb
+	    COMMAND ${CMAKE_COMMAND} -E chdir ${rocksdb_SOURCE_DIR} $(MAKE) static_lib
+	    COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/rocksdb/include
+	    COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/rocksdb/lib
+	    COMMAND ${CMAKE_COMMAND} -E copy_directory
+	            ${rocksdb_SOURCE_DIR}/include
+	            ${THIRD_PARTY_DIR}/rocksdb/include
+	    COMMAND ${CMAKE_COMMAND} -E copy
+	            ${rocksdb_SOURCE_DIR}/librocksdb.a
+	            ${THIRD_PARTY_DIR}/rocksdb/lib
 )
+endif()
