@@ -118,7 +118,7 @@ auto s = t.streamFromGenerator<TPtr>(gen, 1000)
 
 #### where ####
 
-`Pipe Pipe::where<T>(std::function<bool(const T&, bool)> func)`
+`Pipe Pipe::where(std::function<bool(const T&, bool)> func)`
 
 This operator implements a filter operator where all tuples satisfying the predicate function `func`
 are forwarded to the next operator.
@@ -130,12 +130,12 @@ typedef TuplePtr<Tuple<int,int,int>> Tin;
 Topology t;
 auto s = t.newStreamFromFile("data.csv")
           .extract<Tin>(',')
-          .where<Tin>([](auto tp, bool) { return get<0>(tp) % 2 == 0; } )
+          .where([](auto tp, bool) { return get<0>(tp) % 2 == 0; } )
 ```
 
 #### map ####
 
-`Pipe Pipe::map<Tin,Tout>(std::function<Tout(const Tin&, bool)> func)`
+`Pipe Pipe::map<Tout>(std::function<Tout(const Tin&, bool)> func)`
 
 This operator implements a projection where each tuple of type `Tin` (usually a `TuplePtr` type) is converted
 into a tuple of type `Tout` using the function `func`.
@@ -147,12 +147,12 @@ typedef TuplePtr<Tuple<int>> Tout;
 Topology t;
 auto s = t.newStreamFromFile("data.csv")
           .extract<Tin>(',')
-          .map<Tin, Tout>([](auto tp, bool) { return makeTuplePtr(get<1>(tp)); } )
+          .map<Tout>([](auto tp, bool) { return makeTuplePtr(get<1>(tp)); } )
 ```
 
 #### statefulMap ####
 
-`Pipe Pipe::statefulMap<Tin,Tout,State>(std::function<Tout(const Tin&, bool, std::shared_ptr<State>)> func)`
+`Pipe Pipe::statefulMap<Tout,State>(std::function<Tout(const Tin&, bool, std::shared_ptr<State>)> func)`
 
 This operator implements a stateful projection where each tuple of type `Tin` is converted into a tuple of type `Tout` using the 
 function `func` and taking the state into account which can be updated during processing. The `state` type can be any class that maintains
@@ -170,7 +170,7 @@ struct MyState {
 Topology t;
 auto s = t.newStreamFromFile("data.csv")
           .extract<Tin>(',')
-          .statefulMap<Tin, Tout, MyState>([](auto tp, bool, std::shared_ptr<MyState> state) { 
+          .statefulMap<Tout, MyState>([](auto tp, bool, std::shared_ptr<MyState> state) { 
               state->cnt++;
               state->sum += get<2>(tp);
               return makeTuplePtr(state->cnt, state->sum); 
@@ -180,15 +180,15 @@ auto s = t.newStreamFromFile("data.csv")
 
 #### print ####
 
-`Pipe Pipe::print<T>(std::ostream& s)`
+`Pipe Pipe::print(std::ostream& s)`
 
 This operator prints each tuple to the stream `s` where the default value for
-`s` is `std::cout`. `T` represents the tuple type.
+`s` is `std::cout`.
 
 ```
 Topology t;
 auto s = t.newStreamFromFile("data.csv")
-          .print<TStringPtr>();
+          .print();
 ```
 
 #### saveToFile ####
@@ -236,18 +236,18 @@ assigns the function `f` for deriving (or calculating) a timestamp for each inpu
 
 #### slidingWindow ####
 
-`slidingWindow<T>(w, sz, sd)`
+`slidingWindow(w, sz, sd)`
 
 defines a sliding window of the given type and size on the stream. The window type `w` can be row or range for which `sz` specifies the size. 
 In case of a range (time-based) window the `assignTimestamp` operator has to defined before.
 
 #### tumblingWindow ####
 
-`tumblingWindow<T>(w, sz)`
+`tumblingWindow(w, sz)`
 
 #### queue ####
 
-`Pipe Pipe::queue<T>()`
+`Pipe Pipe::queue()`
 
 This operator decouple two operators in the dataflow. The upstream part inserts tuples of type `T` into the queue which is processed by a 
 separate thread to retrieve tuples from the queue and sent them downstream. In this way, the upstream part is not blocked anymore.

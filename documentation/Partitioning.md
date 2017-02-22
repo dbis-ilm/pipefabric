@@ -12,9 +12,9 @@ are finally merged into a single stream again.
 ```C++
 auto s = t->newStreamFromFile("data.csv")
   .extract<Tin>(',')
-  .partitionBy<Tin>([](auto tp) { return getAttribute<0>(tp) % 5; }, 5)
-  .where<Tin>([](auto tp, bool outdated) { return getAttribute<0>(tp) % 2 == 0; } )
-  .map<Tin, Tout>([](auto tp) { return makeTuplePtr(getAttribute<0>(tp)); } )
-  .merge<Tout>()
-  ..print<Tout>(std::cout);
+  .partitionBy([](auto tp) { return get<0>(tp) % 5; }, 5)
+  .where([](auto tp, bool outdated) { return get<0>(tp) % 2 == 0; } )
+  .map<Tout>([](auto tp) { return makeTuplePtr(get<0>(tp)); } )
+  .merge()
+  .print(std::cout);
 ```
