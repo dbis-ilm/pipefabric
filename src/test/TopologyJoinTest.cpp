@@ -63,11 +63,11 @@ TEST_CASE("Building and running a topology with joins on different tuple formats
   tgen2.writeData(8);
 
   std::stringstream strm;
-  std::string expected = "0,This is a string field,0.5,0,This is a string field,0.5\n\
-1,This is a string field,100.5,1,This is a string field,100.5\n\
-2,This is a string field,200.5,2,This is a string field,200.5\n\
-3,This is a string field,300.5,3,This is a string field,300.5\n\
-4,This is a string field,400.5,4,This is a string field,400.5\n";
+  std::string expected = "0,This is a string field,0.5,0,0.5\n\
+1,This is a string field,100.5,1,100.5\n\
+2,This is a string field,200.5,2,200.5\n\
+3,This is a string field,300.5,3,300.5\n\
+4,This is a string field,400.5,4,400.5\n";
 
   Topology t;
   auto s1 = t.newStreamFromFile("file2.csv")
