@@ -80,6 +80,8 @@ template <typename T>
 class Pipe {
  private:
   friend class Topology;
+  template<typename> friend class Pipe;
+
   PartitioningState partitioningState;
 
   typedef Dataflow::BaseOpIterator OpIterator;
