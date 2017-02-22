@@ -11,7 +11,7 @@ incoming tuple. Thus, the example above can be modified:
 ```C++
 auto s = t->newStreamFromREST(8099, "^/publish$", RESTSource::POST_METHOD)
   ...
-  .notify<ResultTuplePtr>([&](auto tp, bool outdated) {
+  .notify([&](auto tp, bool outdated) {
     std::cout << tp << std::endl;
   });
 

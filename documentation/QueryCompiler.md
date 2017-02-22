@@ -35,7 +35,7 @@ PFabricContext::TopologyPtr Query_2::create(PFabricContext& ctx) {
         auto SENSOR_DATA = ctx.getTable<Tuple_1_Type_::element_type, int>("SENSOR_DATA");
         topology = ctx.createTopology();
         topology->selectFromTable<Tuple_1_Type_, int>(SENSOR_DATA)
-                .print<Tuple_1_Type_>();
+                .print();
         return topology;
 }
 
