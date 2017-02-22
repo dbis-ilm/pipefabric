@@ -269,3 +269,45 @@ TEST_CASE("Building and running a topology with grouping", "[GroupBy]") {
 
 	REQUIRE(strm.str() == expected);
 }
+
+struct MySumState {
+  MySumState() : sum(0) {}
+  double sum;
+};
+
+TEST_CASE("Building and running a topology with stateful map", "[StatefulMap]") {
+  typedef TuplePtr<Tuple<unsigned long, double>> MyTuplePtr;
+  typedef TuplePtr<Tuple<double> > AggregationResultPtr;
+  typedef StatefulMap<AggregationResultPtr, AggregationResultPtr, MySumState> TestMap;
+
+  StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {
+    return makeTuplePtr(n, (double)n + 0.5);
+  });
+  unsigned long num = 1000;
+  unsigned long tuplesProcessed = 0;
+
+  std::vector<double> results;
+
+  auto mapFun = [&]( const MyTuplePtr& tp, bool, TestMap::StateRepPtr state) -> AggregationResultPtr {
+                    state->sum += get<1>(tp);
+                    return makeTuplePtr(state->sum);
+                };
+
+  Topology t;
+  auto s = t.streamFromGenerator<MyTuplePtr>(streamGen, num)
+    .keyBy<0>()
+    .statefulMap<AggregationResultPtr, MySumState>(mapFun)
+    .notify([&](auto tp, bool outdated) {
+        if (tuplesProcessed < num)
+          results.push_back(get<0>(tp));
+        tuplesProcessed++;
+    });
+
+  t.start(false);
+
+  REQUIRE(results.size() == num);
+  for (auto i=0u; i<num; i++) {
+    if (i==0) REQUIRE(results[i] == 0.5);
+    else REQUIRE(results[i] == results[i-1]+i+0.5);
+  }
+}
