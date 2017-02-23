@@ -16,6 +16,7 @@ operators and utility classes. It consists of the following main components:
  + [Installation](documentation/Installation.md)
  + [Getting started: Using PipeFabric](/documentation/Usage.md)
  + [List of operators](/documentation/Operators.md)
+ + [Table support](/documentation/Tables.md)
  + [Tutorial: How to write a query](/documentation/Tutorial.md)
  + [Tutorial: Embedding PipeFabric](/documentation/Embedding.md)
  + [Tutorial: Stream partitioning](/documentation/Partitioning.md)
