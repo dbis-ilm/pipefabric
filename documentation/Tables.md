@@ -26,6 +26,7 @@ auto myTable = ctx.createTable<RecordType, int>("TEST_TBL");
 Note, that a key has to be specified for each table and the data type of the key (in the example above
 `int`)  is passed as second argument to the template instantiation. Furthermore, in contrast to type
 arguments for the streaming operators, the `createTable` method requires a `Tuple` type but not a `TuplePtr`.
+The key is always part of the tuple type.
 
 There is an alternative way of creating a new table that allows to specify a complete schema consisting
 of column types and names using a `TableInfo` object. This approach is needed if ad-hoc queries on tables
@@ -47,6 +48,20 @@ Tables in PipeFabric support different ways of storing, updating, and retrieving
  + via the Table API, i.e. insert, deleteByKey, deleteWhere, updateByKey, ...
  + via the streaming operator DSL, i.e. toTable, newStreamFromTable, updateTable, ...
  + via the ad-hoc query facility.
+
+The Table API provides basic functions to insert, update, delete, and retrieve table records. In the following list
+`KeyType` refers to the data type of the key, `RecordType` to the tuple type representing the schema.
+
+ + `insert(KeyType k, const RecordType& rec)` inserts a new record with the given key into the table.
+ + `deleteByKey(KeyType k)` deletes the record with the given key.
+ + `deleteWhere(std::function<bool(const RecordType&)> predicate)` deletes all records satisfying the given predicate.
+ + `updateByKey(KeyType k,  std::function<void(RecordType&)> updater)` updates the tuple with the given key by applying 
+   the function `updater` which accepts the tuple as parameter and modified it in a certain way.
+ + `updateWhere(std::function<bool(const RecordType&)> predicate, std::function<void(RecordType&)> updater)` updates all tuples from
+   the table satisfying the given predicate by applying the function `updater` which modifies the tuple.
+ + `getByKey(KeyType k)` returns a pointer to the tuple with the given key in the form of `TuplePtr<RecordType>`. If no tuple 
+    exists for this key, then an exception is raised.
+ + `select(std::function<bool(const RecordType&)> predicate)`
 
 Streaming operators are used as part of constructing a topology. Table-related operators are 
 (see [Operators](Operators.md) for a detailed description):
