@@ -91,7 +91,7 @@ public:
 	 */
 	void processPunctuation( const PunctuationPtr& punctuation ) {
 		for (auto it : mPartitions) {
-      std::cout << "PartitionBy::processPunctuation" << std::endl;
+      //std::cout << "PartitionBy::processPunctuation" << std::endl;
 			auto qop = it.second;
 			auto slot = qop->template getInputChannelByID<1>().getSlot();
 			slot(punctuation);

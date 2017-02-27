@@ -6,7 +6,7 @@ set(CMAKE_MACOSX_RPATH 1)
 set (PipeFabric_VERSION_MAJOR 0)
 set (PipeFabric_VERSION_MINOR 2)
 
-#include(CTest) (?)
+include(CTest)
 
 #############################
 # customization section
@@ -43,6 +43,12 @@ option(BUILD_ONLY_LIBS
 # If switched to off, no tests will be build
 option(BUILD_TEST_CASES
   "build tests for pipefabric functionality"
+  ON
+)
+
+#Build google benchmark library with test
+option(BUILD_GOOGLE_BENCH
+  "build google benchmark"
   ON
 )
 
@@ -95,6 +101,17 @@ elseif(JEMALLOC_FOUND)
 	 set(MALLOC_LIB ${JEMALLOC_LIBRARIES})
 else()
      set(MALLOC_LIB "")
+endif()
+
+########################
+# Google benchmark library
+########################
+#
+if (BUILD_GOOGLE_BENCH)
+  include_directories("${THIRD_PARTY_DIR}/benchmark/include")
+  set (BENCHMARK_LIB "${THIRD_PARTY_DIR}/benchmark/lib/libbenchmark.a")
+else()
+  set (BENCHMARK_LIB "")
 endif()
 
 ########################
@@ -224,6 +241,13 @@ if(USE_ROCKSDB_TABLE)
   set(core_sources
     ${core_sources}
     ${THIRD_PARTY_DIR}/rocksdb
+  )
+endif()
+
+if(BUILD_GOOGLE_BENCH)
+  set(core_sources
+    ${core_sources}
+    ${THIRD_PARTY_DIR}/benchmark
   )
 endif()
 

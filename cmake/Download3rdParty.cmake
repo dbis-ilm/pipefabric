@@ -71,6 +71,7 @@ add_custom_command(
                 ${THIRD_PARTY_DIR}/SimpleWeb)
 
 #--------------------------------------------------------------------------------
+if (BUILD_GOOGLE_BENCH)
 # Google Benchmark framework
 download_project(PROJ               benchmark
                 GIT_REPOSITORY      https://github.com/google/benchmark.git
@@ -78,6 +79,20 @@ download_project(PROJ               benchmark
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
+add_custom_command(
+	    OUTPUT ${THIRD_PARTY_DIR}/benchmark
+	    COMMAND ${CMAKE_COMMAND} -E chdir ${benchmark_SOURCE_DIR} cmake -DCMAKE_BUILD_TYPE=Release
+		COMMAND ${CMAKE_COMMAND} -E chdir ${benchmark_SOURCE_DIR} $(MAKE)
+	    COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/benchmark/include
+	    COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/benchmark/lib
+	    COMMAND ${CMAKE_COMMAND} -E copy_directory
+	            ${benchmark_SOURCE_DIR}/include
+	            ${THIRD_PARTY_DIR}/benchmark/include
+	    COMMAND ${CMAKE_COMMAND} -E copy
+	            ${benchmark_SOURCE_DIR}/src/libbenchmark.a
+	            ${THIRD_PARTY_DIR}/benchmark/lib
+)
+endif()
 
 #--------------------------------------------------------------------------------
 if(USE_ROCKSDB_TABLE)
@@ -101,3 +116,4 @@ add_custom_command(
 	            ${THIRD_PARTY_DIR}/rocksdb/lib
 )
 endif()
+
