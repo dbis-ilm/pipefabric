@@ -19,6 +19,7 @@
 
 #include "dsl/Topology.hpp"
 #include "dsl/Pipe.hpp"
+#include "dsl/PFabricContext.hpp"
 
 using namespace pfabric;
 using namespace ns_types;
@@ -36,11 +37,11 @@ TEST_CASE("Building and running a simple topology", "[Topology]") {
   Topology t;
   auto s1 = t.newStreamFromFile("file.csv")
     .extract<T1>(',')
-    .where([](auto tp, bool outdated) { return getAttribute<0>(tp) % 2 == 0; } )
+    .where([](auto tp, bool outdated) { return get<0>(tp) % 2 == 0; } )
     .map<T2>([](auto tp, bool outdated) -> T2 {
-      return makeTuplePtr(getAttribute<2>(tp), getAttribute<0>(tp));
+      return makeTuplePtr(get<2>(tp), get<0>(tp));
     })
-    .assignTimestamps([](auto tp) { return getAttribute<1>(tp); })
+    .assignTimestamps([](auto tp) { return get<1>(tp); })
     .print(strm);
 
   t.start();
@@ -98,7 +99,7 @@ TEST_CASE("Building and running a topology with ToTable", "[Topology]") {
   Topology t;
   auto s = t.newStreamFromFile("file.csv")
     .extract<T1>(',')
-    .keyBy<int>([](auto tp) { return getAttribute<0>(tp); })
+    .keyBy<int>([](auto tp) { return get<0>(tp); })
     .toTable<int>(testTable);
 
   t.start(false);
@@ -276,4 +277,34 @@ TEST_CASE("Building and running a topology with stateful map", "[StatefulMap]") 
     if (i==0) REQUIRE(results[i] == 0.5);
     else REQUIRE(results[i] == results[i-1]+i+0.5);
   }
+}
+
+TEST_CASE("Combining tuples from two streams to one stream", "[ToStream]") {
+  typedef TuplePtr<Tuple<int, std::string, double> > T1;
+
+  TestDataGenerator tgen("file.csv");
+  tgen.writeData(100);
+
+  int results = 0;
+  PFabricContext ctx;
+  Dataflow::BaseOpPtr stream = ctx.createStream<T1>("stream");
+
+  Topology t;
+  auto s1 = t.newStreamFromFile("file.csv")
+    .extract<T1>(',')
+	.toStream(stream);
+
+  auto s2 = t.newStreamFromFile("file.csv")
+    .extract<T1>(',')
+	.toStream(stream);
+
+  auto s3 = t.fromStream<T1>(stream)
+    .notify([&](auto tp, bool outdated) {
+      results++;
+    });
+
+  t.start();
+  t.wait();
+
+  REQUIRE(results == 200);
 }
