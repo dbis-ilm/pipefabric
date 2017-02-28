@@ -306,5 +306,8 @@ TEST_CASE("Combining tuples from two streams to one stream", "[ToStream]") {
   t.start();
   t.wait();
 
+  using namespace std::chrono_literals;
+  std::this_thread::sleep_for(2s);
+
   REQUIRE(results == 200);
 }
