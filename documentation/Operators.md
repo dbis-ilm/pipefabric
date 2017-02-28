@@ -259,17 +259,21 @@ auto s = t.newStreamFromFile("data.csv")
 
 #### deserialize ####
 
-`Pipe<Tout> Pipe::deserialize()`
+`Pipe<Tout> Pipe::deserialize<Tout>()`
 
-This operator deserializes Tuples coming from a buffer. Buffering is not used in the current topology.
+This operator deserializes tuples from byte arrays. A byte array is represented by the type `TBufPtr` and usually produced by a ZMQ source
+operator in binary mode. Thus, `deserialize` is mainly used in combination with the `newBinaryStreamFromZMQ` operator. The target type of
+deserialization is given by the `Tout` parameter.
 
 #### keyBy ####
 
-`Pipe<T> Pipe::keyBy(std::function<KeyType(const T&))`
-`Pipe<T> Pipe::keyBy()`
+`Pipe<T> Pipe::keyBy(std::function<KeyType(const T&)> extractor)`
+`Pipe<T> Pipe::keyBy<N>()`
 
-This operator assigns the function `std::function<KeyType(const T&))` for deriving (or calculating) a key of type `K` of the input
+This operator assigns the function `extractor` for deriving (or calculating) a key of type `K` of the input
 tuples which are of type `T`. Note that the `KeyType` parameter has the default value of `unsigned long`.
+
+The second version of the `keyBy` operator uses the N-th column as the key. No separate key extractor function has to be specified.
 
 The following two examples show the use of the `keyBy` operator, doing the same (with different syntax). The key of incoming tuples is set
 to first attribute (integer) and can now be used for following functions, like a join or grouping.
