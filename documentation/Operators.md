@@ -79,7 +79,7 @@ auto s = t.newStreamFromTable<T1, long>(testTable)
 `Pipe<T> Topology::fromStream(stream)`
 
 This operator gets another already processed stream as input. With this operator it is possible to use another (already preprocessed)
-stream, for example. `T` references to the tuple type, `stream` is another data stream, possibly defined per `toStream()` operator
+stream, for example. `T` represents the tuple type, `stream` is another data stream, possibly defined per `toStream()` operator
 explained later on.
 
 The following example defines the structure of a tuple `T1` first, along with a new stream element. Then, tuples are pushed into this
