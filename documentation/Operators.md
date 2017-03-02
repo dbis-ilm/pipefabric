@@ -453,7 +453,25 @@ a single one. See above for an example.
 
 #### batch ####
 
-`Pipe<BatchPtr<T>> Pipe::batch(bsize)`
+`Pipe<BatchPtr<T>> Pipe::batch(size_t bsize)`
+
+The `batch` operator combines `bsize` consecutive tuples of the input stream into a single batch of tuples
+that is forwarded to the subscribers as a single tuple. A batch is defined as follows
+
+```C++
+template <typename T>
+using BatchPtr = TuplePtr<Tuple<std::vector<std::pair<T, bool>>>>;
+```
+
+where `T` denotes the type of the input tuple and the pairs represent the tuple as well as its outdated flag.
+In the following example batches of 100 tuples are constructed:
+
+```C++
+auto s = t.newStreamFromFile("file.csv")
+    .extract<T1>(',')
+    .map<T2>([](auto tp, bool outdated) -> T2 { return makeTuplePtr(get<0>(tp)); } )
+    .batch(100)
+```
 
 #### toStream ####
 
