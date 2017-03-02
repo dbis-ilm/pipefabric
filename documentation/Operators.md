@@ -302,7 +302,7 @@ auto s = t.newStreamFromFile("data.csv")
 `Pipe<T> Pipe::assignTimestamps<N>()`
 
 This operator assigns a timestamp to incoming tuples, used for window or outdated calculations. The first method uses `func` on tuple type `T` as
-a function to calculate the corresponding timestamp. The second method uses a specified column `N` (a number between 0 and NumColumns - 2) as timestamp.
+a function to calculate the corresponding timestamp. The second method uses a specified column `N` (a number between 0 and NumColumns - 1) as timestamp.
 
 The following two examples show the usage of this operator (with same results on different syntax), both setting the second attribute as timestamp.
 
@@ -416,7 +416,29 @@ auto s = t.newStreamFromFile("data.csv")
 
 #### partitionBy ####
 
-`Pipe<T> Pipe::partitionBy(pFun, nPartitions)`
+`Pipe<T> Pipe::partitionBy(std::function<PartitionID(const T&)> pFun, unsigned int nPartitions)`
+
+The `partitionBy` operator partitions the input stream on given partition id which is derived 
+using a user-defined function `pFun` and forwards the tuples of each partition to a subquery. 
+Subqueries are registered via their input channels for each partition id. The number of paritions
+is specified by the parameter `nPartitions`. If a `partitionBy` operator is inserted into the dataflow
+then a separate subquery is constructed for each partition containing the dataflow from the operator
+following partitionBy to the next `merge` operator. Thus, everything between `partitionBy` and `merge`
+runs in parallel (i.e. in separate threads). The purpose of the partitioning function `pFun` is the
+return a partition id (an integer value ranging from 0 to `nPartitions-1`) for each incoming tuple.
+
+In the following example the stream is splitted into 5 partitions using a simple hash partitioning scheme
+on the first column of the tuples. Thus, 5 instances of the `where` operator are created and run in parallel.
+The final `merge` step combines the partitioned stream into a single stream.
+
+```C++
+Topology t;
+  auto s = t.newStreamFromFile("file.csv")
+    .extract<T1>(',')
+    .partitionBy([](auto tp) { return get<0>(tp) % 5; }, 5)
+    .where([](auto tp, bool outdated) { return get<0>(tp) % 2 == 0; } )
+    .merge()
+```
 
 #### merge ####
 
