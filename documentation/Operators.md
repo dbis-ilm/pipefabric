@@ -8,7 +8,7 @@ PipeFabric provides two classes of operators
 
 #### newStreamFromFile ####
 
-`Pipe<TStringPtr> Topology::newStreamFromFile(fname, limit = 0)`
+`Pipe<TStringPtr> Topology::newStreamFromFile(const std::string& fname, unsigned long limit = 0)`
 
 This operator reads the file with the given name `fname` and produces a stream of tuples where each line corresponds to one tuple
 only consisting of a single string attribute (`TStringPtr`). There is an optional variable to define the maximum tuples to be read,
@@ -24,7 +24,7 @@ auto s = t.newStreamFromFile("data.csv")
 
 #### newStreamFromREST ####
 
-`Pipe<TStringPtr> Topology::newStreamFromREST(port, path, m, num = 1)`
+`Pipe<TStringPtr> Topology::newStreamFromREST(unsigned int port, const std::string& path, RESTSource::RESTMethod m, unsigned short num = 1)`
 
 This is an operator for receiving tuples via REST. Each call of the REST service produces a single tuple (consisting of a single string).
 The parameters define the TCP port for receiving REST calls (`port`), the URI path of the service (`path`), the method
