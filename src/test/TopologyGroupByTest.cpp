@@ -17,6 +17,31 @@
 using namespace pfabric;
 using namespace ns_types;
 
+TEST_CASE("Building and running a topology with standard grouping", "[GroupBy]") {
+  typedef TuplePtr<Tuple<std::string, int>> MyTuplePtr;
+  typedef TuplePtr<Tuple<std::string, int>> AggrRes;
+  typedef Aggregator2<AggrRes, AggrIdentity<std::string>, 0, AggrCount<int, int>, 1> AggrState;
+
+  std::map<std::string, int> results;
+  Topology t;
+  auto s = t.streamFromGenerator<MyTuplePtr>([](unsigned long n) {
+      std::string key = fmt::format("KEY#{0}", n % 5);
+      return makeTuplePtr(key, (int)n);
+    }, 50)
+    .keyBy<0, std::string>()
+    .groupBy<AggrRes, AggrState, std::string>()
+    .notify([&](auto tp, bool outdated) {
+          results[get<0>(tp)] = get<1>(tp);
+    });
+
+  t.start(false);
+
+  REQUIRE(results.size() == 5);
+  for (auto iter : results) {
+    REQUIRE(iter.second == 10);
+  }
+}
+
 template<typename StreamElement>
 class MyAggregateState: public AggregateStateBase<StreamElement> {
 public:

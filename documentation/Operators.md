@@ -358,7 +358,7 @@ of `int` values:
 ```C++
 typedef TuplePtr<Tuple<int>> InTuple;
 typedef Aggregator3<
-  InTuple, i        // the input type for the aggregation
+  InTuple,          // the input type for the aggregation
   AggrAvg<int, int>,// an aggregate for calculating the average (input column type = int, output type = int)
   0,                // the values to be aggregated are taken from column 0
   AggrCount<int>,   // an aggregate for counting values (result type = int)
@@ -387,8 +387,29 @@ tuple and a `finalize` function for producing the final result tuple.
 
 #### groupBy #####
 
-`Pipe<Tout> Pipe::groupBy(tType, tInterval)`
-`Pipe<Tout> Pipe::groupBy(finalFun, iterFun, tType, tInterval)`
+`Pipe<Tout> Pipe::groupBy<Tout, State, KeyType>(tType, tInterval)`
+`Pipe<Tout> Pipe::groupBy<Tout, State, KeyType>(finalFun, iterFun, tType, tInterval)`
+
+The `groupBy` operator implements the relational grouping on the key column and applies an incremental
+aggregation on the individual groups. As in `aggregate` either one of the predefined `AggregatorN` class
+or a user-defined class can be used to implement the `State` class. Compared to `aggregate` an additional
+type parameter specifying the type of the grouping key is required.
+
+The following example implements a simple grouping on the key column for calculating the sum per group.
+In order to specify the key for grouping the `keyBy` operator is needed. Note, that we use the `AggrIdentity`
+class to store the grouping value in the aggregator class.
+
+```C++
+typedef TuplePtr<Tuple<int, int, int>> Tin;
+typedef TuplePtr<Tuple<int, int> > AggrRes; // group_id, sum(col1)
+typedef Aggregator2<AggrRes, AggrIdentity<int>, 0, AggrSum<int>, 1> AggrState;
+
+Topology t;
+auto s = t.newStreamFromFile("data.csv")
+    .extract<Tin>(',')
+    .keyBy<0>()
+    .groupBy<AggrRes, AggrState, int>()
+```
 
 #### join ####
 `Pipe<typename SHJoin<T, T2, KeyType>::ResultElement> Pipe::join(otherPipe, pred)`
