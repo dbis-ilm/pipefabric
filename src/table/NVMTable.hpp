@@ -60,26 +60,13 @@ using nvml::obj::make_persistent;
 using nvml::obj::delete_persistent;
 using nvml::obj::transaction;
 
-/*
-namespace detail
-{
-// Rebuild a tuple from a given ddc_block and position within this block
-
-template <class T>
-inline T retrievTuple(persistent_ptr<struct ddc_block> b, int32_t i)
-{
-  b->StreamType buf(ptr, ptr + size);
-  return T(buf);
-}
-}
-*/
 template <typename RecordType, typename KeyType>
 class NVMIterator
 {
 public:
   typedef std::function<bool(const RecordType &)> Predicate;
   typedef TuplePtr<RecordType> RecordTypePtr;
-  typedef pfabric::persistent_table<RecordType, KeyType> pTable_type;
+  typedef nvm::persistent_table<RecordType, KeyType> pTable_type;
 
   explicit NVMIterator() {}
   explicit NVMIterator(persistent_ptr<pTable_type> _pTable, Predicate _pred) : pTable(_pTable), pred(_pred)
@@ -131,7 +118,7 @@ protected:
 
 template <typename RecordType, typename KeyType>
 inline NVMIterator<RecordType, KeyType> makeNVMIterator(
-    persistent_ptr<pfabric::persistent_table<RecordType, KeyType>> pTable,
+    persistent_ptr<nvm::persistent_table<RecordType, KeyType>> pTable,
     typename NVMIterator<RecordType, KeyType>::Predicate pred)
 {
   return NVMIterator<RecordType, KeyType>(pTable, pred);
@@ -155,7 +142,7 @@ class NVMTable : public BaseTable
 {
 public:
   // TODO: - Index (volatile)
-  typedef pfabric::persistent_table<RecordType, KeyType> pTable_type;
+  typedef nvm::persistent_table<RecordType, KeyType> pTable_type;
 
   struct root
   {
@@ -412,7 +399,7 @@ private:
     std::string path = tableInfo.tableName() + ".db";
     if (access(path.c_str(), F_OK) != 0)
     {
-      pop = pool<root>::create(path, LAYOUT, (size_t)blockSize, 0666);
+      pop = pool<root>::create(path, LAYOUT);//, (size_t)blockSize, 0666);
       //throw TableException("failed to create pool\n");
     }
     else
