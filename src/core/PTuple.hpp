@@ -53,7 +53,7 @@ const int AttrOffsetSize  =  4;
 const int OffsetSize      =  2;
 
 /** The size of a single block in persistent memory */
-static constexpr uint16_t BlockSize = 1 << 10; // 32KB
+static constexpr uint16_t BlockSize = 1 << 15; // 32KB
 
 /**
  * \brief This type represents a byte array used for persistent structures.
@@ -191,10 +191,13 @@ struct get_helper<double, ID> {
  *****************************************************************************/
 template<class Tuple>
 class PTuple {
-public:
+
+private:
+
   persistent_ptr<NVM_Block> block;
   std::vector<uint16_t> offsets;//!< TODO: Something else than a runtime eater like vector
 
+public:
   /************************************************************************//**
    * \brief the number of attributes for this tuple type.
    ***************************************************************************/
@@ -235,9 +238,13 @@ public:
    *   a reference to the persistent tuple's attribute with the requested \c ID
    ***************************************************************************/
   template<std::size_t ID>
+  inline auto getAttribute() -> typename getAttributeType<ID>::type {
+    return detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets);
+  }
+
+  template<std::size_t ID>
   inline auto get() -> typename getAttributeType<ID>::type {
-    return detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block,
-        offsets);
+    return detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets);
   }
 
 }; /* class PTuplePtr */
@@ -260,10 +267,8 @@ public:
  *   a reference to the persistent tuple's attribute with the requested \c ID
  *****************************************************************************/
 template<std::size_t ID, class Tuple>
-auto get(
-    nvm::PTuple<Tuple> ptp) -> decltype(nvm::detail::get_helper<typename Tuple::template getAttributeType<ID>::type, ID>::apply(ptp.block, ptp.offsets)) {
-  return nvm::detail::get_helper<typename Tuple::template getAttributeType<ID>::type, ID>::apply(
-      ptp.block, ptp.offsets);
+auto get(nvm::PTuple<Tuple> ptp) -> decltype(ptp.template get<ID>()) {
+  return ptp.template get<ID>();
 }
 
 } /* end namespace pfabric */
