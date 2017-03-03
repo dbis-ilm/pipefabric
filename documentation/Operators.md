@@ -407,7 +407,7 @@ typedef Aggregator2<AggrRes, AggrIdentity<int>, 0, AggrSum<int>, 1> AggrState;
 Topology t;
 auto s = t.newStreamFromFile("data.csv")
     .extract<Tin>(',')
-    .keyBy<0>()
+    .keyBy<0, int>()
     .groupBy<AggrRes, AggrState, int>()
 ```
 
