@@ -891,11 +891,9 @@ class Pipe {
    *
    * // Aggregator1 defines already functions for finalize and iterate
    * t->newStreamFrom...
-   *    .aggregate<T1, T2, MyAggrState> ()
+   *    .aggregate<T2, MyAggrState> ()
    * @endcode
    *
-   * @tparam Tin
-   *      the input tuple type (usually a TuplePtr) for the operator.
    * @tparam Tout
    *      the result tuple type (usually a TuplePtr) for the operator.
    * @tparam AggrState
@@ -937,12 +935,10 @@ class Pipe {
     *
     * // Aggregator1 defines already functions for finalize and iterate
     * t->newStreamFrom...
-    *    .aggregate<T1, T2, MyAggrState> (MyAggrState::finalize,
+    *    .aggregate<T2, MyAggrState> (MyAggrState::finalize,
     *                                    MyAggrState::iterate)
     * @endcode
     *
-    * @tparam Tin
-    *      the input tuple type (usually a TuplePtr) for the operator.
     * @tparam Tout
     *      the result tuple type (usually a TuplePtr) for the operator.
     * @tparam AggrState

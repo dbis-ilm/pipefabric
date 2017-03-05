@@ -20,7 +20,7 @@ using namespace ns_types;
 TEST_CASE("Building and running a topology with standard grouping", "[GroupBy]") {
   typedef TuplePtr<Tuple<std::string, int>> MyTuplePtr;
   typedef TuplePtr<Tuple<std::string, int>> AggrRes;
-  typedef Aggregator2<AggrRes, AggrIdentity<std::string>, 0, AggrCount<int, int>, 1> AggrState;
+  typedef Aggregator2<MyTuplePtr, AggrIdentity<std::string>, 0, AggrCount<int, int>, 1> AggrState;
 
   std::map<std::string, int> results;
   Topology t;
