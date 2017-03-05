@@ -125,7 +125,7 @@ auto s = t.streamFromGenerator<T1>(gen, 1000)
 
 #### extract #####
 
-`Pipe<Tout> Pipe::extract(char sep)`
+`Pipe<Tout> Pipe::extract<Tout>(char sep)`
 
 This operator processes a stream of strings, splits each tuple using the given separator character `sep` and constructs tuples of type `T`.
 
@@ -141,7 +141,7 @@ auto s = t.newStreamFromFile("data.csv")
 
 #### extractJson ####
 
-`Pipe<Tout> Pipe::extractJson(const std::initializer_list<std::string>& keys)`
+`Pipe<Tout> Pipe::extractJson<Tout>(const std::initializer_list<std::string>& keys)`
 
 This operator processes a stream of JSON strings and constructs tuples of type `T`. The given `keys` are needed for reading JSON strings.
 
@@ -157,7 +157,7 @@ auto s = t.newStreamFromREST(8099, "^/publish$", RESTSource::POST_METHOD)
 
 #### where ####
 
-`Pipe<T> Pipe::where(typename Where<T>::PredicateFunc func)`
+`Pipe<T> Pipe::where(std::function<bool(const T&, bool)> func)`
 
 This operator implements a filter operator where all tuples satisfying the predicate function `func` are forwarded to the next operator.
 The `T` parameter represents the input/output type (a `TuplePtr` type).
@@ -176,7 +176,7 @@ auto s = t.newStreamFromFile("data.csv")
 
 #### map ####
 
-`Pipe<Tout> Pipe::map(typename Map<T, Tout>::MapFunc func)`
+`Pipe<Tout> Pipe::map<Tout>(std::function<Tout (const T&, bool)> func)`
 
 This operator implements a projection where each tuple of type `T` (usually a `TuplePtr` type) is converted into a tuple of type `Tout` using
 the function `func`.
@@ -195,7 +195,7 @@ auto s = t.newStreamFromFile("data.csv")
 ```
 
 #### statefulMap ####
-`Pipe<Tout> Pipe::statefulMap(typename StatefulMap<T, Tout, State>::MapFunc func)`
+`Pipe<Tout> Pipe::statefulMap<Tout, State>(std::function<Tout (const T&, bool, StatePtr)> func)`
 
 This operator implements a stateful projection where each tuple of type `T` is converted into a tuple of type `Tout` using the function `func`
 and taking the state into account which can be updated during processing. The `state` type can be any class that maintains a state and is accepted
