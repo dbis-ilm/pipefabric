@@ -48,7 +48,4 @@ if (BUILD_TEST_CASES)
 	  do_test(RDBTableTest)
 	endif()
 
-	if (BUILD_GOOGLE_BENCH)
-      do_test(BenchmarkTest)
-    endif()
 endif()

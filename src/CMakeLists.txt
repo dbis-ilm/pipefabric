@@ -46,6 +46,12 @@ option(BUILD_TEST_CASES
   ON
 )
 
+# Build benchmarks (note: requires to set BUILD_GOOGLE_BEMCH to ON)
+option(BUILD_BENCHMARKS
+  "build benchmarks for pipefabric"
+  ON
+)
+
 #Build google benchmark library with test
 option(BUILD_GOOGLE_BENCH
   "build google benchmark"
@@ -296,6 +302,11 @@ target_include_directories(Catch INTERFACE test)
 enable_testing()
 add_subdirectory(test)
 
+#-----------------------------------------------------------------------------------------
+#
+# Micro-benchmarking using Google Benchmark
+#
+add_subdirectory(bench)
 #-----------------------------------------------------------------------------------------
 #
 # Installation
