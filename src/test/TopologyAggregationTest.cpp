@@ -34,7 +34,7 @@ TEST_CASE("Building and running a topology with unpartitioned aggregation",
   Topology t;
   auto s = t.streamFromGenerator<MyTuplePtr>(streamGen, num)
     .keyBy<0>()
-    .aggregate<AggregationResultPtr, AggrStateSum>()
+    .aggregate<AggrStateSum>()
     .notify([&](auto tp, bool outdated) {
         if (tuplesProcessed < num)
           results.push_back(get<0>(tp));
@@ -71,7 +71,7 @@ TEST_CASE("Building and running a topology with partitioned aggregation",
   auto s = t.streamFromGenerator<MyTuplePtr>(streamGen, num)
     .keyBy<0>()
     .partitionBy([](auto tp) { return get<0>(tp) % 5; }, 5)
-    .aggregate<AggregationResultPtr, AggrStateSum>()
+    .aggregate<AggrStateSum>()
     .merge() //TODO: Use new merge operator
     .notify([&](auto tp, bool outdated) {
         if (tuplesProcessed < num)

@@ -891,11 +891,9 @@ class Pipe {
    *
    * // Aggregator1 defines already functions for finalize and iterate
    * t->newStreamFrom...
-   *    .aggregate<T2, MyAggrState> ()
+   *    .aggregate<MyAggrState> ()
    * @endcode
    *
-   * @tparam Tout
-   *      the result tuple type (usually a TuplePtr) for the operator.
    * @tparam AggrState
    *      the type of representing the aggregation state as a subclass of
    *      @c AggregationStateBase. There are predefined template classes
@@ -907,11 +905,12 @@ class Pipe {
    *    the interval for producing aggregate tuples
    * @return a new pipe
    */
-  template <typename Tout, typename AggrState>
-  Pipe<Tout> aggregate(
+  template <typename AggrState>
+  Pipe<typename AggrState::ResultTypePtr> aggregate(
       AggregationTriggerType tType = TriggerAll,
       const unsigned int tInterval = 0) throw(TopologyException) {
-    return aggregate<Tout, AggrState>(AggrState::finalize, AggrState::iterate,
+    static_assert(typename AggrStateTraits<AggrState>::type(), "aggregate requires an AggrState class");
+    return aggregate<typename AggrState::ResultTypePtr, AggrState>(AggrState::finalize, AggrState::iterate,
                                       tType, tInterval);
   }
 
@@ -994,10 +993,7 @@ class Pipe {
    supports
    * window-based aggregation by handling delete tuples accordingly.
    *
-   * @tparam Tin
-   *      the input tuple type (usually a TuplePtr) for the operator.
-   * @tparam Tout
-   *      the result tuple type (usually a TuplePtr) for the operator.
+   * @tparam AggrState
    *      the type of representing the aggregation state as a subclass of
    *      @c AggregationStateBase. There are predefined template classes
    *      @c Aggregator1 ... @c AggregatorN which can be used directly here.
@@ -1010,12 +1006,13 @@ class Pipe {
    *    the interval for producing aggregate tuples
    * @return a new pipe
    */
-  template <typename Tout, typename AggrState,
+  template <typename AggrState,
             typename KeyType = DefaultKeyType>
-  Pipe<Tout> groupBy(
+  Pipe<typename AggrState::ResultTypePtr> groupBy(
       AggregationTriggerType tType = TriggerAll,
       const unsigned int tInterval = 0) throw(TopologyException) {
-    return groupBy<Tout, AggrState, KeyType>(
+    static_assert(typename AggrStateTraits<AggrState>::type(), "groupBy requires an AggrState class");
+    return groupBy<typename AggrState::ResultTypePtr, AggrState, KeyType>(
         AggrState::finalize, AggrState::iterate, tType, tInterval);
   }
 

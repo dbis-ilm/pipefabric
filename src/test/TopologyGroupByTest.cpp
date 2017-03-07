@@ -29,7 +29,7 @@ TEST_CASE("Building and running a topology with standard grouping", "[GroupBy]")
       return makeTuplePtr(key, (int)n);
     }, 50)
     .keyBy<0, std::string>()
-    .groupBy<AggrRes, AggrState, std::string>()
+    .groupBy<AggrState, std::string>()
     .notify([&](auto tp, bool outdated) {
           results[get<0>(tp)] = get<1>(tp);
     });
@@ -74,7 +74,7 @@ TEST_CASE("Building and running a topology with simple unpartitioned grouping",
   Topology t;
   auto s = t.streamFromGenerator<MyTuplePtr>(streamGen, num)
     .keyBy<0>()
-    .groupBy<AggregationResultPtr, AggrStateSum, unsigned long>()
+    .groupBy<AggrStateSum, unsigned long>()
     .notify([&](auto tp, bool outdated) {
         if (tuplesProcessed < num)
           results.push_back(get<0>(tp));

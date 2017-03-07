@@ -89,6 +89,14 @@ public:
 };
 
 /**
+ * AggrStateTraits is a trait to check whether a class satisfies
+ * the requirements of an aggregator class, i.e. to define a
+ * @c ResultTypePtr.
+ */
+template<typename T>
+struct AggrStateTraits : std::false_type{};
+
+/**
  * Aggregator1 represents the aggregation state for a single aggregation
  * function.
  * The following example defines the aggregation state for calculate the sum
@@ -154,6 +162,9 @@ public:
 		return makeTuplePtr(state->aggr1_.value());
 	}
 };
+
+template <typename StreamElement, typename Aggr1Func, int Aggr1Col>
+struct AggrStateTraits<Aggregator1<StreamElement, Aggr1Func, Aggr1Col>> : std::true_type{};
 
 /**
  * Aggregator2 represents the aggregation state for two aggregation
@@ -230,6 +241,16 @@ public:
 		return makeTuplePtr(state->aggr1_.value(), state->aggr2_.value());
 	}
 };
+
+template <
+	typename StreamElement,
+	typename Aggr1Func, int Aggr1Col,
+	typename Aggr2Func, int Aggr2Col
+>
+struct AggrStateTraits<Aggregator2<StreamElement, 
+  Aggr1Func, Aggr1Col,
+  Aggr2Func, Aggr2Col
+  >> : std::true_type{};
 
 /**
  * Aggregator3 represents the aggregation state for three aggregation
@@ -317,6 +338,18 @@ public:
 		return makeTuplePtr(state->aggr1_.value(), state->aggr2_.value(), state->aggr3_.value());
 	}
 };
+
+template <
+	typename StreamElement,
+	typename Aggr1Func, int Aggr1Col,
+	typename Aggr2Func, int Aggr2Col,
+	typename Aggr3Func, int Aggr3Col
+>
+struct AggrStateTraits<Aggregator3<StreamElement, 
+  Aggr1Func, Aggr1Col,
+  Aggr2Func, Aggr2Col,
+  Aggr3Func, Aggr3Col
+  >> : std::true_type{};
 
 /**
  * Aggregator4 represents the aggregation state for four aggregation
@@ -415,6 +448,21 @@ public:
 												state->aggr3_.value(), state->aggr4_.value());
 	}
 };
+
+template <
+	typename StreamElement,
+	typename Aggr1Func, int Aggr1Col,
+	typename Aggr2Func, int Aggr2Col,
+	typename Aggr3Func, int Aggr3Col,
+	typename Aggr4Func, int Aggr4Col
+>
+struct AggrStateTraits<Aggregator4<StreamElement, 
+  Aggr1Func, Aggr1Col,
+  Aggr2Func, Aggr2Col,
+  Aggr3Func, Aggr3Col,
+  Aggr4Func, Aggr4Col
+  >> : std::true_type{};
+
 } /* end namespace pfabric */
 
 

@@ -374,7 +374,7 @@ separate thread to retrieve tuples from the queue and sent them downstream. In t
 
 #### aggregate ####
 
-`Pipe<Tout> Pipe::aggregate<Tout, State>(tType, tInterval)`
+`Pipe<Tout> Pipe::aggregate<State>(tType, tInterval)`
 `Pipe<Tout> Pipe::aggregate<Tout, State>(finalFun, iterFun, tType, tInterval)`
 
 calculates a set of aggregates over the stream of type `Tin`, possibly supported by a window. The aggregates a represented by tuples 
@@ -398,16 +398,15 @@ typedef Aggregator3<
   > AggrState;
 ```
 
-With the help of this state class, `aggregate` can be used. However, we have to define the ouput type of the
-aggregate which consists in this case of three `int` values (for avg, count, sum):
+With the help of this state class, `aggregate` can be used. Note, that we don't have to define the output
+type - it is derived from the `AggrState` class:
 
 ```C++
-tyepdef TuplePtr<Tuple<int, int, int>> OutTuple;
 
 Topology t;
 auto s = t.newStreamFromFile("data.csv")
           .extract<InTuple>(',')
-          .aggregate<OutTuple, AggrState>()
+          .aggregate<AggrState>()
           ...
 ```
 
@@ -417,7 +416,7 @@ tuple and a `finalize` function for producing the final result tuple.
 
 #### groupBy #####
 
-`Pipe<Tout> Pipe::groupBy<Tout, State, KeyType>(tType, tInterval)`
+`Pipe<Tout> Pipe::groupBy<State, KeyType>(tType, tInterval)`
 `Pipe<Tout> Pipe::groupBy<Tout, State, KeyType>(finalFun, iterFun, tType, tInterval)`
 
 The `groupBy` operator implements the relational grouping on the key column and applies an incremental
@@ -431,14 +430,14 @@ class to store the grouping value in the aggregator class.
 
 ```C++
 typedef TuplePtr<Tuple<int, int, int>> Tin;
-typedef TuplePtr<Tuple<int, int> > AggrRes; // group_id, sum(col1)
+typedef TuplePtr<Tuple<int, int> > AggrRes; // group_id, sum(col1), but not needed here!
 typedef Aggregator2<AggrRes, AggrIdentity<int>, 0, AggrSum<int>, 1> AggrState;
 
 Topology t;
 auto s = t.newStreamFromFile("data.csv")
     .extract<Tin>(',')
     .keyBy<0, int>()
-    .groupBy<AggrRes, AggrState, int>()
+    .groupBy<AggrState, int>()
 ```
 
 #### join ####

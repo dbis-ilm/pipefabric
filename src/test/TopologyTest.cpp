@@ -230,7 +230,7 @@ TEST_CASE("Building and running a topology with grouping", "[GroupBy]") {
     Topology t;
     auto s = t.streamFromGenerator<T1>(streamGen, num)
         .keyBy<int>([](auto tp) { return get<0>(tp); })
-        .groupBy<T2, AggrStateSum, int>()
+        .groupBy<AggrStateSum, int>()
 	.print(strm);
 	t.start(false);
 

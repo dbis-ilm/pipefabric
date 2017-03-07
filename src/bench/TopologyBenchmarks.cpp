@@ -175,7 +175,7 @@ void TopologyGroupByTest(benchmark::State& state) {
     auto s = t.newStreamFromFile("file.csv")
       .extract<T1>(',')
       .keyBy<int>([](auto tp) { return get<0>(tp); })
-      .groupBy<T2, AggrStateSum, int>()
+      .groupBy<AggrStateSum, int>()
 	  .map<T2>([](auto tp, bool outdated) -> T2 {
 		double math = doMath(get<0>(tp));
         return makeTuplePtr(math);
@@ -207,7 +207,7 @@ void TopologyPartitionedGroupByTest(benchmark::State& state) {
       .extract<T1>(',')
 	  .keyBy<int>([](auto tp) { return get<0>(tp); })
 	  .partitionBy([](auto tp) { return get<0>(tp) % 3; }, 3)
-      .groupBy<T2, AggrStateSum, int>()
+      .groupBy<AggrStateSum, int>()
 	  .map<T2>([](auto tp, bool outdated) -> T2 {
         double math = doMath(get<0>(tp));
         return makeTuplePtr(math);
