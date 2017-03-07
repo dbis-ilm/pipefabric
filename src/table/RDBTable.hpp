@@ -79,7 +79,7 @@ class RDBTableIterator {
 
  public:
   typedef std::function<bool(const RecordType&)> Predicate;
-  typedef TuplePtr<RecordType> RecordTypePtr;
+  typedef SmartPtr<RecordType> RecordTypePtr;
 
   explicit RDBTableIterator() {}
   explicit RDBTableIterator(rocksdb::Iterator* i, Predicate p) : pred(p) {
@@ -108,7 +108,7 @@ class RDBTableIterator {
 
   bool isValid() const { return iter->Valid(); }
   RecordTypePtr operator*() {
-    TuplePtr<RecordType> tptr;
+    SmartPtr<RecordType> tptr;
     tptr.reset(pfabric::detail::sliceToTuplePtr<RecordType>(iter->value()));
     return tptr;
   }
@@ -401,13 +401,13 @@ class RDBTable : public BaseTable {
    * @param key the key value
    * @return the tuple associated with the given key
    */
-  TuplePtr<RecordType> getByKey(KeyType key) throw(TableException) {
+  SmartPtr<RecordType> getByKey(KeyType key) throw(TableException) {
     std::string resultData;
     auto status =
         db->Get(readOptions, pfabric::detail::valToSlice(key), &resultData);
     if (status.ok()) {
       // if we found the tuple we just return it
-      TuplePtr<RecordType> tptr;
+      SmartPtr<RecordType> tptr;
       tptr.reset(pfabric::detail::sliceToTuplePtr<RecordType>(
           rocksdb::Slice(resultData.data(), resultData.size())));
       return tptr;

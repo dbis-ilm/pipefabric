@@ -16,7 +16,7 @@
 using namespace pfabric;
 
 TEST_CASE("Building and running a topology via the context", "[Context]") {
-  typedef TuplePtr<Tuple<int, std::string, double> > T1;
+  typedef TuplePtr<int, std::string, double> T1;
 
   PFabricContext ctx;
 
@@ -52,7 +52,7 @@ TEST_CASE("Building and running a topology via the context", "[Context]") {
 
 TEST_CASE("Building and running a topology with SelectFromTable",
           "[Context][Topology]") {
-  typedef TuplePtr<Tuple<int, std::string, double> > T1;
+  typedef TuplePtr<int, std::string, double> T1;
 
   PFabricContext ctx;
 

@@ -68,7 +68,7 @@ For every update on `testTable` a tuple with structure `T1` and keytype `long` (
 following operators.
 
 ```C++
-typedef TuplePtr<Tuple<long, std::string, double>> T1;
+typedef TuplePtr<long, std::string, double> T1;
 
 Topology t;
 auto s = t.newStreamFromTable<T1, long>(testTable)
@@ -86,7 +86,7 @@ The following example registers a new named stream object of type `T1` first. Th
 stream by an already existing topology. Finally, the stream is then used in `fromStream` in another topology.
 
 ```C++
-typedef TuplePtr<Tuple<long, std::string, double>> T1;
+typedef TuplePtr<long, std::string, double> T1;
 
 PFabricContext ctx;
 Dataflow::BaseOpPtr myStream = ctx.createStream<T1>("streamName");
@@ -111,7 +111,7 @@ both numbers by one for all following tuples, described in a lambda function. `s
 forwarding them to the next operators.
 
 ```C++
-typedef TuplePtr<Tuple<int, int>> T1;
+typedef TuplePtr<int, int> T1;
 
 StreamGenerator<T1>::Generator gen ([](unsigned long n) -> T1 {
     return makeTuplePtr((int)n, (int)n + 10);
@@ -132,7 +132,7 @@ This operator processes a stream of strings, splits each tuple using the given s
 The following example reads tuples from a file called "data.csv" and extracts tuples out of it, consisting out of three integer attributes.
 
 ```
-typedef TuplePtr<Tuple<int,int,int>> Tin;
+typedef TuplePtr<int,int,int> Tin;
 
 Topology t;
 auto s = t.newStreamFromFile("data.csv")
@@ -149,7 +149,7 @@ The following example reads JSON strings from REST source and extracts them into
 (data).
 
 ```C++
-typedef TuplePtr<Tuple<int, double>> Tin;
+typedef TuplePtr<int, double> Tin;
 
 auto s = t.newStreamFromREST(8099, "^/publish$", RESTSource::POST_METHOD)
           .extractJson<Tin>({"key", "data"})
@@ -166,7 +166,7 @@ The following example reads again tuples from a file called "data.csv". After ex
 (mod 2) are dropped.
 
 ```C++
-typedef TuplePtr<Tuple<int,int,int>> Tin;
+typedef TuplePtr<int,int,int> Tin;
 
 Topology t;
 auto s = t.newStreamFromFile("data.csv")
@@ -185,8 +185,8 @@ The following example reads tuples again from "data.csv". Each tuple consists ou
 tuple only consists out of one integer attribute (the second attribute from inserted tuple).
 
 ```C++
-typedef TuplePtr<Tuple<int,int,int>> Tin;
-typedef TuplePtr<Tuple<int>> Tout;
+typedef TuplePtr<int,int,int> Tin;
+typedef TuplePtr<int> Tout;
 
 Topology t;
 auto s = t.newStreamFromFile("data.csv")
@@ -206,8 +206,8 @@ defined, containing the mentioned tuple count and sum. After reading and extract
 the `statefulMap` operator, returning tuple count and sum to next operators.
 
 ```C++
-typedef TuplePtr<Tuple<int,int,int>> Tin;
-typedef TuplePtr<Tuple<int, int>> Tout;
+typedef TuplePtr<int,int,int> Tin;
+typedef TuplePtr<int, int> Tout;
 
 struct MyState {
         MyState() : cnt(0), sum(0) {}
@@ -231,8 +231,8 @@ This operator prints each tuple to the stream `s` where the default value for `s
 
 The following example prints all tuples (three integer attributes each) from file to console (per std::cout).
 
-```
-typedef TuplePtr<Tuple<int,int,int>> Tin;
+```C++
+typedef TuplePtr<int,int,int> Tin;
 
 Topology t;
 auto s = t.newStreamFromFile("data.csv")
@@ -248,7 +248,7 @@ This operator saves incoming tuples into a file named `fname`. `ffun` is an opti
 The following example reads tuples from "data.csv", selecting only tuples whose first attribute is even, and saves them to "resultFile.txt".
 
 ```C++
-typedef TuplePtr<Tuple<int,int,int>> Tin;
+typedef TuplePtr<int,int,int> Tin;
 
 Topology t;
 auto s = t.newStreamFromFile("data.csv")
@@ -279,7 +279,7 @@ The following two examples show the use of the `keyBy` operator, doing the same 
 to first attribute (integer) and can now be used for following functions, like a join or grouping.
 
 ```C++
-typedef TuplePtr<Tuple<int,int,int>> Tin;
+typedef TuplePtr<int,int,int> Tin;
 
 Topology t;
 auto s = t.newStreamFromFile("data.csv")
@@ -287,8 +287,8 @@ auto s = t.newStreamFromFile("data.csv")
           .keyBy<int>([](auto tp) { return get<0>(tp); })
 ```
 
-```
-typedef TuplePtr<Tuple<int,int,int>> Tin;
+```C++
+typedef TuplePtr<int,int,int> Tin;
 
 Topology t;
 auto s = t.newStreamFromFile("data.csv")
@@ -307,7 +307,7 @@ a function to calculate the corresponding timestamp. The second method uses a sp
 The following two examples show the usage of this operator (with same results on different syntax), both setting the second attribute as timestamp.
 
 ```C++
-typedef TuplePtr<Tuple<int,std::string,int>> Tin;
+typedef TuplePtr<int,std::string,int> Tin;
 
 Topology t;
 auto s = t.newStreamFromFile("data.csv")
@@ -316,7 +316,7 @@ auto s = t.newStreamFromFile("data.csv")
 ```
 
 ```C++
-typedef TuplePtr<Tuple<int,std::string,int>> Tin;
+typedef TuplePtr<int,std::string,int> Tin;
 
 Topology t;
 auto s = t.newStreamFromFile("data.csv")
@@ -386,7 +386,7 @@ example creates a state class for computing the average, the count, and the sum 
 of `int` values:
 
 ```C++
-typedef TuplePtr<Tuple<int>> InTuple;
+typedef TuplePtr<int> InTuple;
 typedef Aggregator3<
   InTuple,          // the input type for the aggregation
   AggrAvg<int, int>,// an aggregate for calculating the average (input column type = int, output type = int)
@@ -429,8 +429,8 @@ In order to specify the key for grouping the `keyBy` operator is needed. Note, t
 class to store the grouping value in the aggregator class.
 
 ```C++
-typedef TuplePtr<Tuple<int, int, int>> Tin;
-typedef TuplePtr<Tuple<int, int> > AggrRes; // group_id, sum(col1), but not needed here!
+typedef TuplePtr<int, int, int> Tin;
+typedef TuplePtr<int, int> AggrRes; // group_id, sum(col1), but not needed here!
 typedef Aggregator2<AggrRes, AggrIdentity<int>, 0, AggrSum<int>, 1> AggrState;
 
 Topology t;
@@ -453,8 +453,8 @@ The following example illustrates the usage of the join operator:
 
 
 ```C++
-typedef TuplePtr<Tuple<int, int, double>> T1;
-typedef TuplePtr<Tuple<int, int, std::string>> T2;
+typedef TuplePtr<int, int, double> T1;
+typedef TuplePtr<int, int, std::string> T2;
 
 Topology t;
 
@@ -479,7 +479,7 @@ tuple. Note that the tuple cannot be modified for the stream (use `map` instead)
 conditions if you modify a global state in the callback functions.
 
 ```C++
-typedef TuplePtr<Tuple<int,std::string,int>> Tin;
+typedef TuplePtr<int,std::string,int> Tin;
 
 Topology t;
 auto s = t.newStreamFromFile("data.csv")
@@ -536,7 +536,7 @@ that is forwarded to the subscribers as a single tuple. A batch is defined as fo
 
 ```C++
 template <typename T>
-using BatchPtr = TuplePtr<Tuple<std::vector<std::pair<T, bool>>>>;
+using BatchPtr = TuplePtr<std::vector<std::pair<T, bool>>>;
 ```
 
 where `T` denotes the type of the input tuple and the pairs represent the tuple as well as its outdated flag.

@@ -54,8 +54,8 @@ using namespace ns_types;
  */
 void TopologyMapWhereTest(benchmark::State& state) {
 	
-  typedef TuplePtr<Tuple<int, std::string, double> > T1;
-  typedef TuplePtr<Tuple<double, int> > T2;
+  typedef TuplePtr<int, std::string, double> T1;
+  typedef TuplePtr<double, int> T2;
 
   TestDataGenerator tgen("file.csv");
   tgen.writeData(1000);
@@ -86,8 +86,8 @@ BENCHMARK(TopologyMapWhereTest);
  */
 void TopologyWhereMapTest(benchmark::State& state) {
 	
-  typedef TuplePtr<Tuple<int, std::string, double> > T1;
-  typedef TuplePtr<Tuple<double, int> > T2;
+  typedef TuplePtr<int, std::string, double> T1;
+  typedef TuplePtr<double, int> T2;
 
   TestDataGenerator tgen("file.csv");
   tgen.writeData(1000);
@@ -115,8 +115,8 @@ BENCHMARK(TopologyWhereMapTest);
  */
 void TopologyPartitionedWhereBeforeMapTest(benchmark::State& state) {
 	
-  typedef TuplePtr<Tuple<int, std::string, double> > T1;
-  typedef TuplePtr<Tuple<double, int> > T2;
+  typedef TuplePtr<int, std::string, double> T1;
+  typedef TuplePtr<double, int> T2;
 
   TestDataGenerator tgen("file.csv");
   tgen.writeData(1000);
@@ -163,8 +163,8 @@ double doMath(double input) {
  */
 void TopologyGroupByTest(benchmark::State& state) {
 	
-  typedef TuplePtr<Tuple<int, std::string, double> > T1;
-  typedef TuplePtr<Tuple<double> > T2;
+  typedef TuplePtr<int, std::string, double> T1;
+  typedef TuplePtr<double> T2;
   typedef Aggregator1<T1, AggrSum<double>, 2> AggrStateSum;
 
   TestDataGenerator tgen("file.csv");
@@ -194,8 +194,8 @@ BENCHMARK(TopologyGroupByTest);
  */
 void TopologyPartitionedGroupByTest(benchmark::State& state) {
 	
-  typedef TuplePtr<Tuple<int, std::string, double> > T1;
-  typedef TuplePtr<Tuple<double> > T2;
+  typedef TuplePtr<int, std::string, double> T1;
+  typedef TuplePtr<double> T2;
   typedef Aggregator1<T1, AggrSum<double>, 2> AggrStateSum;
 
   TestDataGenerator tgen("file.csv");

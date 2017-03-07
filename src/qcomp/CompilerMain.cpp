@@ -13,7 +13,7 @@ using namespace pfabric;
 
 namespace po = boost::program_options;
 
-typedef TuplePtr<Tuple<int, double> > InTuplePtr;
+typedef TuplePtr<int, double> InTuplePtr;
 
 PFabricContext::TopologyPtr createStreamQuery(PFabricContext& ctx) {
   auto myTable = ctx.getTable<InTuplePtr::element_type, int>("SENSOR_DATA");

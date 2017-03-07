@@ -5,10 +5,11 @@
 using namespace pfabric;
 
 // the structure of tuples we receive via REST
-typedef TuplePtr<Tuple<int, double> > InTuplePtr;
+// typedef TuplePtr<Tuple<int, double> > InTuplePtr;
+typedef TuplePtr<int, double> InTuplePtr;
 
 // the structure of aggregate tuples
-typedef TuplePtr<Tuple<double> > ResultTuplePtr;
+// typedef TuplePtr<Tuple<double> > ResultTuplePtr;
 
 // the aggregate operator needs a state object that is defined here:
 // template parameters are: the input type,

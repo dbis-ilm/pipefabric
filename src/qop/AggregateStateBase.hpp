@@ -120,7 +120,7 @@ public:
 	/**
 	 * The tuple type representing the aggregation result.
 	 */
-	typedef TuplePtr<Tuple<typename Aggr1Func::ResultType>> ResultTypePtr;
+	typedef TuplePtr<typename Aggr1Func::ResultType> ResultTypePtr;
 
 	/**
 	 * Typedef for a pointer to the aggregation state.
@@ -196,8 +196,8 @@ public:
 	/**
 	 * The tuple type representing the aggregation result.
 	 */
-	typedef TuplePtr<Tuple<typename Aggr1Func::ResultType,
-												 typename Aggr2Func::ResultType>> ResultTypePtr;
+	typedef TuplePtr<typename Aggr1Func::ResultType,
+									 typename Aggr2Func::ResultType> ResultTypePtr;
 	/**
 	 * Typedef for a pointer to the aggregation state.
 	 */
@@ -289,9 +289,9 @@ public:
 	/**
 	 * The tuple type representing the aggregation result.
 	 */
-	typedef TuplePtr<Tuple<typename Aggr1Func::ResultType,
-												 typename Aggr2Func::ResultType,
-												 typename Aggr3Func::ResultType>> ResultTypePtr;
+	typedef TuplePtr<typename Aggr1Func::ResultType,
+									 typename Aggr2Func::ResultType,
+									 typename Aggr3Func::ResultType> ResultTypePtr;
 
 	/**
 	 * Typedef for a pointer to the aggregation state.
@@ -395,10 +395,10 @@ public:
 	/**
 	 * The tuple type representing the aggregation result.
 	 */
-	typedef TuplePtr<Tuple<typename Aggr1Func::ResultType,
-												 typename Aggr2Func::ResultType,
-												 typename Aggr3Func::ResultType,
-												 typename Aggr4Func::ResultType>> ResultTypePtr;
+	typedef TuplePtr<typename Aggr1Func::ResultType,
+									 typename Aggr2Func::ResultType,
+									 typename Aggr3Func::ResultType,
+									 typename Aggr4Func::ResultType> ResultTypePtr;
 
 	/**
 	 * Typedef for a pointer to the aggregation state.

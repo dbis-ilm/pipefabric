@@ -25,8 +25,8 @@ using namespace pfabric;
 using namespace ns_types;
 
 TEST_CASE("Building and running a simple topology", "[Topology]") {
-  typedef TuplePtr<Tuple<int, std::string, double> > T1;
-  typedef TuplePtr<Tuple<double, int> > T2;
+  typedef TuplePtr<int, std::string, double> T1;
+  typedef TuplePtr<double, int> T2;
 
   TestDataGenerator tgen("file.csv");
   tgen.writeData(5);
@@ -50,7 +50,7 @@ TEST_CASE("Building and running a simple topology", "[Topology]") {
 }
 
 TEST_CASE("Building and running a topology with ZMQ", "[Topology]") {
-  typedef TuplePtr<Tuple<int, int> > T1;
+  typedef TuplePtr<int, int> T1;
 
   zmq::context_t context (1);
   zmq::socket_t publisher (context, ZMQ_PUB);
@@ -89,7 +89,7 @@ TEST_CASE("Building and running a topology with ZMQ", "[Topology]") {
 }
 
 TEST_CASE("Building and running a topology with ToTable", "[Topology]") {
-  typedef TuplePtr<Tuple<int, std::string, double> > T1;
+  typedef TuplePtr<int, std::string, double> T1;
 
   auto testTable = std::make_shared<Table<T1::element_type, int>>("TopTable");
 
@@ -116,8 +116,8 @@ TEST_CASE("Building and running a topology with ToTable", "[Topology]") {
 }
 
 TEST_CASE("Building and running a topology with partitioning", "[Topology]") {
-  typedef TuplePtr<Tuple<int, std::string, double> > T1;
-  typedef TuplePtr<Tuple<int> > T2;
+  typedef TuplePtr<int, std::string, double> T1;
+  typedef TuplePtr<int> T2;
 
   TestDataGenerator tgen("file.csv");
   tgen.writeData(1000);
@@ -152,8 +152,8 @@ TEST_CASE("Building and running a topology with partitioning", "[Topology]") {
 }
 
 TEST_CASE("Building and running a topology with batcher", "[Topology]") {
-  typedef TuplePtr<Tuple<int, std::string, double> > T1;
-  typedef TuplePtr<Tuple<int> > T2;
+  typedef TuplePtr<int, std::string, double> T1;
+  typedef TuplePtr<int> T2;
   typedef BatchPtr<T2> B2;
 
   TestDataGenerator tgen("file.csv");
@@ -187,7 +187,7 @@ TEST_CASE("Building and running a topology with batcher", "[Topology]") {
 }
 
 TEST_CASE("Building and running a topology with stream generator", "[StreamGenerator]") {
-    typedef TuplePtr<Tuple<int,int,int>> MyTuplePtr;
+    typedef TuplePtr<int,int,int> MyTuplePtr;
 
     auto testTable = std::make_shared<Table<MyTuplePtr::element_type, int>>("StreamGenTable");
 
@@ -215,8 +215,8 @@ TEST_CASE("Building and running a topology with stream generator", "[StreamGener
 }
 
 TEST_CASE("Building and running a topology with grouping", "[GroupBy]") {
-    typedef TuplePtr<Tuple<int, double> > T1;
-    typedef TuplePtr<Tuple<double> > T2;
+    typedef TuplePtr<int, double> T1;
+    typedef TuplePtr<double> T2;
     typedef Aggregator1<T1, AggrSum<double>, 1> AggrStateSum;
 
     StreamGenerator<T1>::Generator streamGen ([](unsigned long n) -> T1 {
@@ -243,8 +243,8 @@ struct MySumState {
 };
 
 TEST_CASE("Building and running a topology with stateful map", "[StatefulMap]") {
-  typedef TuplePtr<Tuple<unsigned long, double>> MyTuplePtr;
-  typedef TuplePtr<Tuple<double> > AggregationResultPtr;
+  typedef TuplePtr<unsigned long, double> MyTuplePtr;
+  typedef TuplePtr<double> AggregationResultPtr;
   typedef StatefulMap<AggregationResultPtr, AggregationResultPtr, MySumState> TestMap;
 
   StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {
@@ -280,7 +280,7 @@ TEST_CASE("Building and running a topology with stateful map", "[StatefulMap]") 
 }
 
 TEST_CASE("Combining tuples from two streams to one stream", "[ToStream]") {
-  typedef TuplePtr<Tuple<int, std::string, double> > T1;
+  typedef TuplePtr<int, std::string, double> T1;
 
   TestDataGenerator tgen("file.csv");
   tgen.writeData(100);

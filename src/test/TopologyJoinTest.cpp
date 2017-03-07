@@ -20,7 +20,7 @@ using namespace pfabric;
 using namespace ns_types;
 
 TEST_CASE("Building and running a topology with joins", "[Unpartitioned Join]") {
-  typedef TuplePtr<Tuple<int, std::string, double> > T1;
+  typedef TuplePtr<int, std::string, double> T1;
 
   TestDataGenerator tgen1("file1.csv");
   tgen1.writeData(5);
@@ -53,8 +53,8 @@ TEST_CASE("Building and running a topology with joins", "[Unpartitioned Join]") 
 
 TEST_CASE("Building and running a topology with joins on different tuple formats",
           "[Join different tuples]") {
-  typedef TuplePtr<Tuple<int, std::string, double> > T1;
-  typedef TuplePtr<Tuple<int, double>> T2;
+  typedef TuplePtr<int, std::string, double> T1;
+  typedef TuplePtr<int, double> T2;
 
   TestDataGenerator tgen1("file1.csv");
   tgen1.writeData(5);
@@ -90,7 +90,7 @@ TEST_CASE("Building and running a topology with joins on different tuple formats
 
 TEST_CASE("Building and running a topology with a join on one partitioned stream", 
           "[Partitioned and unpartitioned Join]") {
-  typedef TuplePtr<Tuple<unsigned long, unsigned long>> MyTuplePtr;
+  typedef TuplePtr<unsigned long, unsigned long> MyTuplePtr;
 
   StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {
     return makeTuplePtr(n, n % 100); 

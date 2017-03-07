@@ -30,7 +30,7 @@
 namespace pfabric {
 
 template <typename InputStreamElement>
-using BatchPtr = TuplePtr<Tuple<std::vector<std::pair<InputStreamElement, bool>>>>;
+using BatchPtr = TuplePtr<std::vector<std::pair<InputStreamElement, bool>>>;
 
 template <typename InputStreamElement>
 class Batcher : public UnaryTransform< InputStreamElement, BatchPtr<InputStreamElement> > // use default unary transform

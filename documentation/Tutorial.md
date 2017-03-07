@@ -15,10 +15,10 @@ Next, we define the schema: the tuple types for representing input and output da
 
 ```C++
 // the structure of tuples we receive via REST
-typedef TuplePtr<Tuple<int, double> > InTuplePtr;
+typedef TuplePtr<int, double> InTuplePtr;
 
 // the structure of our output (aggregate) tuples
-typedef TuplePtr<Tuple<double> > ResultTuplePtr;
+typedef TuplePtr<double> ResultTuplePtr;
 ```
 
 And for the aggregation we have to define a type the captures the aggregation state.

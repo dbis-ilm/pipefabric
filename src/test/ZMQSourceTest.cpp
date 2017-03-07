@@ -19,8 +19,7 @@
 
 using namespace pfabric;
 
-typedef Tuple< int, int > MyTuple;
-typedef TuplePtr< MyTuple > MyTuplePtr;
+typedef TuplePtr< int, int > MyTuplePtr;
 
 /**
  * A simple test of the ZMQSource operator.

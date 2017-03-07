@@ -4,11 +4,12 @@ The main data structure for representing elements of a data stream is the `Tuple
 represents a template class which can parametrized with the attribute types of the element. Note,
 that timestamps are not represented separately: timestamps can be derived from any attribute (or
 a combination of attributes). Furthermore, tuples are not copied around but only passed by reference.
-For this purpose, the `TuplePtr<>` template is used. Thus, a complete schema definition for a stream
+For this purpose, usually the `TuplePtr<>` template is used instead of `Tuple` which simply wraps
+a tuple with an intrusive pointer. Thus, a complete schema definition for a stream
 looks like the following:
 
 ```C++
-typedef TuplePtr<Tuple<int, std::string, double> > T1;
+typedef TuplePtr<int, std::string, double> T1;
 ```
 
 Tuples can be constructed using the `makeTuplePtr` function which of course requires correctly
@@ -31,8 +32,8 @@ which allows to specify processing steps in a DSL very similar to Apache Spark. 
 code snippet gives an example. See below for an explanation of the provided operators.
 
 ```C++
-typedef TuplePtr<Tuple<int, std::string, double> > T1;
-typedef TuplePtr<Tuple<double, int> > T2;
+typedef TuplePtr<int, std::string, double> T1;
+typedef TuplePtr<double, int> T2;
 
 Topology t;
 auto s = t.newStreamFromFile("file.csv")

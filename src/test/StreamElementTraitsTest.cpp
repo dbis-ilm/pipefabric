@@ -144,13 +144,12 @@ struct TestStreamElementTraits {
 
 
 TEST_CASE( "Properties of StreamElementTraits", "[StreamElementTraits]" ) {
-	typedef Tuple< int, char , int > TestTuple;
-	typedef TuplePtr< TestTuple > TestTuplePtr;
-	typedef TestTuple* RawTestTuplePtr;
+	typedef TuplePtr< int, char, int > TestTuplePtr;
+	typedef TestTuplePtr::element_type* RawTestTuplePtr;
 
 	typedef boost::mpl::vector<
 		CustomElement,
-		TestTuple,
+		TestTuplePtr::element_type,
 		TestTuplePtr,
 		RawTestTuplePtr
 	> TestElementTypes;

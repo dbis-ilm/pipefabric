@@ -19,8 +19,7 @@
 
 using namespace pfabric;
 
-typedef Tuple< int, int, int > ATuple;
-typedef TuplePtr< ATuple > ATuplePtr;
+typedef TuplePtr< int, int, int > ATuplePtr;
 
 TEST_CASE("Extracting tuples from text lines", "[TupleExtractor]") {
 	const char *s[] = { "0,0,0", "1,1,10", "2,2,20" };
@@ -109,7 +108,7 @@ TEST_CASE("Extracting more tuples from text lines with null values", "[TupleExtr
 			makeTuplePtr(StringRef(s[0], strlen(s[0]))),
 			makeTuplePtr(StringRef(s[1], strlen(s[1]))) };
 
-	typedef TuplePtr<Tuple<std::string, long, long, std::string, std::string, long, long>> CommentType;
+	typedef TuplePtr<std::string, long, long, std::string, std::string, long, long> CommentType;
 
 	std::vector<CommentType> expected = {
 		makeTuplePtr(std::string("2010-03-03T17:34:40.328+0000"),

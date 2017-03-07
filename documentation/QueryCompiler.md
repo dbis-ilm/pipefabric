@@ -29,7 +29,7 @@ using namespace pfabric;
 
 BUILDER_CLASS(Query_2)
 
-typedef TuplePtr<Tuple<int, double>> Tuple_1_Type_;
+typedef TuplePtr<int, double> Tuple_1_Type_;
 
 PFabricContext::TopologyPtr Query_2::create(PFabricContext& ctx) {
         auto SENSOR_DATA = ctx.getTable<Tuple_1_Type_::element_type, int>("SENSOR_DATA");

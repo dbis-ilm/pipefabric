@@ -18,8 +18,8 @@ using namespace pfabric;
 using namespace ns_types;
 
 TEST_CASE("Building and running a topology with standard grouping", "[GroupBy]") {
-  typedef TuplePtr<Tuple<std::string, int>> MyTuplePtr;
-  typedef TuplePtr<Tuple<std::string, int>> AggrRes;
+  typedef TuplePtr<std::string, int> MyTuplePtr;
+  typedef TuplePtr<std::string, int> AggrRes;
   typedef Aggregator2<MyTuplePtr, AggrIdentity<std::string>, 0, AggrCount<int, int>, 1> AggrState;
 
   std::map<std::string, int> results;
@@ -58,8 +58,8 @@ public:
 
 TEST_CASE("Building and running a topology with simple unpartitioned grouping", 
         "[Simple unpartitioned Grouping]") {
-  typedef TuplePtr<Tuple<unsigned long, double>> MyTuplePtr;
-  typedef TuplePtr<Tuple<double> > AggregationResultPtr;
+  typedef TuplePtr<unsigned long, double> MyTuplePtr;
+  typedef TuplePtr<double> AggregationResultPtr;
   typedef Aggregator1<MyTuplePtr, AggrSum<double>, 1> AggrStateSum;
         
   StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {
@@ -98,7 +98,7 @@ TEST_CASE("Building and running a topology with simple unpartitioned grouping",
 
 TEST_CASE("Building and running a topology with unpartitioned grouping", 
         "[Unpartitioned Grouping]") {
-  typedef TuplePtr<Tuple<unsigned long, double>> MyTuplePtr;
+  typedef TuplePtr<unsigned long, double> MyTuplePtr;
   typedef MyAggregateState<const MyTuplePtr&> MyAggrState;
   typedef std::shared_ptr<MyAggrState> MyAggrStatePtr;
 	
@@ -112,7 +112,7 @@ TEST_CASE("Building and running a topology with unpartitioned grouping",
 			          myState->sum1_.iterate(get<1>(tp), outdated);
 		          };
 	
-  typedef TuplePtr<Tuple<int, double>> AggregationResultPtr;
+  typedef TuplePtr<int, double> AggregationResultPtr;
         
   StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {
     if (n<500) return makeTuplePtr((unsigned long)0, (double)n + 0.5);
@@ -164,7 +164,7 @@ TEST_CASE("Building and running a topology with unpartitioned grouping",
 
 TEST_CASE("Building and running a topology with partitioned grouping", 
         "[Partitioned Grouping]") {
-  typedef TuplePtr<Tuple<unsigned long, double>> MyTuplePtr;
+  typedef TuplePtr<unsigned long, double> MyTuplePtr;
   typedef MyAggregateState<const MyTuplePtr&> MyAggrState;
   typedef std::shared_ptr<MyAggrState> MyAggrStatePtr;
 	
@@ -178,7 +178,7 @@ TEST_CASE("Building and running a topology with partitioned grouping",
 			          myState->sum1_.iterate(get<1>(tp), outdated);
 		          };
 	
-  typedef TuplePtr<Tuple<int, double>> AggregationResultPtr;
+  typedef TuplePtr<int, double> AggregationResultPtr;
         
   StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {
     if (n<500) return makeTuplePtr((unsigned long)0, (double)n + 0.5);

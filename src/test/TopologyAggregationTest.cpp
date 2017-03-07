@@ -19,8 +19,8 @@ using namespace ns_types;
 
 TEST_CASE("Building and running a topology with unpartitioned aggregation", 
         "[Unpartitioned Aggregation]") {
-  typedef TuplePtr<Tuple<unsigned long, double>> MyTuplePtr;
-  typedef TuplePtr<Tuple<double> > AggregationResultPtr;
+  typedef TuplePtr<unsigned long, double> MyTuplePtr;
+  typedef TuplePtr<double> AggregationResultPtr;
   typedef Aggregator1<MyTuplePtr, AggrSum<double>, 1> AggrStateSum;
         
   StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {
@@ -55,8 +55,8 @@ TEST_CASE("Building and running a topology with unpartitioned aggregation",
 
 TEST_CASE("Building and running a topology with partitioned aggregation", 
         "[Partitioned Aggregation]") {
-  typedef TuplePtr<Tuple<unsigned long, double>> MyTuplePtr;
-  typedef TuplePtr<Tuple<double> > AggregationResultPtr;
+  typedef TuplePtr<unsigned long, double> MyTuplePtr;
+  typedef TuplePtr<double> AggregationResultPtr;
   typedef Aggregator1<MyTuplePtr, AggrSum<double>, 1> AggrStateSum;
 
   StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {

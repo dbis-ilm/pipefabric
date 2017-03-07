@@ -68,10 +68,14 @@ class Punctuation;
 typedef std::shared_ptr< Punctuation > PunctuationPtr;
 
 
+#if 0
 /// a pointer to a generic tuple
 template< typename TupleType >
 using TuplePtr = boost::intrusive_ptr< TupleType >;
+#endif
 
+template< typename T >
+using SmartPtr = boost::intrusive_ptr< T >;
 
 class BaseAggregateState;
 

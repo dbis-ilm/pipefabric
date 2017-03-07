@@ -17,8 +17,7 @@
 
 using namespace pfabric;
 
-typedef Tuple<int, int, Timestamp> MyTuple;
-typedef TuplePtr<MyTuple> MyTuplePtr;
+typedef TuplePtr<int, int, Timestamp> MyTuplePtr;
 
 class TupleGenerator :
 	public DataSource< MyTuplePtr >,

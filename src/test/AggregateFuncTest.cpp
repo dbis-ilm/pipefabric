@@ -198,7 +198,7 @@ TEST_CASE("Test AggrIdentity function", "[AggregateFunc]") {
   AggrIdentity<std::string> aggr2;
 	std::vector<std::string> data = { "aaa", "bbb", "ccc", "ddd", "eee" };
 
-  for (int i = 0; i < data.size(); i++)
+  for (unsigned i = 0; i < data.size(); i++)
     aggr2.iterate(data[i]);
 
   REQUIRE(aggr2.value() == "eee");
