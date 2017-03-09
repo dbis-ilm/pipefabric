@@ -1,0 +1,9 @@
+http://data.org/id/1,http://data.org/name,Meier
+http://data.org/id/1,http://data.org/price,42
+http://data.org/id/1,http://data.org/someOther,Schulze
+http://data.org/id/2,http://data.org/name,Müller
+http://data.org/id/2,http://data.org/price,12
+http://data.org/id/2,http://data.org/someOther,Schulze
+http://data.org/id/3,http://data.org/name,Wagner
+http://data.org/id/3,http://data.org/price,5
+http://data.org/id/3,http://data.org/someOther,Krause
