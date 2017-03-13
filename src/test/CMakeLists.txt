@@ -42,6 +42,8 @@ if (BUILD_TEST_CASES)
 	do_test(PartitionTest)
 	do_test(BarrierTest)
 	do_test(StreamGeneratorTest)
+	do_test(TuplifierTest)
+	do_test(BPTreeTest)
 
 	if (USE_ROCKSDB_TABLE)
 	  do_test(RocksDBTest)

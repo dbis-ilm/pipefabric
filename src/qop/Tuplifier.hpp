@@ -34,6 +34,19 @@
 #include "qop/UnaryTransform.hpp"
 
 namespace pfabric {
+  struct TuplifierParams {
+ /**
+   * An enumeration to specify the tuplifying mode
+   */
+  enum TuplifyMode {
+    ORDERED,     //< we assume triples arrive ordered on the subject
+    WINDOW,      //< we maintain a time window and publish all tuples (including
+                 //incomplete tuples) if they are outdated
+    PUNCTUATED,  //< at a punctuation we publish all tuples received so far
+    COMPLETED    //< as soon as a tuple is complete, we publish it
+  };
+};
+
 /**
  * @brief this class provides an operator to transform a set of primtive tuples
  * (triples)
@@ -60,18 +73,7 @@ class Tuplifier
     : public UnaryTransform<InputStreamElement, OutputStreamElement> {
   PFABRIC_UNARY_TRANSFORM_TYPEDEFS(InputStreamElement, OutputStreamElement)
  public:
-  /**
-   * An enumeration to specify the tuplifying mode
-   */
-  enum TuplifyMode {
-    ORDERED,     //< we assume triples arrive ordered on the subject
-    WINDOW,      //< we maintain a time window and publish all tuples (including
-                 //incomplete tuples) if they are outdated
-    PUNCTUATED,  //< at a punctuation we publish all tuples received so far
-    COMPLETED    //< as soon as a tuple is complete, we publish it
-  };
-
-  /**
+ /**
    * A typedef for predicates list
    */
   typedef std::vector<std::string> PredicateList;
@@ -86,7 +88,7 @@ class Tuplifier
    * @param m the tuplifying mode
    * @param ws a window size for periodic notification (default = 0)
    */
-  Tuplifier(const std::initializer_list<std::string>& predList, TuplifyMode m, unsigned int ws = 0)
+  Tuplifier(const std::initializer_list<std::string>& predList, TuplifierParams::TuplifyMode m, unsigned int ws = 0)
       : mode(m),
         currentSubj(),
         notifier(
@@ -102,7 +104,7 @@ class Tuplifier
   }
 
   Tuplifier(TimestampExtractorFunc func, 
-      const std::initializer_list<std::string>& predList, TuplifyMode m, unsigned int ws = 0) : 
+      const std::initializer_list<std::string>& predList, TuplifierParams::TuplifyMode m, unsigned int ws = 0) : 
       Tuplifier(predList, m, ws),
       mTimestampExtractor(func) {}
 
@@ -141,7 +143,7 @@ class Tuplifier
    */
   void processDataElement(const InputStreamElement& data,
                           const bool outdated = false) {
-    if (mode == ORDERED) {
+    if (mode == TuplifierParams::ORDERED) {
       const std::string& subj = get<0>(*data);
       if (currentSubj.empty() || subj == currentSubj) {
         // add triple to buffer
@@ -158,7 +160,7 @@ class Tuplifier
       // just add to tuple to the buffer
       addToBuffer(data);
 
-      if (mode == COMPLETED) {
+      if (mode == TuplifierParams::COMPLETED) {
         // we try to publish all completed tuples
         produceCompleteTuples();
       }
@@ -176,7 +178,7 @@ class Tuplifier
    * (outdated == true)
    */
   void processPunctuation(const PunctuationPtr& pp) {
-    if (mode == ORDERED) {
+    if (mode == TuplifierParams::ORDERED) {
       produceTupleForSubject(currentSubj);
     } else {
       produceAllTuples();
@@ -235,7 +237,7 @@ class Tuplifier
       it->second.matches++;
       it->second.tripleList.push_back(data);
     } else {
-      const Timestamp ts = this->mTimestampExtractor(data);
+      const Timestamp ts = this->mTimestampExtractor == nullptr ? 0 : this->mTimestampExtractor(data);
       
       BufferItem item(ts);
       item.tripleList.push_back(data);
@@ -310,7 +312,7 @@ class Tuplifier
       tupleBuffer;  //< a buffer for all received triples not yet published
   PredicateMap predicates;  //< a map containing all predicates and their
                             //position in the tuple
-  TuplifyMode mode;         //< the mode for constructing tuples from triples
+  TuplifierParams::TuplifyMode mode;         //< the mode for constructing tuples from triples
   std::string currentSubj;  //< the current subject in the triple stream (only
                             //useful for ordered)
   std::unique_ptr<TriggerNotifier> notifier;  //< the notifier object which

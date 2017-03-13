@@ -54,6 +54,7 @@
 #include "qop/TumblingWindow.hpp"
 #include "qop/TupleDeserializer.hpp"
 #include "qop/TupleExtractor.hpp"
+#include "qop/Tuplifier.hpp"
 #include "qop/Where.hpp"
 #include "qop/ZMQSink.hpp"
 
@@ -171,13 +172,11 @@ class Pipe {
     return dataflow->addPublisher(op);
   }
 
-  template <typename JoinOp, typename OtherSource>
+  template <typename T2, typename KeyType>
   OpIterator addPartitionedJoin(
-      std::vector<std::shared_ptr<JoinOp>>& opList, OtherSource* otherOp,
+      std::vector<std::shared_ptr<SHJoin<T, T2, KeyType>>>& opList, DataSource<T2>* otherOp,
       PartitioningState otherPartitioningState) throw(TopologyException) {
-    typedef typename PartitionBy<T>::InputDataChannel InputDataChannel;
-    typedef typename PartitionBy<T>::InputPunctuationChannel
-        InputPunctuationChannel;
+    typedef typename std::shared_ptr<SHJoin<T, T2, KeyType>> JoinOpPtr;
     if (partitioningState == NoPartitioning)
       throw TopologyException("Missing partitionBy operator in topology.");
 
@@ -185,14 +184,14 @@ class Pipe {
       auto partition = castOperator<PartitionBy<T>>(getPublisher());
 
       for (auto i = 0u; i < opList.size(); i++) {
-        auto op = opList[i];
+        // auto op = opList[i];
+        JoinOpPtr op = opList[i];
 
         // connect to left input channels
         partition->connectChannelsForPartition(
             i,
-            reinterpret_cast<InputDataChannel&>(op->getLeftInputDataChannel()),
-            reinterpret_cast<InputPunctuationChannel&>(
-                op->getInputPunctuationChannel()));
+            op->getLeftInputDataChannel(),
+            op->getInputPunctuationChannel());
         // connect to right input channels
         if (otherPartitioningState == NoPartitioning) {
           connectChannels(otherOp->getOutputDataChannel(),
@@ -833,6 +832,26 @@ class Pipe {
     }
   }
 
+  template <typename Tout>
+  Pipe<Tout> tuplify(const std::initializer_list<std::string>& predList, TuplifierParams::TuplifyMode m, 
+      unsigned int ws = 0) throw(TopologyException) {
+    if (partitioningState == NoPartitioning) {
+      auto op = std::make_shared<Tuplifier<T, Tout>>(predList, m, ws);
+      auto iter = addPublisher<Tuplifier<T, Tout>, DataSource<T>>(op);
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+                        partitioningState, numPartitions);
+
+    } else {
+      std::vector<std::shared_ptr<Tuplifier<T, Tout>>> ops;
+      for (auto i = 0u; i < numPartitions; i++) {
+        ops.push_back(std::make_shared<Tuplifier<T, Tout>>(predList, m, ws));
+      }
+      auto iter = addPartitionedPublisher<Tuplifier<T, Tout>, T>(ops);
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+                        partitioningState, numPartitions);
+    }
+  }
+
   /**
    * @brief Creates a stateful map operator.
    *
@@ -1224,7 +1243,7 @@ class Pipe {
           auto op = std::make_shared<SHJoin<T, T2, KeyType>>(fn1, fn2, pred);
           ops.push_back(op);
         }
-        auto iter = addPartitionedJoin<SHJoin<T, T2, KeyType>, DataSource<T2>>(
+        auto iter = addPartitionedJoin<T2, KeyType>(
             ops, otherOp, otherPipe.partitioningState);
         return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
                           partitioningState, numPartitions);
@@ -1381,7 +1400,7 @@ class Pipe {
       auto pOp = castOperator<DataSource<T>>(iter->get());
       CREATE_LINK(pOp, op);
     }
-    auto iter = dataflow->addPublisher(op);
+    dataflow->addPublisher(op);
     // return Pipe(dataflow, iter, keyExtractor, timestampExtractor,
     // partitioningState, numPartitions);
 

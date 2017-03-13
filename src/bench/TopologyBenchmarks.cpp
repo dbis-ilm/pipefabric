@@ -229,9 +229,9 @@ BENCHMARK(TopologyPartitionedGroupByTest);
  *Testing method six: partitioned join
  *ERROR while testing: "double free or corruption (out)"
  */
-/*void TopologyPartitionedJoinTest(benchmark::State& state) {
+void TopologyPartitionedJoinTest(benchmark::State& state) {
 	
-  typedef TuplePtr<Tuple<int, std::string, double> > T1;
+  typedef TuplePtr<int, std::string, double> T1;
 
   TestDataGenerator tgen1("file1.csv");
   tgen1.writeData(100);
@@ -251,8 +251,8 @@ BENCHMARK(TopologyPartitionedGroupByTest);
 	  .join<int>(s1, [](auto tp1, auto tp2) { return true; })
 	  .merge();
 
-    t.start(false);
-	  
+    t.start();
+	  t.wait();  
 	//BAD: Takes far too long because of iteration number
 	//wait for results - stop timer
 	//state.PauseTiming();
@@ -260,7 +260,7 @@ BENCHMARK(TopologyPartitionedGroupByTest);
 	//state.ResumeTiming();
   }
 }
-BENCHMARK(TopologyPartitionedJoinTest);*/
+BENCHMARK(TopologyPartitionedJoinTest);
 
 //MAIN for benchmark tests
 BENCHMARK_MAIN();

@@ -311,3 +311,22 @@ TEST_CASE("Combining tuples from two streams to one stream", "[ToStream]") {
 
   REQUIRE(results == 200);
 }
+
+TEST_CASE("Tuplifying a stream of RDF strings", "[Tuplifier]") {
+  typedef TuplePtr<std::string, std::string, std::string> Triple;
+  typedef TuplePtr<std::string, std::string, std::string, std::string> RDFTuple;
+  std::vector<RDFTuple> results;
+  std::mutex r_mutex;
+
+  Topology t;
+  auto s = t.newStreamFromFile(std::string(TEST_DATA_DIRECTORY) + "tuplifier_test1.in")
+    .extract<Triple>(',')
+    .tuplify<RDFTuple>({ "http://data.org/name", "http://data.org/price", "http://data.org/someOther" }, 
+        TuplifierParams::ORDERED)
+    .notify([&](auto tp, bool outdated) {
+      std::lock_guard<std::mutex> lock(r_mutex);
+      results.push_back(tp);
+    });
+  t.start(false);
+  REQUIRE(results.size() == 3);
+}
