@@ -26,6 +26,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <mutex>
 
 #include <boost/unordered/unordered_map.hpp>
 
