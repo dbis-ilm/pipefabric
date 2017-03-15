@@ -46,17 +46,22 @@ option(BUILD_TEST_CASES
   ON
 )
 
-# Build benchmarks (note: requires to set BUILD_GOOGLE_BEMCH to ON)
+#Build google benchmark library
+option(BUILD_GOOGLE_BENCH
+  "build google benchmark"
+  ON
+)
+
+# Build benchmark test
 option(BUILD_BENCHMARKS
   "build benchmarks for pipefabric"
   ON
 )
 
-#Build google benchmark library with test
-option(BUILD_GOOGLE_BENCH
-  "build google benchmark"
-  ON
-)
+# Benchmark test requires benchmark library
+if (BUILD_BENCHMARKS)
+  set(BUILD_GOOGLE_BENCH ON)
+endif()
 
 # Force using intel compiler
 #include(CMakeForceCompiler)
@@ -68,10 +73,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated -g -O3 
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedefs -Wno-#pragma-messages")
 elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
-  # Require at least gcc version 5.4 ("?")
-  #if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5.4)
-  #  message(FATAL_ERROR "GCC version must be at least 5.4!")
-  #endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedefs -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -Wno-unused")
 elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Intel")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd488 -wd597")
