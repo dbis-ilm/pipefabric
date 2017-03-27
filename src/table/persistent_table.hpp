@@ -22,19 +22,24 @@
 #ifndef persistent_table_hpp_
 #define persistent_table_hpp_
 
-#include <stddef.h>
 #include <algorithm>
 #include <array>
+#include <bitset>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <iostream>
 #include <iterator>
 #include <map>
 #include <string>
+#include <typeinfo>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <core/PTuple.hpp>
 #include <core/serialize.hpp>
+#include <table/BDCCInfo.hpp>
 #include <table/TableException.hpp>
 #include <table/TableInfo.hpp>
 
@@ -59,46 +64,88 @@ namespace pfabric { namespace nvm {
 
 namespace detail {
 
-template <typename Container>
-inline std::string getStringFrom(const Container &container, size_t start_pos = 0)
-{
-  typename Container::const_iterator it_size;
-  it_size = container.cbegin() + start_pos;
-  auto it_data = it_size + sizeof(uint64_t);
-  uint64_t string_size = *(uint64_t *)(&(*it_size));
-  
-  try {
-    std::string value(string_size, '\0');
-    for (size_t i = 0; i < string_size; ++i)
-      value.at(i) = *(uint8_t *)(&(*it_data) + i);
-  return value;
-  } catch (std::bad_alloc& ba) {
-    std::cerr << "bad_alloc caught. Could not create string for string size: "
-              << string_size << " (" << ba.what() << ")\n";
-  }
-  return "";
-}
+typedef std::unordered_map<ColumnInfo, uint16_t> ColumnIntMap;
 
-} /* end namespace detail */
+/**************************************************************************//**
+ * \brief Helper function to calculate the minipage sizes for a given schema.
+ *
+ * \param[in] tableInfo
+ *   the table schema for which the minipages sizes should be calculated
+ * \param[in] totalSize
+ *   total available space/size
+ * \param[in] customizations
+ *   optional map of weightings for specific columns.
+ * \return
+ *   a mapping from ColumnInfo to the calculated minipage size
+ *****************************************************************************/
+struct minipage_helper {
+  static ColumnIntMap calcMinipageSizes(const TableInfo& tableInfo, uint16_t totalSize,
+      ColumnIntMap customizations = ColumnIntMap()) {
+    size_t portions = 0;
+    ColumnIntMap mp_sizes = ColumnIntMap();
+    /* Get the sum of all column portitions */
+    for (auto &c : tableInfo) {
+      if (customizations.find(c) == customizations.end()) {
+        switch (c.mColType) {
+        case ColumnInfo::Int_Type:
+          portions += 1;
+          break;
+        case ColumnInfo::Double_Type:
+          portions += 2;
+          break;
+        case ColumnInfo::String_Type:
+          portions += 5;
+          break;
+        default:
+          throw TableException("unsupported column type\n");
+          break;
+        }
+      } else
+        portions += customizations[c];
+    }
+    /* Calculate and save the minipage sizes for all columns */
+    for (auto &c : tableInfo) {
+      if (customizations.find(c) == customizations.end()) {
+        switch (c.mColType) {
+        case ColumnInfo::Int_Type:
+          mp_sizes[c] = 1 * totalSize / portions;
+          break;
+        case ColumnInfo::Double_Type:
+          mp_sizes[c] = 2 * totalSize / portions;
+          break;
+        case ColumnInfo::String_Type:
+          mp_sizes[c] = 5 * totalSize / portions;
+          break;
+        default:
+          throw TableException("unsupported column type\n");
+          break;
+        }
+      } else
+        mp_sizes[c] = customizations[c] * totalSize / portions;
+    }
+    return mp_sizes;
+  }
+};
+} /* namespace detail */
+
 
 /**************************************************************************//**
  * \brief A persistent table used for PMEM technologies or emulations.
  *
  * \author Philipp Goetze <philipp.goetze@tu-ilmenau.de>
  *****************************************************************************/
-template<class Tuple, typename K>
+template<class Tuple, typename KeyType>
 class persistent_table {
 
 public:
   typedef persistent_ptr<Tuple> RecordType;
-  typedef K KeyType; // BDCC Key?
 
   /************************************************************************//**
    * \brief Default Constructor.
    ***************************************************************************/
   persistent_table() {
     auto pop = pool_by_vptr(this);
-    transaction::exec_tx(pop, [&] {init(TableInfo());});
+    transaction::exec_tx(pop, [&] {init(TableInfo(), detail::ColumnIntMap());});
   }
 
   /************************************************************************//**
@@ -106,7 +153,23 @@ public:
    ***************************************************************************/
   persistent_table(const TableInfo &_tInfo) {
     auto pop = pool_by_vptr(this);
-    transaction::exec_tx(pop, [&] {init(_tInfo);});
+    transaction::exec_tx(pop, [&] {init(_tInfo, detail::ColumnIntMap());});
+  }
+
+  /************************************************************************//**
+   * \brief Constructor for a given schema and dimension clustering.
+   ***************************************************************************/
+  persistent_table(const TableInfo &_tInfo, const detail::ColumnIntMap& _bdccInfo) {
+    auto pop = pool_by_vptr(this);
+    transaction::exec_tx(pop, [&] {init(_tInfo, _bdccInfo);});
+  }
+
+  /************************************************************************//**
+   * \brief Default Destructor.
+   ***************************************************************************/
+  ~persistent_table() {
+    //TODO: Complete this
+    root->block_list->clear();
   }
 
   /************************************************************************//**
@@ -115,259 +178,131 @@ public:
    *
    * \param[in] rec
    *   the new record/tuple to insert.
-   * \return 0 if successful
+   * \return
+   *   number of inserted tuples
    ***************************************************************************/
-  int insert(Tuple rec)
-  {
-    auto pop = pool_by_vptr(this);
+  int insert(KeyType key, Tuple rec) {
+
+    /* Block across implementation
+     *
+     * X Calc bdcc value
+     * X Search correct block
+     * X Check for enough space
+     *   - yes, but not in minipage -> rearrange (average) <-- TODO:
+     *   X no -> split block (what if bdcc range only one value?)
+     * X Insert + adapt SMAs and count
+     */
+
     auto dest_block = root->block_list;
-    auto b = dest_block->block;
-    auto tInfo = *this->root->tInfo;
-    auto record_size = 0;
-    size_t idx = 0;
-    size_t recOffset = 1;
-    std::vector<uint16_t> pTupleOffsets;
     StreamType buf;
-    StreamType &buf_ref = buf;
     rec.serializeToStream(buf);
-    auto cnt = *(uint32_t *)(b->begin() + nvm::CountPos);
-    auto space = *(uint16_t*)(b->begin() + nvm::FreeSpacePos);
-    if (space < buf.size()) {
-      std::cerr << "Not enough space to insert tuple: (" << rec << ")" << std::endl;
-      throw TableException("Not enough space in block\n");
-    }
-    //TODO: Free Space check -> adapt Minipages or new Block
-    
 
-    transaction::exec_tx(pop, [&] {
-      // Each attribute (SMA + Data) 
-      for (auto &c : tInfo)
-      {
-        uint16_t sma_pos = *(uint16_t *)(b->begin() + nvm::SmaOffsetPos + idx * nvm::AttrOffsetSize);
-        uint16_t data_pos = *(uint16_t *)(b->begin() + nvm::DataOffsetPos + idx * nvm::AttrOffsetSize);
+    /* Calculate BDCC value for input tuple*/
+    auto xtr = static_cast<uint32_t>(getBDCCFromTuple(rec).to_ulong());
 
-        switch (c.mColType)
-        {
-        case ColumnInfo::Int_Type:
-        {
-          auto it_begin = buf_ref.cbegin() + recOffset;
-          auto it_end = it_begin + sizeof(int32_t);
-          int32_t value = deserialize<int32_t>(it_begin, it_end);
-          recOffset += sizeof(int32_t);
+    /* Search for correct Block */
+    do {
+      /* Retrieve DDC Range */
+      const auto& ddc_min = reinterpret_cast<const uint32_t &>(dest_block->block->at(nvm::gDDCRangePos1));
+      const auto& ddc_max = reinterpret_cast<const uint32_t &>(dest_block->block->at(nvm::gDDCRangePos2));
 
-          /* Check remaining space in minipage */
-          uint16_t next_sma_pos;
-          if (rec.size()==idx+1)
-            next_sma_pos = nvm::BlockSize;
-          else
-            next_sma_pos = *(const uint16_t *)(b->begin() + nvm::SmaOffsetPos + (idx+1) * nvm::AttrOffsetSize);
-          uint16_t mp_free = next_sma_pos - data_pos - (cnt * sizeof(int32_t));
-          if(mp_free < sizeof(int32_t)) {
-            std::cerr << "Not enough space to insert tuple: (" << rec << ")" << std::endl;
-            transaction::abort(100);
-          }
-
-          /* Update SMA */
-          int32_t sma_min = *(int32_t *)(b->begin() + sma_pos);
-          int32_t sma_max = *(int32_t *)(b->begin() + sma_pos + sizeof(uint32_t));
-
-          if (sma_min > value || cnt == 0) {
-            std::copy(reinterpret_cast<const uint8_t *>(&value),
-                      reinterpret_cast<const uint8_t *>(&value) + sizeof(uint32_t),
-                      b->begin() + sma_pos);
-          }
-          if (sma_max < value || cnt == 0) {
-            std::copy(reinterpret_cast<const uint8_t *>(&value),
-                      reinterpret_cast<const uint8_t *>(&value) + sizeof(uint32_t),
-                      b->begin() + (sma_pos + sizeof(uint32_t)));
-          }
-
-          /* Insert Data */
-          uint16_t data_offset = data_pos + cnt * sizeof(uint32_t);
-          std::copy(reinterpret_cast<const uint8_t *>(&value),
-                    reinterpret_cast<const uint8_t *>(&value) + sizeof(uint32_t),
-                    b->begin() + data_offset);
-          record_size += sizeof(uint32_t);
-          pTupleOffsets.push_back(data_offset);
-        }
-        break;
-        case ColumnInfo::Double_Type:
-        {
-          auto it_begin = buf_ref.cbegin() + recOffset;
-          auto it_end = it_begin + sizeof(double);
-          double value = deserialize<double>(it_begin, it_end);
-          recOffset += sizeof(double);
-
-          /* Check remaining space in minipage */
-          uint16_t next_sma_pos;
-          if (rec.size()==idx+1)
-            next_sma_pos = nvm::BlockSize;
-          else
-            next_sma_pos = *(const uint16_t *)(b->begin() + nvm::SmaOffsetPos + (idx+1) * nvm::AttrOffsetSize);
-          uint16_t mp_free = next_sma_pos - data_pos - (cnt * sizeof(double));
-          if(mp_free < sizeof(double)) {
-            std::cerr << "Not enough space to insert tuple: (" << rec << ")" << std::endl;
-            transaction::abort(100);
-          }
-
-          /* Update SMA */
-          double sma_min = *(double *)(b->begin() + sma_pos);
-          double sma_max = *(double *)(b->begin() + sma_pos + sizeof(uint64_t));
-
-          if (sma_min > value || cnt == 0)
-          {
-            std::copy(reinterpret_cast<const uint8_t *>(&value),
-                      reinterpret_cast<const uint8_t *>(&value) + sizeof(uint64_t),
-                      b->begin() + sma_pos);
-          }
-          if (sma_max < value || cnt == 0)
-          {
-            std::copy(reinterpret_cast<const uint8_t *>(&value),
-                      reinterpret_cast<const uint8_t *>(&value) + sizeof(uint64_t),
-                      b->begin() + (sma_pos + sizeof(uint64_t)));
-          }
-
-          /* Insert Data */
-          uint16_t data_offset = data_pos + cnt * sizeof(uint64_t);
-          std::copy(reinterpret_cast<const uint8_t *>(&value),
-                    reinterpret_cast<const uint8_t *>(&value) + sizeof(uint64_t),
-                    b->begin() + data_offset);
-          record_size += sizeof(uint64_t);
-          pTupleOffsets.push_back(data_offset);
-        }
-        break;
-        case ColumnInfo::String_Type:
-        {
-          auto it_begin = buf_ref.cbegin() + recOffset;
-          auto value = detail::getStringFrom(buf_ref, recOffset);
-          const char* c_value = value.c_str();
-          uint64_t string_size = value.size() + 1;
-          recOffset += string_size - 1 + sizeof(uint64_t);
-
-          /* Check remaining space in minipage */
-          uint16_t mp_free;
-          if (cnt != 0) {
-            uint16_t current_offset_pos = data_pos + cnt * nvm::OffsetSize ;
-            uint16_t current_offset = *(uint16_t *)(b->begin() + current_offset_pos - nvm::OffsetSize);
-            mp_free = current_offset - current_offset_pos;
-          }
-          else
-          {
-            uint16_t next_sma_pos;
-            if (rec.size()==idx+1)
-              next_sma_pos = nvm::BlockSize;
-            else
-              next_sma_pos = *(const uint16_t *)(b->begin() + nvm::SmaOffsetPos + (idx+1) * nvm::AttrOffsetSize);
-            mp_free = next_sma_pos - data_pos;
-          }
-
-          if(mp_free < string_size + nvm::OffsetSize) {
-            std::cerr << "Not enough space to insert tuple: (" << rec << ")" << std::endl;
-            transaction::abort(100);
-          }
-
-          /* Insert Data - Get target position */
-          uint16_t target_offset_pos = data_pos + cnt * nvm::OffsetSize;
-          uint16_t target_data_pos;
-          if (cnt == 0)
-          {
-            uint16_t end_minipage;
-            if (idx < rec.size() - 1)
-            {
-              end_minipage = (*(uint16_t *)(b->begin() + nvm::SmaOffsetPos + (idx + 1) * nvm::AttrOffsetSize));
-            }
-            else
-            {
-              end_minipage = nvm::BlockSize;
-            }
-            target_data_pos = end_minipage - string_size;
-          }
-          else /* cnt != 0 */
-          {
-            uint16_t last_offset = *(uint16_t *)(b->begin() + target_offset_pos - nvm::OffsetSize);
-            target_data_pos = last_offset - string_size;
-          }
-
-          /* Insert Data - Set offset and string data */
-          std::copy(reinterpret_cast<const uint8_t *>(&target_data_pos),
-                    reinterpret_cast<const uint8_t *>(&target_data_pos) + nvm::OffsetSize,
-                    b->begin() + target_offset_pos);
-          std::copy(reinterpret_cast<const uint8_t *>(c_value),
-                  	reinterpret_cast<const uint8_t *>(c_value) + string_size,
-                  	b->begin() + target_data_pos);
-
-          /* Update SMA */
-          if (cnt != 0)
-          {
-            uint16_t& sma_min_pos = reinterpret_cast<uint16_t &>(b->at(sma_pos));
-            uint16_t& sma_max_pos = reinterpret_cast<uint16_t &>(b->at(sma_pos + nvm::OffsetSize));
-            std::string sma_min(reinterpret_cast<const char (&)[]>(b->at(sma_min_pos)));
-            std::string sma_max(reinterpret_cast<const char (&)[]>(b->at(sma_max_pos)));
-
-            if (sma_min > value)
-            {
-              std::copy(reinterpret_cast<const uint8_t *>(&target_data_pos),
-                        reinterpret_cast<const uint8_t *>(&target_data_pos) + nvm::OffsetSize,
-                        b->begin() + sma_pos);
-            }
-            else if (sma_max < value)
-            {
-              std::copy(reinterpret_cast<const uint8_t *>(&target_data_pos),
-                        reinterpret_cast<const uint8_t *>(&target_data_pos) + nvm::OffsetSize,
-                        b->begin() + (sma_pos + nvm::OffsetSize));
-            }
-          }
-          else /* cnt == 0 */
-          {
-            std::copy(reinterpret_cast<const uint8_t *>(&target_data_pos),
-                      reinterpret_cast<const uint8_t *>(&target_data_pos) + nvm::OffsetSize,
-                      b->begin() + sma_pos);
-            std::copy(reinterpret_cast<const uint8_t *>(&target_data_pos),
-                      reinterpret_cast<const uint8_t *>(&target_data_pos) + nvm::OffsetSize,
-                      b->begin() + (sma_pos + nvm::OffsetSize));
-          }
-
-          record_size += string_size + nvm::OffsetSize;
-          pTupleOffsets.push_back(target_data_pos);
-        }
-        break;
-        default:
-        {
-          throw TableException("unsupported column type\n");
-        }
-        break;
-        }
-        ++idx;
-      } /* for loop over Columns */
-
-      /* Increase BDCC count */
-      ++((uint32_t &)b->at(nvm::CountPos));
-      /* Adapt Free Space */
-      auto &fspace = ((uint16_t &)b->at(nvm::FreeSpacePos));
-      fspace -= record_size;
-    }); /* end of transaction */
-
-
-    nvm::PTuple<decltype(rec)> ptp(b, pTupleOffsets);
-    auto attr0 = get<3>(ptp);
-    //std::cout << "PTuplePtr element at 0: " << attr0 << std::endl;
-
-    /* TODO: Block across implementation (currently only one block supported)
-    do
-    {
-      // Search correct block
-      // Check for enough space
-      //   yes, but not in minipage -> rearrange (average)
-      //   no -> split block
-      // Insert (For each attribute increase data vector and add value)
-      // adapt SMAs and count  (How to cheaply increment)
+      if (xtr >= ddc_min && xtr <= ddc_max) break; //Found correct block
 
       auto cur_block = dest_block->next;
       dest_block = cur_block;
-    } while (dest_block != nullptr);
-    */
+    } while (dest_block != nullptr); /* Should not reach end! */
 
+    /* Check for enough space in target block */
+    auto& space = reinterpret_cast<uint16_t&>(dest_block->block->at(nvm::gFreeSpacePos));
+    if (space < buf.size()) {
+      auto newBlocks = splitBlock(dest_block);
+      const auto& splitValue = reinterpret_cast<uint32_t &>(newBlocks.first->block->at(nvm::gDDCRangePos2));
+      auto xtr = static_cast<uint32_t>(getBDCCFromTuple(rec).to_ulong());
+      if (xtr <= splitValue)
+        return insertTuple(key, rec, newBlocks.first);
+      else
+        return insertTuple(key, rec, newBlocks.second);
+    }
+
+    return insertTuple(key, rec, dest_block);
+  }
+
+  /************************************************************************//**
+   * \brief Update a specific attribute of a tuple specified by the given key.
+   *
+   * Update the complete tuple in the table associated with the given key. For
+   * that the tuple is deleted first and then newly inserted.
+   *
+   * \param[in] key
+   *   the key value
+   * \param[in] pos
+   *   the index of the tuple's attribute
+   * \param[in] rec
+   *   the new tuple values for this key
+   * \return
+   *   the number of modified tuples
+   ***************************************************************************/
+  int updateAttribute(KeyType key, size_t pos, RecordType rec) {
+    //TODO: Implement. But is this really necessary?
     return 0;
+  }
+
+  /************************************************************************//**
+   * \brief Update the complete tuple specified by the given key.
+   *
+   * Update the complete tuple in the table associated with the given key. For
+   * that the tuple is deleted first and then newly inserted.
+   *
+   * \param[in] key
+   *   the key value
+   * \param[in] rec
+   *   the new tuple values for this key
+   * \return
+   *   the number of modified tuples
+   ***************************************************************************/
+  int updateComplete(KeyType key, RecordType rec) {
+    auto nres = deleteByKey(key);
+    if (!nres)
+      throw TableException("key not found");
+    nres = insert(key, rec);
+    return nres;
+  }
+
+  /************************************************************************//**
+   * \brief Delete the tuple from the table associated with the given key.
+   *
+   * Delete the tuple from the persistent table and index structure that is
+   * associated with the given key.
+   *
+   * \param[in] key
+   *   the key value
+   * \return
+   *   the number of tuples deleted
+   ***************************************************************************/
+  int deleteByKey(KeyType key) {
+    //TODO: Also delete data
+    auto nres = index.erase(key);
+    return nres;
+  }
+
+  /************************************************************************//**
+   * \brief Return the PTuple associated with the given key.
+   *
+   * Return the tuple from the persistent table that is associated with the
+   * given key. If the key doesn't exist, an exception is thrown.
+   *
+   * \param[in] key
+   *   the key value
+   * \return
+   *   the PTuple associated with the given key
+   ***************************************************************************/
+  PTuple<Tuple> getByKey(KeyType key) {
+    auto res = index.find(key);
+    if (res != index.end()) {
+      return res->second;
+    } else {
+      throw TableException("key not found");
+    }
   }
 
   /************************************************************************//**
@@ -376,246 +311,175 @@ public:
    * \param[in] raw
    *   set to true to additionaly print out the complete raw byte arrays.
    ***************************************************************************/
-  void print(bool raw = false)
-  {
+  void print(bool raw = false) {
 
     auto dest_block = root->block_list;
-    auto b = dest_block->block;
     auto tInfo = *this->root->tInfo;
 
     size_t colCnt = 0;
     for (auto &c : tInfo)
       colCnt++;
 
-    auto key1 = *(uint32_t*)(b->begin());
-    auto key2 = *(uint32_t*)(b->begin()+4);
-    auto cnt = *(uint32_t*)(b->begin()+nvm::CountPos);
-    auto space = *(uint16_t*)(b->begin()+nvm::FreeSpacePos);
-    auto headerSize = nvm::FixedHeaderSize + nvm::AttrOffsetSize * colCnt;
-    auto bodySize = nvm::BlockSize - headerSize;
+    do {
+      auto b = dest_block->block;
 
-    /* Plain byte-by-byte output */
-    if (raw) 
-    {
-      size_t i = 0;
-      printf("[ ");
-      for (auto &byte : *b)
-      {
-        printf("%02x ", byte);
-        if (++i % 32 == 0)
-        {
-          printf("]");
-          if(i < b->size()) printf("\n[ ");
+      const auto& key1 = reinterpret_cast<const uint32_t&>(b->at(nvm::gDDCRangePos1));
+      const auto& key2 = reinterpret_cast<const uint32_t&>(b->at(nvm::gDDCRangePos2));
+      const auto& cnt = reinterpret_cast<const uint32_t&>(b->at(nvm::gCountPos));
+      const auto& space = reinterpret_cast<const uint16_t&>(b->at(nvm::gFreeSpacePos));
+      const auto headerSize = nvm::gFixedHeaderSize + nvm::gAttrOffsetSize * colCnt;
+      const auto bodySize = nvm::gBlockSize - headerSize;
+
+      /* Plain byte-by-byte output */
+      if (raw) {
+        size_t i = 0;
+        printf("[ ");
+        for (auto &byte : *b) {
+          printf("%02x ", byte);
+          if (++i % 32 == 0) {
+            printf("]");
+            if (i < b->size())
+              printf("\n[ ");
+          }
         }
       }
-    }
-    
-    std::cout << "\nDDC Range min: " << key1  << '\n'
-              << "DDC Range max: "   << key2  << '\n'
-              << "Tuple count: "     << cnt   << '\n'
-              << "Header size: "     << headerSize << " Bytes" << '\n'
-              << "Body size: "       << bodySize   << " Bytes" << '\n'
-              << "Free Space: "      << space      << " Bytes" << std::endl;
 
-    if (cnt > 0)
-    {
-      size_t idx = 0;
-      for (auto &c : tInfo)
-      {
-        uint16_t sma_pos = *(const uint16_t *)(b->begin() + nvm::SmaOffsetPos + idx * nvm::AttrOffsetSize);
-        uint16_t data_pos = *(const uint16_t *)(b->begin() + nvm::DataOffsetPos + idx * nvm::AttrOffsetSize);
+      /* Header/General information */
+      std::cout << "\nDDC Range min: " << key1 << '\n'
+                << "DDC Range max: " << key2 << '\n'
+                << "Tuple count: " << cnt << '\n'
+                << "Header size: " << headerSize << " Bytes" << '\n'
+                << "Body size: " << bodySize << " Bytes" << '\n'
+                << "Free Space: " << space << " Bytes" << std::endl;
 
-        switch (c.mColType)
-        {
-        case ColumnInfo::Int_Type:
-        {
-          auto &sma_min = (int32_t &)b->at(sma_pos);
-          auto &sma_max = (int32_t &)b->at(sma_pos + sizeof(uint32_t));
-          auto &data = (int32_t(&)[cnt])b->at(data_pos);
+      /* Body/Column/Minipage data */
+      if (cnt > 0) {
+        size_t idx = 0;
+        for (auto &c : tInfo) {
+          const auto& sma_pos = reinterpret_cast<const uint16_t&>(b->at(nvm::gSmaOffsetPos + idx * nvm::gAttrOffsetSize));
+          const auto& data_pos = reinterpret_cast<const uint16_t&>(b->at(nvm::gDataOffsetPos + idx * nvm::gAttrOffsetSize));
 
-          /* Remaining Space */
-          uint16_t next_sma_pos;
-          if (colCnt==idx+1)
-            next_sma_pos = nvm::BlockSize;
-          else
-            next_sma_pos = *(const uint16_t *)(b->begin() + nvm::SmaOffsetPos + (idx+1) * nvm::AttrOffsetSize);
-          uint16_t mp_free = next_sma_pos - data_pos - (cnt * sizeof(int32_t));
-         
-          std::cout << "Column[" << idx << "]: " << c.mColName 
-                    << "\n\tSpace left: "        << mp_free << " Bytes"
-                    << "\n\tsma_min: "           << sma_min
-                    << "\n\tsma_max: "           << sma_max
-                    << "\n\tData: {";
-          const char *padding = "";
-          for (uint32_t i = 0; i < cnt; i++)
-          {
-            std::cout << padding << data[i];
-            padding = ", ";
+          switch (c.mColType) {
+          case ColumnInfo::Int_Type: {
+            const auto& sma_min = reinterpret_cast<const int32_t&>(b->at(sma_pos));
+            const auto& sma_max =reinterpret_cast<const int32_t&>(b->at(sma_pos + sizeof(int32_t)));
+            const auto& data = reinterpret_cast<const int32_t(&)[cnt]>(b->at(data_pos));
+
+            /* Remaining Space */
+            auto next_sma_pos = (colCnt == idx + 1) ?
+              nvm::gBlockSize :
+              reinterpret_cast<const uint16_t&>(b->at(nvm::gSmaOffsetPos + (idx + 1) * nvm::gAttrOffsetSize));
+            auto mp_free = next_sma_pos - data_pos - (cnt * sizeof(int32_t));
+
+            std::cout << "Column[" << idx << "]: " << c.mColName
+                      << "\n\tSpace left: " << mp_free << " Bytes"
+                      << "\n\tsma_min: " << sma_min
+                      << "\n\tsma_max: " << sma_max
+                      << "\n\tData: {";
+            const char *padding = "";
+            for (auto i = 0u; i < cnt; i++) {
+              std::cout << padding << data[i];
+              padding = ", ";
+            }
+            std::cout << "}\n";
+          } break;
+
+          case ColumnInfo::Double_Type: {
+            const auto& sma_min = reinterpret_cast<const double&>(b->at(sma_pos));
+            const auto& sma_max = reinterpret_cast<const double&>(b->at(sma_pos + sizeof(double)));
+            const auto& data = reinterpret_cast<const double(&)[cnt]>(b->at(data_pos));
+
+            /* Remaining Space */
+            auto next_sma_pos =(colCnt == idx + 1) ?
+              nvm::gBlockSize :
+              reinterpret_cast<const uint16_t&>(b->at(nvm::gSmaOffsetPos + (idx + 1) * nvm::gAttrOffsetSize));
+            uint16_t mp_free = next_sma_pos - data_pos - (cnt * sizeof(double));
+
+            std::cout << "Column[" << idx << "]: " << c.mColName
+                      << "\n\tSpace left: " << mp_free << " Bytes"
+                      << "\n\tsma_min: " << sma_min
+                      << "\n\tsma_max: " << sma_max
+                      << "\n\tData: {";
+            const char *padding = "";
+            for (auto i = 0u; i < cnt; i++) {
+              std::cout << padding << data[i];
+              padding = ", ";
+            }
+            std::cout << "}\n" << std::endl;
+          } break;
+
+          case ColumnInfo::String_Type: {
+            auto &sma_min_pos = (uint16_t &) b->at(sma_pos);
+            auto &sma_max_pos = (uint16_t &) b->at(sma_pos + nvm::gOffsetSize);
+            auto &string_pos = (uint16_t (&)[cnt]) b->at(data_pos);
+            auto sma_min(reinterpret_cast<const char (&)[]>(b->at(sma_min_pos)));
+            auto sma_max(reinterpret_cast<const char (&)[]>(b->at(sma_max_pos)));
+
+            auto current_offset_pos = data_pos + cnt * nvm::gOffsetSize;
+            auto current_offset = reinterpret_cast<const uint16_t&>(b->at(current_offset_pos - nvm::gOffsetSize));
+            auto mp_free = current_offset - current_offset_pos;
+
+            std::cout << "Column[" << idx << "]: " << c.mColName
+                      << "\n\tSpace left: " << mp_free << " Bytes"
+                      << "\n\tsma_min: " << sma_min
+                      << "\n\tsma_max: " << sma_max
+                      << "\n\tData: {";
+            const char *padding = "";
+            for (auto i = 0u; i < cnt; i++) {
+              std::string data(reinterpret_cast<char (&)[]>(b->at(string_pos[i])));
+              std::cout << padding << data;
+              padding = ", ";
+            }
+            std::cout << "}\n" << std::endl;
+          } break;
+
+          default: {
+            throw TableException("unsupported column type\n");
+          } break;
           }
-          std::cout << "}\n" << std::endl;
-        }
-        break;
-        case ColumnInfo::Double_Type:
-        {
-          auto &sma_min = (double &)b->at(sma_pos);
-          auto &sma_max = (double &)b->at(sma_pos + sizeof(uint64_t));
-          auto &data = (double(&)[cnt])b->at(data_pos);
+          ++idx;
+        } /* end for (auto &c: tInfo) */
+      } /* if cnt > 0 */
 
-          /* Remaining Space */
-          uint16_t next_sma_pos;
-          if (colCnt==idx+1)
-            next_sma_pos = nvm::BlockSize;
-          else
-            next_sma_pos = *(const uint16_t *)(b->begin() + nvm::SmaOffsetPos + (idx+1) * nvm::AttrOffsetSize);
-          uint16_t mp_free = next_sma_pos - data_pos - (cnt * sizeof(double));
-          
-          std::cout << "Column[" << idx << "]: " << c.mColName 
-                    << "\n\tSpace left: "        << mp_free << " Bytes"
-                    << "\n\tsma_min: "           << sma_min
-                    << "\n\tsma_max: "           << sma_max
-                    << "\n\tData: {";
-          const char *padding = "";
-          for (uint32_t i = 0; i < cnt; i++)
-          {
-            std::cout << padding << data[i];
-            padding = ", ";
-          }
-          std::cout << "}\n" << std::endl;
-        }
-        break;
-        case ColumnInfo::String_Type:
-        {
-          auto &sma_min_pos = (uint16_t &)b->at(sma_pos);
-          auto &sma_max_pos = (uint16_t &)b->at(sma_pos + nvm::OffsetSize);
-          auto &string_pos = (uint16_t(&)[cnt])b->at(data_pos);
-          auto sma_min(reinterpret_cast<const char (&)[]>(b->at(sma_min_pos)));
-          auto sma_max(reinterpret_cast<const char (&)[]>(b->at(sma_max_pos)));
-
-          uint16_t current_offset_pos = data_pos + cnt * nvm::OffsetSize ;
-          uint16_t current_offset = *(uint16_t *)(b->begin() + current_offset_pos - nvm::OffsetSize);
-          uint16_t mp_free = current_offset - current_offset_pos;
-
-          std::cout << "Column[" << idx << "]: " << c.mColName
-                    << "\n\tSpace left: "        << mp_free << " Bytes"
-                    << "\n\tsma_min: " << sma_min
-                    << "\n\tsma_max: " << sma_max
-                    << "\n\tData: {";
-          const char *padding = "";
-          for (uint32_t i = 0; i < cnt; i++)
-          {
-            std::string data(reinterpret_cast<char (&)[]>(b->at(string_pos[i])));
-            std::cout << padding << data;
-            padding = ", ";
-          }
-          std::cout << "}\n" << std::endl;
-        }
-        break;
-        default:
-        {
-          throw TableException("unsupported column type\n");
-        }
-        break;
-        }
-        ++idx;
-      } /* end for (auto &c: tInfo) */
-    } /* if cnt > 0 */
-
-    
-  }
-
-  // TODO: For later
-  int update(RecordType rec, KeyType key)
-  {
-    return 0;
-  }
-
-  int deleteByKey(KeyType key)
-  {
-    return 0;
-  }
-
-  RecordType getByKey(KeyType key)
-  {
+      auto cur_block = dest_block->next;
+      dest_block = cur_block;
+    } while (dest_block != nullptr);
   }
 
 // Private ////////////////////////////////////////////////////////////////////
 private:
-  struct nvm_block
-  {
-    nvm_block() : next(nullptr), block(nullptr) {}
-    nvm_block(nvm::NVM_Block _block) : next(nullptr), block(_block) {}
+  struct nvm_block {
+    nvm_block() :
+        next(nullptr), block(nullptr) {
+    }
+    nvm_block(nvm::NVM_Block _block) :
+        next(nullptr), block(_block) {
+    }
 
     persistent_ptr<struct nvm_block> next;
     persistent_ptr<nvm::NVM_Block> block;
 
-    void clear()
-    {
-      if (next)
-      {
+    void clear() {
+      if (next) {
         delete_persistent<struct nvm_block>(next);
         next = nullptr;
       }
-      if (block)
-      {
+      if (block) {
         delete_persistent<nvm::NVM_Block>(block);
         block = nullptr;
       }
     }
   };
 
-  struct root
-  {
+  struct root {
     persistent_ptr<struct nvm_block> block_list;
     persistent_ptr<const TableInfo> tInfo;
-    //persistent_ptr<std::string> tName;
+    persistent_ptr<BDCCInfo> bdccInfo;
   };
 
   persistent_ptr<struct root> root;
-  
-  struct ColumnInfoCompare
-  {
-    bool operator() (const ColumnInfo& lhs, const ColumnInfo& rhs) const
-    {
-      return lhs.mColName < rhs.mColName;
-    }
-  };
-  typedef std::map<ColumnInfo, uint16_t, ColumnInfoCompare> ColumnIntMap;
-  ColumnIntMap calcMinipageSizes(const TableInfo& tableInfo, uint16_t totalSize, ColumnIntMap customizations = ColumnIntMap()) 
-  {
-    size_t portions = 0;
-    ColumnIntMap mp_sizes = ColumnIntMap();
-    for (auto &c: tableInfo) {
-      if (customizations.find(c) == customizations.end())
-      {
-        switch (c.mColType)
-        {
-          case ColumnInfo::Int_Type:    portions += 1; break;
-          case ColumnInfo::Double_Type: portions += 2; break;
-          case ColumnInfo::String_Type: portions += 5; break;
-          default: throw TableException("unsupported column type\n"); break;
-        }
-      } 
-      else
-        portions += customizations[c];
-    }
 
-    for (auto &c: tableInfo) {
-      if (customizations.find(c) == customizations.end())
-      {
-        switch (c.mColType)
-        {
-          case ColumnInfo::Int_Type:    mp_sizes[c] = 1 * totalSize / portions; break;
-          case ColumnInfo::Double_Type: mp_sizes[c] = 2 * totalSize / portions; break;
-          case ColumnInfo::String_Type: mp_sizes[c] = 5 * totalSize / portions; break;
-          default: throw TableException("unsupported column type\n"); break;
-        }
-      } 
-      else
-        mp_sizes[c] = customizations[c] * totalSize / portions;
-    }
-    return mp_sizes;
-  }
-
+  std::map<KeyType, nvm::PTuple<Tuple>> index;
 
   /************************************************************************//**
    * \brief Initialization function for creating the necessary structures.
@@ -623,12 +487,14 @@ private:
    * \param[in] _tInfo
    *   the underlying schema to use
    ***************************************************************************/
-  void init(const TableInfo &_tInfo) {
+  void init(const TableInfo& _tInfo, const detail::ColumnIntMap& _bdccInfo) {
     this->root = make_persistent<struct root>();
     this->root->tInfo = make_persistent<TableInfo>(_tInfo);
+    this->root->bdccInfo = make_persistent<BDCCInfo>(BDCCInfo(_bdccInfo));
     this->root->block_list = make_persistent<struct nvm_block>();
-    nvm::NVM_Block first = initBlock();
-    this->root->block_list->block = make_persistent<nvm::NVM_Block>(first);
+    this->root->block_list->block = make_persistent<nvm::NVM_Block>(
+        nvm::NVM_Block(initBlock(0, ((1L << this->root->bdccInfo->numBins) - 1)))
+    );
   }
 
   /************************************************************************//**
@@ -636,70 +502,67 @@ private:
    *
    * \return a new initialized nvm::NVM_Block.
    ***************************************************************************/
-  nvm::NVM_Block initBlock()
-  {
-    auto b = nvm::NVM_Block{
-        0x00, 0x00, 0x00, 0x00,  // BDCC Range
-        0xFF, 0xFF, 0xFF, 0xFF,  // BDCC Range
-        0x00, 0x00, 0x00, 0x00}; // Tuple Count
+  nvm::NVM_Block initBlock(const uint32_t& ddc0, const uint32_t& ddc1) {
+    auto b = nvm::NVM_Block{};
+
+    std::copy(reinterpret_cast<const uint8_t *>(&ddc0),
+              reinterpret_cast<const uint8_t *>(&ddc0) + nvm::gDDCValueSize,
+              b.begin() + nvm::gDDCRangePos1);
+    std::copy(reinterpret_cast<const uint8_t *>(&ddc1),
+              reinterpret_cast<const uint8_t *>(&ddc1) + nvm::gDDCValueSize,
+              b.begin() + nvm::gDDCRangePos2);
 
     auto colCnt = 0;
     for (auto &c : *this->root->tInfo)
       colCnt++;
 
-    uint16_t header_size = nvm::FixedHeaderSize + colCnt * nvm::AttrOffsetSize;
-    uint16_t body_size = nvm::BlockSize - header_size;
+    uint16_t header_size = nvm::gFixedHeaderSize + colCnt * nvm::gAttrOffsetSize;
+    uint16_t body_size = nvm::gBlockSize - header_size;
     auto minipage_size = body_size / colCnt;
 
-    auto sizes = calcMinipageSizes(*this->root->tInfo, body_size);
+    auto sizes = detail::minipage_helper::calcMinipageSizes(*this->root->tInfo, body_size);
 
     /* Set Offsets */
     size_t idx = 0;
     size_t sma_size = 0;
     uint16_t current_offset = header_size;
-    for (auto &c : *this->root->tInfo)
-    {
+    for (auto &c : *this->root->tInfo) {
       uint16_t sma_offset;
       uint16_t data_offset;
-      switch (c.mColType)
-      {
-      case ColumnInfo::Int_Type:
-      {
+      switch (c.mColType) {
+      case ColumnInfo::Int_Type: {
         sma_offset = current_offset;
         data_offset = current_offset + 2 * sizeof(uint32_t);
         sma_size += 2 * sizeof(uint32_t);
         current_offset += sizes[c];
       }
-      break;
-      case ColumnInfo::Double_Type:
-      {
+        break;
+      case ColumnInfo::Double_Type: {
         sma_offset = current_offset;
         data_offset = current_offset + 2 * sizeof(uint64_t);
         sma_size += 2 * sizeof(uint64_t);
         current_offset += sizes[c];
       }
-      break;
-      case ColumnInfo::String_Type:
-      {
+        break;
+      case ColumnInfo::String_Type: {
         sma_offset = current_offset;
-        data_offset = current_offset + nvm::AttrOffsetSize;
-        sma_size += nvm::AttrOffsetSize;
+        data_offset = current_offset + nvm::gAttrOffsetSize;
+        sma_size += nvm::gAttrOffsetSize;
         current_offset += sizes[c];
       }
-      break;
-      default:
-      {
+        break;
+      default: {
         throw TableException("unsupported column type\n");
       }
-      break;
+        break;
       }
 
       std::copy(reinterpret_cast<const uint8_t *>(&sma_offset),
-                reinterpret_cast<const uint8_t *>(&sma_offset) + nvm::OffsetSize,
-                b.begin() + (nvm::SmaOffsetPos + idx * nvm::AttrOffsetSize));
+                reinterpret_cast<const uint8_t *>(&sma_offset) + nvm::gOffsetSize,
+                b.begin() + (nvm::gSmaOffsetPos + idx * nvm::gAttrOffsetSize));
       std::copy(reinterpret_cast<const uint8_t *>(&data_offset),
-                reinterpret_cast<const uint8_t *>(&data_offset) + nvm::OffsetSize,
-                b.begin() + (nvm::DataOffsetPos + idx * nvm::AttrOffsetSize));
+                reinterpret_cast<const uint8_t *>(&data_offset) + nvm::gOffsetSize,
+                b.begin() + (nvm::gDataOffsetPos + idx * nvm::gAttrOffsetSize));
       ++idx;
     }
 
@@ -707,18 +570,413 @@ private:
     uint16_t free_space = body_size - sma_size;
     std::copy(reinterpret_cast<const uint8_t *>(&free_space),
               reinterpret_cast<const uint8_t *>(&free_space) + sizeof(uint16_t),
-              b.begin() + nvm::FreeSpacePos);
-    
+              b.begin() + nvm::gFreeSpacePos);
+
     return b;
   }
 
-  void insert_block()
-  {
+  int insertTuple(KeyType key, Tuple rec, persistent_ptr<struct nvm_block>& dest_block) {
+    auto pop = pool_by_vptr(this);
+    auto b = dest_block->block;
+    auto tInfo = *this->root->tInfo;
+    auto record_size = 0;
+    size_t idx = 0;
+    size_t recOffset = 1;
+    std::array<uint16_t, Tuple::NUM_ATTRIBUTES> pTupleOffsets;
+    StreamType buf;
+    rec.serializeToStream(buf);
+    auto& cnt = reinterpret_cast<uint32_t&>(b->at(nvm::gCountPos));
+
+    try {
+    transaction::exec_tx(pop, [&] {
+      // Each attribute (SMA + Data)
+        for (auto &c : tInfo) {
+          const auto& sma_pos = reinterpret_cast<const uint16_t&>(b->at(nvm::gSmaOffsetPos + idx * nvm::gAttrOffsetSize));
+          const auto& data_pos = reinterpret_cast<const uint16_t&>(b->at(nvm::gDataOffsetPos + idx * nvm::gAttrOffsetSize));
+
+          switch (c.mColType) {
+
+            case ColumnInfo::Int_Type: {
+              /* Get Record Value */
+              auto it_begin = buf.cbegin() + recOffset;
+              auto it_end = it_begin + sizeof(int32_t);
+              int32_t value = deserialize<int32_t>(it_begin, it_end);
+
+              /* Check remaining space in minipage */
+              auto next_sma_pos = (rec.size()==idx+1) ? nvm::gBlockSize :
+              reinterpret_cast<const uint16_t&>(b->at(nvm::gSmaOffsetPos + (idx+1) * nvm::gAttrOffsetSize));
+              uint16_t mp_free = next_sma_pos - data_pos - (cnt * sizeof(int32_t));
+              if(mp_free < sizeof(int32_t)) {
+                std::cerr << "Not enough space to insert tuple: (" << rec << ")" << std::endl;
+                transaction::abort(100);
+              }
+
+              /* Insert Data */
+              uint16_t data_offset = data_pos + cnt * sizeof(int32_t);
+              std::copy(reinterpret_cast<const uint8_t *>(&value),
+                  reinterpret_cast<const uint8_t *>(&value) + sizeof(int32_t),
+                  b->begin() + data_offset);
+
+              /* Update SMA */
+              auto& sma_min = reinterpret_cast<int32_t&>(b->at(sma_pos));
+              auto& sma_max = reinterpret_cast<int32_t&>(b->at(sma_pos + sizeof(int32_t)));
+              if (sma_min > value || cnt == 0) sma_min = value;
+              if (sma_max < value || cnt == 0) sma_max = value;
+
+              /* Set new positions and sizes */
+              recOffset += sizeof(int32_t);
+              record_size += sizeof(int32_t);
+              pTupleOffsets[idx] = data_offset;
+
+            }break;
+
+            case ColumnInfo::Double_Type: {
+              /* Get Record Value */
+              auto it_begin = buf.cbegin() + recOffset;
+              auto it_end = it_begin + sizeof(double);
+              double value = deserialize<double>(it_begin, it_end);
+
+              /* Check remaining space in minipage */
+              uint16_t next_sma_pos;
+              if (rec.size()==idx+1) {
+                next_sma_pos = nvm::gBlockSize;
+              } else {
+                next_sma_pos = reinterpret_cast<const uint16_t&>(b->at(nvm::gSmaOffsetPos + (idx+1) * nvm::gAttrOffsetSize));
+              }
+              uint16_t mp_free = next_sma_pos - data_pos - (cnt * sizeof(double));
+              if(mp_free < sizeof(double)) {
+                std::cerr << "Not enough space to insert tuple: (" << rec << ")" << std::endl;
+                transaction::abort(100);
+              }
+
+              /* Insert Data */
+              uint16_t data_offset = data_pos + cnt * sizeof(double);
+              std::copy(reinterpret_cast<const uint8_t *>(&value),
+                  reinterpret_cast<const uint8_t *>(&value) + sizeof(double),
+                  b->begin() + data_offset);
+
+              /* Update SMA */
+              auto& sma_min = reinterpret_cast<double&>(b->at(sma_pos));
+              auto& sma_max = reinterpret_cast<double&>(b->at(sma_pos + sizeof(double)));
+              if (sma_min > value || cnt == 0) sma_min = value;
+              if (sma_max < value || cnt == 0) sma_max = value;
+
+              /* Set new positions and sizes */
+              recOffset += sizeof(double);
+              record_size += sizeof(double);
+              pTupleOffsets[idx] = data_offset;
+
+            }break;
+
+            case ColumnInfo::String_Type: {
+              /* Get Record Value */
+              auto it_begin = buf.cbegin() + recOffset;
+              auto value = deserialize<std::string>(it_begin, buf.end());
+              const char* c_value = value.c_str();
+              uint64_t string_size = value.size() + 1;
+
+              /* Check remaining space in minipage */
+              uint16_t mp_free;
+              if (cnt != 0) {
+                uint16_t current_offset_pos = data_pos + cnt * nvm::gOffsetSize;
+                const auto& current_offset = reinterpret_cast<const uint16_t&>(b->at(current_offset_pos - nvm::gOffsetSize));
+                mp_free = current_offset - current_offset_pos;
+              } else {
+                uint16_t next_sma_pos;
+                if (rec.size()==idx+1) {
+                  next_sma_pos = nvm::gBlockSize;
+                } else {
+                  next_sma_pos = reinterpret_cast<const uint16_t&>(b->at(nvm::gSmaOffsetPos + (idx+1) * nvm::gAttrOffsetSize));
+                }
+                mp_free = next_sma_pos - data_pos;
+              }
+              if(mp_free < string_size + nvm::gOffsetSize) {
+                std::cerr << "Not enough space to insert tuple: (" << rec << ")" << std::endl;
+                transaction::abort(100);
+              }
+
+              /* Insert Data - Get target position */
+              uint16_t target_offset_pos = data_pos + cnt * nvm::gOffsetSize;
+              uint16_t target_data_pos;
+              if (cnt == 0) {
+                auto end_minipage = (idx < rec.size() - 1) ?
+                reinterpret_cast<const uint16_t&>(b->at(nvm::gSmaOffsetPos + (idx + 1) * nvm::gAttrOffsetSize)) : nvm::gBlockSize;
+                target_data_pos = end_minipage - string_size;
+              } else /* cnt != 0 */{
+                const auto& last_offset = reinterpret_cast<const uint16_t&>(b->at(target_offset_pos - nvm::gOffsetSize));
+                target_data_pos = last_offset - string_size;
+              }
+
+              /* Insert Data - Set offset and string data */
+              std::copy(reinterpret_cast<const uint8_t *>(&target_data_pos),
+                  reinterpret_cast<const uint8_t *>(&target_data_pos) + nvm::gOffsetSize,
+                  b->begin() + target_offset_pos);
+              std::copy(reinterpret_cast<const uint8_t *>(c_value),
+                  reinterpret_cast<const uint8_t *>(c_value) + string_size,
+                  b->begin() + target_data_pos);
+
+              /* Update SMA */
+              auto& sma_min_pos = reinterpret_cast<uint16_t &>(b->at(sma_pos));
+              auto& sma_max_pos = reinterpret_cast<uint16_t &>(b->at(sma_pos + nvm::gOffsetSize));
+              if (cnt != 0) {
+                std::string sma_min(reinterpret_cast<const char (&)[]>(b->at(sma_min_pos)));
+                std::string sma_max(reinterpret_cast<const char (&)[]>(b->at(sma_max_pos)));
+                if (sma_min > value) sma_min_pos = target_data_pos;
+                else if (sma_max < value) sma_max_pos =target_data_pos;
+              } else /* cnt == 0 */{
+                sma_min_pos = target_data_pos;
+                sma_max_pos = target_data_pos;
+              }
+
+              /* Set new positions and sizes */
+              recOffset += string_size - 1 + sizeof(uint64_t);
+              record_size += string_size + nvm::gOffsetSize;
+              pTupleOffsets[idx] = target_data_pos;
+
+            }break;
+
+            default: {
+              throw TableException("unsupported column type\n");
+            }break;
+          } /* switch (c.mColType) */
+          ++idx;
+        } /* for (auto &c : tInfo) */
+
+        /* Increase BDCC count */
+        ++reinterpret_cast<uint32_t&>(b->at(nvm::gCountPos));
+        /* Adapt Free Space */
+        auto& fspace = reinterpret_cast<uint16_t&>(b->at(nvm::gFreeSpacePos));
+        fspace -= record_size;
+
+        /* Insert into index structure */
+        nvm::PTuple<decltype(rec)> ptp(b, pTupleOffsets);
+        index.insert( { key, ptp });
+      }); /* end of transaction */
+
+    } catch (std::exception& e) {
+      //TODO: only catch abort
+      std::cout << e.what() << '\n';
+      auto newBlocks = splitBlock(dest_block);
+      const auto& splitValue = reinterpret_cast<uint32_t &>(newBlocks.first->block->at(nvm::gDDCRangePos2));
+      auto xtr = static_cast<uint32_t>(getBDCCFromTuple(rec).to_ulong());
+      return insertTuple(key, rec, (xtr <= splitValue) ? newBlocks.first : newBlocks.second);
+    }
+
+    return 1;
+  }
+
+  std::pair<persistent_ptr<struct nvm_block>, persistent_ptr<struct nvm_block>> splitBlock(
+      persistent_ptr<struct nvm_block>& nvmBlock) {
+    auto pop = pool_by_vptr(this);
+    auto tInfo = *this->root->tInfo;
+    auto b0 = nvmBlock->block;
+
+    /* Calculate new ranges from histogram (at half for the beginning) */
+    const auto& ddc_min = reinterpret_cast<uint32_t &>(b0->at(nvm::gDDCRangePos1));
+    const auto& ddc_max = reinterpret_cast<uint32_t &>(b0->at(nvm::gDDCRangePos2));
+    //TODO: Special Case ddc_min == ddc_max
+    uint32_t splitValue = ddc_min + (ddc_max - ddc_min) / 2;
+    std::cout << "Splitting at: " << splitValue << " (" << ddc_min << ", " << ddc_max << ")\n";
+
+    persistent_ptr<struct nvm_block> newBlock1;
+    persistent_ptr<struct nvm_block> newBlock2;
+
+    /* Create two new blocks */
+    transaction::exec_tx(pop,
+        [&] {
+          newBlock1 = make_persistent<struct nvm_block>();
+          newBlock2 = make_persistent<struct nvm_block>();
+          newBlock1->block = make_persistent<nvm::NVM_Block>(nvm::NVM_Block(initBlock(ddc_min, splitValue)));
+          newBlock2->block = make_persistent<nvm::NVM_Block>(nvm::NVM_Block(initBlock(splitValue + 1, ddc_max)));
+          auto b1 = newBlock1->block;
+          auto b2 = newBlock2->block;
+
+          /* Get, Calculate BDCC, Insert and delete all current values to corresponding block */
+          // TODO: what about deleted records?
+          auto& cnt = reinterpret_cast<uint16_t&>(b0->at(nvm::gCountPos));
+          for (auto tupleOffset = 0u; tupleOffset < cnt; tupleOffset++) {
+            auto record_size = 0;
+            std::array<uint16_t, Tuple::NUM_ATTRIBUTES> pTupleOffsets;
+            // get BDCC value for tuple and decide for block
+
+            auto b = b1;
+
+            auto& dest_cnt = reinterpret_cast<uint32_t&>(b->at(nvm::gCountPos));
+
+            auto idx = 0u;
+            for (auto &c : tInfo) {
+              const auto& sma_pos = reinterpret_cast<const uint16_t&>(b0->at(nvm::gSmaOffsetPos + idx * nvm::gAttrOffsetSize));
+              const auto& data_pos = reinterpret_cast<const uint16_t&>(b0->at(nvm::gDataOffsetPos + idx * nvm::gAttrOffsetSize));
+
+              switch (c.mColType) {
+
+                case ColumnInfo::Int_Type: {
+                  /* Get Record Value */
+                  uint16_t src_data_offset = data_pos + tupleOffset * sizeof(int32_t);
+                  const auto& value = reinterpret_cast<const int32_t&>(b0->at(src_data_offset));
+
+                  /* Insert Data */
+                  uint16_t dest_data_offset = data_pos + dest_cnt * sizeof(int32_t);
+                  std::copy(reinterpret_cast<const uint8_t *>(&value),
+                            reinterpret_cast<const uint8_t *>(&value) + sizeof(int32_t),
+                            b->begin() + dest_data_offset);
+
+                  /* Update SMA */
+                  auto& sma_min = reinterpret_cast<int32_t&>(b->at(sma_pos));
+                  auto& sma_max = reinterpret_cast<int32_t&>(b->at(sma_pos + sizeof(int32_t)));
+                  if (sma_min > value || dest_cnt == 0) sma_min = value;
+                  if (sma_max < value || dest_cnt == 0) sma_max = value;
+
+                  pTupleOffsets[idx] = dest_data_offset;
+                  record_size += sizeof(int32_t);
+
+                }break;
+
+                case ColumnInfo::Double_Type: {
+                  /* Get Record Value */
+                  uint16_t src_data_offset = data_pos + tupleOffset * sizeof(double);
+                  const auto& value = reinterpret_cast<const double&>(b0->at(src_data_offset));
+
+                  /* Insert Data */
+                  uint16_t dest_data_offset = data_pos + dest_cnt * sizeof(double);
+                  std::copy(reinterpret_cast<const uint8_t *>(&value),
+                            reinterpret_cast<const uint8_t *>(&value) + sizeof(double),
+                            b->begin() + dest_data_offset);
+
+                  /* Update SMA */
+                  auto& sma_min = reinterpret_cast<double&>(b->at(sma_pos));
+                  auto& sma_max = reinterpret_cast<double&>(b->at(sma_pos + sizeof(double)));
+                  if (sma_min > value || dest_cnt == 0) sma_min = value;
+                  if (sma_max < value || dest_cnt == 0) sma_max = value;
+
+                  pTupleOffsets[idx] = dest_data_offset;
+                  record_size += sizeof(double);
+
+                }break;
+
+                case ColumnInfo::String_Type: {
+                  /* Get Record Value */
+                  const auto& value_offset = reinterpret_cast<const uint16_t&>(b0->at(data_pos + tupleOffset * nvm::gOffsetSize));
+                  const auto& value = reinterpret_cast<const char (&)[]>(b0->at(value_offset));
+                  std::size_t string_size = strlen(value) + 1;
+
+                  /* Insert Data - Get target position */
+                  uint16_t target_offset_pos = data_pos + dest_cnt * nvm::gOffsetSize;
+                  uint16_t target_data_pos;
+                  if (dest_cnt == 0) {
+                    auto end_minipage = (idx < tInfo.numColumns() - 1) ?
+                    reinterpret_cast<const uint16_t&>(b->at(nvm::gSmaOffsetPos + (idx + 1) * nvm::gAttrOffsetSize)) : nvm::gBlockSize;
+                    target_data_pos = end_minipage - string_size;
+                  } else /* cnt != 0 */{
+                    const auto& last_offset = reinterpret_cast<const uint16_t&>(b->at(target_offset_pos - nvm::gOffsetSize));
+                    target_data_pos = last_offset - string_size;
+                  }
+
+                  /* Insert Data - Set offset and string data */
+                  std::copy(reinterpret_cast<const uint8_t *>(&target_data_pos),
+                      reinterpret_cast<const uint8_t *>(&target_data_pos) + nvm::gOffsetSize,
+                      b->begin() + target_offset_pos);
+                  std::strcpy(reinterpret_cast<char(&)[]>(b->at(target_data_pos)), value);
+
+                  /* Update SMA */
+                  auto& sma_min_pos = reinterpret_cast<uint16_t &>(b->at(sma_pos));
+                  auto& sma_max_pos = reinterpret_cast<uint16_t &>(b->at(sma_pos + nvm::gOffsetSize));
+                  if (dest_cnt != 0) {
+                    std::string sma_min(reinterpret_cast<const char (&)[]>(b->at(sma_min_pos)));
+                    std::string sma_max(reinterpret_cast<const char (&)[]>(b->at(sma_max_pos)));
+                    if (sma_min > value) sma_min_pos = target_data_pos;
+                    else if (sma_max < value) sma_max_pos =target_data_pos;
+                  } else /* cnt == 0 */{
+                    sma_min_pos = target_data_pos;
+                    sma_max_pos = target_data_pos;
+                  }
+
+                  /* Set new positions and sizes */
+                  record_size += string_size + nvm::gOffsetSize;
+                  pTupleOffsets[idx] = target_data_pos;
+
+                }break;
+
+                default: {
+                  throw TableException("unsupported column type\n");
+                }break;
+              } /* switch (c.mColType) */
+              ++idx;
+
+            }
+            /* Increase BDCC count */
+            ++dest_cnt;
+            /* Adapt Free Space */
+            auto& fspace = reinterpret_cast<uint16_t&>(b->at(nvm::gFreeSpacePos));
+            fspace -= record_size;
+          }
+
+
+          // adapt pointers
+          if (root->block_list == nvmBlock) {
+            root->block_list = newBlock1;
+          } else {
+            auto prevBlock = root->block_list;
+            while (prevBlock->next != nvmBlock) {
+              prevBlock = prevBlock->next;
+            }
+            prevBlock->next = newBlock1;
+          }
+          newBlock1->next = newBlock2;
+          newBlock2->next = nvmBlock->next;
+          nvmBlock->clear();
+        });
+
+    return std::make_pair(newBlock1, newBlock2); // blocks can be nullptr
+  }
+
+
+  std::bitset<32> getBDCCFromTuple (Tuple tp) {
+    //TODO: Just use integers and shift operations instead of bitset
+    auto bdccInfo = *this->root->bdccInfo;
+    auto tInfo = *this->root->tInfo;
+    auto colCnt = 0; // total column counter
+    auto dimCnt = 0; // dimension column counter
+    auto bdccSize = 0; // sum of bits used for bdcc
+    std::bitset<32> xtr = 0; // extracted bdcc value
+    std::pair<int, std::bitset<32>> dimsBDCC[bdccInfo.bitMap.size()]; // (no. of bits, binned value)
+
+    for (const auto &c : tInfo) {
+      if (bdccInfo.bitMap.find(c) != bdccInfo.bitMap.end()) {
+        auto nBits = bdccInfo.bitMap.at(c);
+        //get value
+        auto value = ns_types::dynamic_get(colCnt, tp);
+        //get bin
+        int x = 0;
+        if (value.type() == typeid(std::string)) {
+          x = *reinterpret_cast<const int*>(boost::get<std::string>(value).c_str())
+              & ((1L << nBits) - 1);
+        } else if (value.type() == typeid(int)) {
+          x = boost::get<int>(value) & ((1L << nBits) - 1);
+        } else if (value.type() == typeid(double)) {
+          x = static_cast<int>(boost::get<double>(value)) & ((1L << nBits) - 1);
+        }
+        dimsBDCC[dimCnt] = std::make_pair(nBits, std::bitset<32>(x));
+        bdccSize += nBits;
+        ++dimCnt;
+      }
+      ++colCnt;
+    }
+
+    /* Round robin the bins */
+    while (bdccSize > 0) {
+      for (std::size_t k = 0; k < bdccInfo.bitMap.size(); ++k) {
+        if (dimsBDCC[k].first > 0) {
+          xtr[bdccSize - 1] = dimsBDCC[k].second[dimsBDCC[k].first - 1];
+          bdccSize--;
+          dimsBDCC[k].first--;
+        }
+      }
+    }
+    return xtr;
   }
 }; /* class persistent_table */
 
-} /* namespace nvm */
-
-} /* namespace pfabric */
+}} /* namespace pfabric::nvm */
 
 #endif /* persistent_table_hpp_ */

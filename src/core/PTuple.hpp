@@ -27,9 +27,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
-#include <vector>
 
 #include <core/PFabricTypes.hpp>
+#include <core/Tuple.hpp>
 
 #include <libpmemobj++/persistent_ptr.hpp>
 
@@ -39,21 +39,23 @@ namespace pfabric {
 
 namespace nvm {
 
+//TODO: Find a more suitable position for these constants
 /* Positions in NVM_Block */
-const int DDCRangePos1  =  0;
-const int DDCRangePos2  =  4;
-const int CountPos      =  8;
-const int FreeSpacePos  = 12;
-const int SmaOffsetPos  = 14;
-const int DataOffsetPos = 16;
+const int gDDCRangePos1  =  0;
+const int gDDCRangePos2  =  4;
+const int gCountPos      =  8;
+const int gFreeSpacePos  = 12;
+const int gSmaOffsetPos  = 14;
+const int gDataOffsetPos = 16;
 
 /* Sizes/Lengths in NVM_Block */
-const int FixedHeaderSize = 14;
-const int AttrOffsetSize  =  4;
-const int OffsetSize      =  2;
+const int gFixedHeaderSize = 14;
+const int gDDCValueSize    =  4;
+const int gAttrOffsetSize  =  4;
+const int gOffsetSize      =  2;
 
 /** The size of a single block in persistent memory */
-static constexpr uint16_t BlockSize = 1 << 15; // 32KB
+static constexpr uint16_t gBlockSize = 1 << 15; // 32KB
 
 /**
  * \brief This type represents a byte array used for persistent structures.
@@ -82,7 +84,7 @@ static constexpr uint16_t BlockSize = 1 << 15; // 32KB
  *  . ...
  *  . data               -> size of all strings + ddc_cnt (Nul termination)
  */
-typedef typename std::array<uint8_t, BlockSize> NVM_Block;
+typedef typename std::array<uint8_t, gBlockSize> NVM_Block;
 
 namespace detail {
 
@@ -107,7 +109,7 @@ struct get_helper;
  *****************************************************************************/
 template<typename T, std::size_t ID>
 struct get_helper {
-  static T apply(persistent_ptr<NVM_Block> block, const std::vector<uint16_t>& offsets) {
+  static T apply(persistent_ptr<NVM_Block> block, const uint16_t *offsets) {
     T val;
     uint8_t* ptr = reinterpret_cast<uint8_t*>(&val);
     std::copy(block->begin() + offsets[ID], block->begin() + offsets[ID] + sizeof(T), ptr);
@@ -125,7 +127,7 @@ struct get_helper {
  *****************************************************************************/
 template<std::size_t ID>
 struct get_helper<std::string, ID> {
-  static char (&( apply(persistent_ptr<NVM_Block> block, const std::vector<uint16_t>& offsets)))[] {
+  static char (&( apply(persistent_ptr<NVM_Block> block, const uint16_t *offsets)))[] {
     return reinterpret_cast<char (&)[]>(block->at(offsets[ID]));
   }
 };
@@ -140,7 +142,7 @@ struct get_helper<std::string, ID> {
  *****************************************************************************/
 template<std::size_t ID>
 struct get_helper<int32_t, ID> {
-  static int32_t& apply(persistent_ptr<NVM_Block> block, const std::vector<uint16_t>& offsets) {
+  static int32_t& apply(persistent_ptr<NVM_Block> block, const uint16_t *offsets) {
     return reinterpret_cast<int32_t&>(block->at(offsets[ID]));
   }
 };
@@ -155,10 +157,75 @@ struct get_helper<int32_t, ID> {
  *****************************************************************************/
 template<std::size_t ID>
 struct get_helper<double, ID> {
-  static double& apply(persistent_ptr<NVM_Block> block, const std::vector<uint16_t>& offsets) {
+  static double& apply(persistent_ptr<NVM_Block> block, const uint16_t *offsets) {
     return reinterpret_cast<double&>(block->at(offsets[ID]));
   }
 };
+
+/**************************************************************************//**
+ * \brief PTuplePrinter is a helper function to print a persistent tuple of any
+ *        size.
+ *
+ * PTuplePrinter is a helper function to print a PTuple instance of any size
+ * and member types to std::ostream. This template should not be directly used,
+ * but only via the Tuple members.
+ *
+ * \tparam Tuple
+ *    the tuple type
+ * \tparam CurrentIndex
+ *    the index of the attribute value to be printed
+ *****************************************************************************/
+template<class Tuple, std::size_t CurrentIndex>
+struct PTuplePrinter;
+
+/**************************************************************************//**
+ * \brief General overload for printing more than 1 element.
+ *
+ * This specialization will print the remaining elements first and appends the
+ * current one after a comma.
+ *
+ * \tparam Tuple
+ *    the underlying tuple type
+ * \tparam CurrentIndex
+ *    the index of the attribute value to be printed
+ *****************************************************************************/
+template<class Tuple, std::size_t CurrentIndex>
+struct PTuplePrinter {
+  static void print(std::ostream& os, persistent_ptr<NVM_Block> block, const uint16_t* offsets) {
+    PTuplePrinter<Tuple, CurrentIndex - 1>::print(os, block, offsets);
+    os << "," << get_helper<typename Tuple::template getAttributeType<CurrentIndex-1>::type, CurrentIndex - 1>::apply(block, offsets);
+  }
+};
+
+/**************************************************************************//**
+ * \brief Specialization for printing a persistent tuple with 1 element.
+ *
+ * This specialization will just print the element.
+ *
+ * \tparam Tuple
+ *    the underlying tuple type having one element
+ *****************************************************************************/
+template<class Tuple>
+struct PTuplePrinter<Tuple, 1> {
+  static void print(std::ostream& os, persistent_ptr<NVM_Block> block, const uint16_t* offsets) {
+    os << get_helper<typename Tuple::template getAttributeType<0>::type, 0>::apply(block, offsets);
+  }
+};
+
+/**************************************************************************//**
+ * \brief Specialization for printing a persistent tuple with no elements.
+ *
+ * This specialization will do nothing.
+ *
+ * \tparam Tuple
+ *    the underlying tuple type having no elements
+ *****************************************************************************/
+template<class Tuple>
+struct PTuplePrinter<Tuple, 0> {
+  static void print(std::ostream& os, persistent_ptr<NVM_Block> block, const uint16_t* offsets) {
+  }
+};
+
 
 } /* end namespace detail */
 
@@ -191,12 +258,6 @@ struct get_helper<double, ID> {
  *****************************************************************************/
 template<class Tuple>
 class PTuple {
-
-private:
-
-  persistent_ptr<NVM_Block> block;
-  std::vector<uint16_t> offsets;//!< TODO: Something else than a runtime eater like vector
-
 public:
   /************************************************************************//**
    * \brief the number of attributes for this tuple type.
@@ -225,7 +286,7 @@ public:
    * \param[in] _offsets
    *   the offsets for each tuple element
    ***************************************************************************/
-  PTuple(persistent_ptr<NVM_Block> _block, std::vector<uint16_t> _offsets) :
+  PTuple(persistent_ptr<NVM_Block> _block, std::array<uint16_t, NUM_ATTRIBUTES> _offsets) :
       block(_block), offsets(_offsets) {
   }
 
@@ -238,14 +299,63 @@ public:
    *   a reference to the persistent tuple's attribute with the requested \c ID
    ***************************************************************************/
   template<std::size_t ID>
-  inline auto getAttribute() -> typename getAttributeType<ID>::type {
-    return detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets);
+  inline auto getAttribute() {
+    return detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets.data());
   }
 
+  /************************************************************************//**
+   * \brief Get a specific attribute value from the persistent tuple.
+   *
+   * \tparam ID
+   *   the index of the requested attribute.
+   * \return
+   *   a reference to the persistent tuple's attribute with the requested \c ID
+   ***************************************************************************/
   template<std::size_t ID>
-  inline auto get() -> typename getAttributeType<ID>::type {
-    return detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets);
+  inline auto get() {
+    return detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets.data());
   }
+
+  /************************************************************************//**
+   * \brief Get a specific attribute value from the persistent tuple.
+   *
+   * \tparam ID
+   *   the index of the requested attribute.
+   * \return
+   *   a reference to the persistent tuple's attribute with the requested \c ID
+   ***************************************************************************/
+  template<std::size_t ID>
+  inline auto getAttribute() const {
+    return detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets.data());
+  }
+
+  /************************************************************************//**
+   * \brief Get a specific attribute value from the persistent tuple.
+   *
+   * \tparam ID
+   *   the index of the requested attribute.
+   * \return
+   *   a reference to the persistent tuple's attribute with the requested \c ID
+   ***************************************************************************/
+  template<std::size_t ID>
+  inline auto get() const {
+    return detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets.data());
+  }
+
+  /************************************************************************//**
+   * \brief Print this persistent tuple to an ostream.
+   *
+   * \param[in] os
+   *   the output stream to print the tuple
+   ***************************************************************************/
+  void print(std::ostream& os) {
+    detail::PTuplePrinter<Tuple, NUM_ATTRIBUTES>::print(os, block, offsets.data());
+  }
+
+private:
+
+  persistent_ptr<NVM_Block> block;
+  std::array<uint16_t, NUM_ATTRIBUTES> offsets;
 
 }; /* class PTuplePtr */
 
@@ -267,10 +377,48 @@ public:
  *   a reference to the persistent tuple's attribute with the requested \c ID
  *****************************************************************************/
 template<std::size_t ID, class Tuple>
-auto get(nvm::PTuple<Tuple> ptp) -> decltype(ptp.template get<ID>()) {
+auto get(const nvm::PTuple<Tuple>& ptp) -> decltype((ptp.template get<ID>())) {
   return ptp.template get<ID>();
 }
 
+/**************************************************************************//**
+   * \brief Print a persistent tuple to an ostream.
+   *
+   * \param[in] os
+   *   the output stream to print the tuple
+ *****************************************************************************/
+template<class Tuple>
+void print(std::ostream& os, const nvm::PTuple<Tuple>& ptp) {
+  ptp.print(os);
+}
+
 } /* end namespace pfabric */
+
+/**************************************************************************//**
+ * \brief Helper template for printing persistent tuples to an ostream
+ *
+ * \tparam Tuple
+ *   the underlying Tuple of the PTuple
+ * \param[in] os
+ *   the output stream to print the tuple
+ * \param[in] ptp
+ *   PTuple instance to print
+ * \return
+ *   the output stream
+ *****************************************************************************/
+template<typename Tuple>
+std::ostream& operator<<(std::ostream& os, pfabric::nvm::PTuple<Tuple>& ptp) {
+  ptp.print(os);
+  return os;
+}
+
+/*
+namespace std {
+template< std::size_t ID, typename Tuple >
+auto get( pfabric::nvm::PTuple<Tuple>& ptp ) -> decltype(ptp.template getAttribute<ID>()) {
+  return ptp.template getAttribute<ID>();
+}
+}
+*/
 
 #endif /* PTuple_hpp_ */
