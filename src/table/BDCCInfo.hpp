@@ -24,10 +24,14 @@
 
 namespace pfabric {
 
+/**************************************************************************//**
+ * \brief Info structure about the BDCC meta data.
+ *
+ * It is used in persistent tables to store the BDCC meta data and statistics.
+ *****************************************************************************/
 struct BDCCInfo {
   typedef std::unordered_map<ColumnInfo, uint16_t> ColumnBitsMap;
 
-  //BDCCInfo() {}
   BDCCInfo(ColumnBitsMap _bitMap) : bitMap(_bitMap),
       numBins(std::accumulate(_bitMap.begin(), _bitMap.end(), 0,
       [](const size_t sum, decltype(*_bitMap.begin()) p) { return sum + p.second; })) {}
@@ -35,9 +39,9 @@ struct BDCCInfo {
   const ColumnBitsMap bitMap;
   const size_t numBins;
   std::map<uint32_t, std::size_t> histogram;
-};
 
-typedef std::shared_ptr<TableInfo> TableInfoPtr;
-}
+};/* struct BDCCInfo */
 
-#endif
+} /* namespace pfabric */
+
+#endif /* PTuple_hpp_ */
