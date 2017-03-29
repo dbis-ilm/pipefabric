@@ -32,7 +32,7 @@ public:
 
   void processDataElement( const TStringPtr& data, const bool outdated ) {
     std::string input (data->getAttribute<0>().begin_, data->getAttribute<0>().size_);
-    std::string expected = fmt::format("{},This is a string field,{}", tupleNum, tupleNum * 100 + 0.5);
+    std::string expected = fmt::format("{},This is a string field,{:.1f}", tupleNum, tupleNum * 100 + 0.5);
 
     REQUIRE(input == expected);
     tupleNum++;
