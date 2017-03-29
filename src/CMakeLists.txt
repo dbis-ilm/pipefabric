@@ -46,17 +46,22 @@ option(BUILD_TEST_CASES
   ON
 )
 
-# Build benchmarks (note: requires to set BUILD_GOOGLE_BEMCH to ON)
+#Build google benchmark library
+option(BUILD_GOOGLE_BENCH
+  "build google benchmark"
+  ON
+)
+
+# Build benchmark test
 option(BUILD_BENCHMARKS
   "build benchmarks for pipefabric"
   ON
 )
 
-#Build google benchmark library with test
-option(BUILD_GOOGLE_BENCH
-  "build google benchmark"
-  ON
-)
+# Benchmark test requires benchmark library
+if (BUILD_BENCHMARKS)
+  set(BUILD_GOOGLE_BENCH ON)
+endif()
 
 # Force using intel compiler
 #include(CMakeForceCompiler)

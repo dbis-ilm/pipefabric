@@ -26,6 +26,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <mutex>
 
 #include <boost/unordered/unordered_map.hpp>
 
@@ -105,8 +106,9 @@ class Tuplifier
 
   Tuplifier(TimestampExtractorFunc func, 
       const std::initializer_list<std::string>& predList, TuplifierParams::TuplifyMode m, unsigned int ws = 0) : 
-      Tuplifier(predList, m, ws),
-      mTimestampExtractor(func) {}
+      Tuplifier(predList, m, ws) {
+      mTimestampExtractor = func;
+   }
 
   ~Tuplifier() {}
 
