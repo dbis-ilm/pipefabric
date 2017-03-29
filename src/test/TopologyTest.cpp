@@ -214,6 +214,25 @@ TEST_CASE("Building and running a topology with stream generator", "[StreamGener
     testTable->drop();
 }
 
+TEST_CASE("Building and running a topology with a memory source", "[MemorySource]") {
+  typedef TuplePtr<int, std::string, double> T1;
+  std::vector<T1> results;
+
+  TestDataGenerator tgen("file.csv");
+  tgen.writeData(10);
+
+  Topology t;
+  auto s = t.newStreamFromMemory<T1>("file.csv")
+    .notify([&](auto tp, bool outdated) {
+        results.push_back(tp);
+    });
+
+  t.prepare();
+  t.start(false);
+
+  REQUIRE(results.size() == 10);
+}
+
 TEST_CASE("Building and running a topology with grouping", "[GroupBy]") {
     typedef TuplePtr<int, double> T1;
     typedef TuplePtr<double> T2;

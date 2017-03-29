@@ -38,6 +38,10 @@ void Topology::registerStartupFunction(StartupFunc func) {
   startupList.push_back(func);
 }
 
+void Topology::registerPrepareFunction(StartupFunc func) {
+  prepareList.push_back(func);
+}
+
 void Topology::startAsync() {
   // create futures for waiting for the results
   // of the start functions
@@ -56,6 +60,12 @@ void Topology::start(bool async) {
   else
     for (auto sFunc : startupList) {
       (sFunc)();
+    }
+}
+
+void Topology::prepare() {
+    for (auto pFunc : prepareList) {
+      (pFunc)();
     }
 }
 

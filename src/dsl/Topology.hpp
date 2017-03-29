@@ -35,6 +35,7 @@
 #include "qop/TextFileSource.hpp"
 #include "qop/RESTSource.hpp"
 #include "qop/ZMQSource.hpp"
+#include "qop/MemorySource.hpp"
 #include "qop/ToTable.hpp"
 #include "qop/FromTable.hpp"
 #include "qop/SelectFromTable.hpp"
@@ -79,6 +80,7 @@ namespace pfabric {
 
 //    std::list<Pipe*> pipes;               //< the list of pipes created for this topology
     std::vector<StartupFunc> startupList; //< the list of functions to be called for startup
+    std::vector<StartupFunc> prepareList; //< the list of functions to be called for startup
     bool asyncStarted;                    //< true if we started asynchronously
     std::vector<std::future<unsigned long> > startupFutures; //< futures for the startup functions
     std::mutex mMutex;                    //< mutex for accessing startupFutures
@@ -97,6 +99,8 @@ namespace pfabric {
      *    a function pointer for the startup member function
      */
     void registerStartupFunction(StartupFunc func);
+
+    void registerPrepareFunction(StartupFunc func);
 
     /**
      * @brief Invokes the start functions asynchronously.
@@ -128,6 +132,8 @@ namespace pfabric {
      *   determines if the start functions should be invoked asynchronously
      */
     void start(bool async = true);
+
+    void prepare();
 
     /**
      * @brief Waits until the execution of the topology stopped.
@@ -288,6 +294,14 @@ namespace pfabric {
     Pipe<T> streamFromGenerator(typename StreamGenerator<T>::Generator gen, unsigned long num) {
       auto op = std::make_shared<StreamGenerator<T>>(gen, num);
       registerStartupFunction([=]() -> unsigned long { return op->start(); });
+      return Pipe<T>(dataflow, dataflow->addPublisher(op));
+    }
+
+    template<typename T>
+    Pipe<T> newStreamFromMemory(const std::string& fname, char delim = ',', unsigned long num = 0) {
+      auto op = std::make_shared<MemorySource<T>>(fname, delim, num);
+      registerStartupFunction([=]() -> unsigned long { return op->start(); });
+      registerPrepareFunction([=]() -> unsigned long { return op->prepare(); });
       return Pipe<T>(dataflow, dataflow->addPublisher(op));
     }
   };
