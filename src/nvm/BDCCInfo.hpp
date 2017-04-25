@@ -22,7 +22,11 @@
 #ifndef BDCCInfo_hpp_
 #define BDCCInfo_hpp_
 
-namespace pfabric {
+#include <nvm/PTableInfo.hpp>
+#include <map>
+#include <unordered_map>
+
+namespace pfabric { namespace nvm {
 
 /**************************************************************************//**
  * \brief Info structure about the BDCC meta data.
@@ -42,6 +46,6 @@ struct BDCCInfo {
 
 };/* struct BDCCInfo */
 
-} /* namespace pfabric */
+}} /* namespace pfabric::nvm */
 
 #endif /* PTuple_hpp_ */

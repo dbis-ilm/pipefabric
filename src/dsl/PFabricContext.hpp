@@ -21,13 +21,21 @@
 #ifndef PFabricContext_hpp_
 #define PFabricContext_hpp_
 
-#include <string>
+#include <iostream>
 #include <map>
+#include <memory>
+#include <string>
 
 #include "core/PFabricTypes.hpp"
-#include "table/Table.hpp"
+#include "dsl/Dataflow.hpp"
 #include "qop/Queue.hpp"
-#include "dsl/Topology.hpp"
+#include "table/Table.hpp"
+#include "table/TableException.hpp"
+#include "table/TableInfo.hpp"
+
+namespace pfabric {
+class Topology;
+} /* namespace pfabric */
 
 namespace pfabric {
 
@@ -168,7 +176,7 @@ public:
   }
 
 private:
-  typedef std::shared_ptr<BaseTable> BaseTablePtr;
+  using BaseTablePtr = typename std::shared_ptr<BaseTable>;
 
   std::map<std::string, BaseTablePtr> mTableSet;         //< a dictionary collecting all existing tables
   std::map<std::string, Dataflow::BaseOpPtr> mStreamSet; //< a dictionary collecting all named streams

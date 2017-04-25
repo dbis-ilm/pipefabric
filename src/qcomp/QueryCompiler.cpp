@@ -6,6 +6,7 @@
 #include "SQLParser.hpp"
 #include "TopologyBuilder.hpp"
 #include "UniqueNameGenerator.hpp"
+#include "table/TableInfo.hpp"
 
 namespace dll = boost::dll;
 
@@ -148,7 +149,7 @@ void QueryCompiler::modifyWhereExpression(
   int i = 0;
   for (auto iter = inputSchema.begin(); iter != inputSchema.end();
        iter++, i++) {
-    columnMap[iter->mColName] = i;
+    columnMap[iter->getName()] = i;
   }
 
   MapColumnVisitor visitor(columnMap);
@@ -164,7 +165,7 @@ void QueryCompiler::constructMapSchema(
     std::shared_ptr<PlanOp<MapInfo>> mapOp) throw(QueryCompileException) {
   MapInfo& mInfo = mapOp->payload();
   auto inputSchema = mapOp->mChild->mOutputSchema;
-  std::vector<ColumnInfo> outputColumns;
+  TableInfo::ColumnVector outputColumns;
 
   for (auto s : mInfo.columns) {
     auto pos = inputSchema.findColumnByName(s);
@@ -177,7 +178,7 @@ void QueryCompiler::constructMapSchema(
       throw QueryCompileException("unknown column");
     }
   }
-  mapOp->mOutputSchema.setColumns(outputColumns);
+  //mapOp->mOutputSchema.setColumns(outputColumns);
 }
 
 TopologyBuilderPtr QueryCompiler::execQuery(

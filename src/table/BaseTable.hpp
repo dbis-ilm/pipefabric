@@ -33,11 +33,10 @@
 #include <shared_mutex>
 
 #include <boost/signals2.hpp>
-
-#include "fmt/format.h"
-
 #include "table/TableInfo.hpp"
 #include "table/TableException.hpp"
+
+#include "fmt/format.h"
 
 namespace pfabric {
 
@@ -75,7 +74,7 @@ protected:
   /**
    * Constructor for creating an empty table with a given schema.
    */
-  BaseTable(const TableInfo& tInfo) : mTableInfo(std::make_shared<TableInfo>(tInfo)) {}
+  BaseTable(const TableInfo& tInfo) : mTableInfo(tInfo.makeShared()) {}
 
 public:
   virtual ~BaseTable() {}

@@ -56,7 +56,7 @@ option(USE_NVML_TABLE
 #CMAKE_FORCE_CXX_COMPILER(icpc "Intel C++ Compiler")
 
 # C++ compiler flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated -g -O3 -Wsign-compare")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated -g -O0 -Wsign-compare")
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedefs -Wno-#pragma-messages")
 elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
@@ -127,10 +127,10 @@ if (USE_NVML_TABLE)
 	message(STATUS "using NVML based persistent table")
 	add_definitions(-DUSE_NVML_TABLE)
 	set (NVML_LIBRARIES
-				"${THIRD_PARTY_DIR}/nvml/lib/libpmemblk.a"
-				"${THIRD_PARTY_DIR}/nvml/lib/libpmemlog.a"
+#				"${THIRD_PARTY_DIR}/nvml/lib/libpmemblk.a"
+#				"${THIRD_PARTY_DIR}/nvml/lib/libpmemlog.a"
 				"${THIRD_PARTY_DIR}/nvml/lib/libpmemobj.a"
-				"${THIRD_PARTY_DIR}/nvml/lib/libpmempool.a"
+#				"${THIRD_PARTY_DIR}/nvml/lib/libpmempool.a"
 				"${THIRD_PARTY_DIR}/nvml/lib/libpmem.a"
 #				"${THIRD_PARTY_DIR}/nvml/lib/libvmem.a"
 #				"${THIRD_PARTY_DIR}/nvml/lib/libvmmalloc.a"
@@ -220,7 +220,7 @@ else()
 set (ZEROMQ_SOURCES "")
 endif (ZEROMQ_FOUND)
 
-add_library(pfabric_core SHARED
+set(core_sources
   core/TimestampHelper.cpp
   core/Punctuation.cpp
   qop/TextFileSource.cpp
@@ -230,21 +230,41 @@ add_library(pfabric_core SHARED
   dsl/Topology.cpp
   dsl/Dataflow.cpp
   dsl/PFabricContext.cpp
-  table/TableInfo.cpp
   ${ZEROMQ_SOURCES}
   # we need this as dependency to download the sources from github
   ${THIRD_PARTY_DIR}/json
   ${THIRD_PARTY_DIR}/fmt
   ${THIRD_PARTY_DIR}/SimpleWeb
-  ${THIRD_PARTY_DIR}/rocksdb
-  ${THIRD_PARTY_DIR}/nvml
   ${THIRD_PARTY_DIR}/catch
 )
 
+if(USE_ROCKSDB_TABLE)
+  set(core_sources
+    ${core_sources}
+    ${THIRD_PARTY_DIR}/rocksdb
+    )
+endif()
+
+if(USE_NVML_TABLE)
+  set(core_sources
+    ${core_sources}
+    nvm/PTableInfo.cpp
+    ${THIRD_PARTY_DIR}/nvml
+  )
+else()
+  set(core_sources
+    ${core_sources}
+    nvm/VTableInfo.cpp
+  )
+endif(USE_NVML_TABLE)
+
+add_library(pfabric_core SHARED
+    ${core_sources}
+)
 
 target_link_libraries(pfabric_core
-		${BOOST_LIBRARIES}
-		 ${ZEROMQ_LIBRARIES}
+  ${BOOST_LIBRARIES}
+  ${ZEROMQ_LIBRARIES}
 )
 
 #-----------------------------------------------------------------------------------------
@@ -271,7 +291,7 @@ add_subdirectory(qcomp)
 #
 # Demo project
 #
-add_subdirectory(demo)
+#add_subdirectory(demo)
 
 #-----------------------------------------------------------------------------------------
 #

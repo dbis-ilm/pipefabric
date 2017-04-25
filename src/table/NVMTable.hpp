@@ -36,29 +36,28 @@
 
 #include "fmt/format.h"
 
-#include "table/TableInfo.hpp"
 #include "table/TableException.hpp"
 #include "table/BaseTable.hpp"
-#include "table/persistent_table.hpp"
+#include "table/TableInfo.hpp"
+#include "nvm/persistent_table.hpp"
 
+#include "nvml/include/libpmemobj++/make_persistent.hpp"
 #include "nvml/include/libpmemobj++/p.hpp"
 #include "nvml/include/libpmemobj++/persistent_ptr.hpp"
 #include "nvml/include/libpmemobj++/pool.hpp"
-#include "nvml/include/libpmemobj++/make_persistent.hpp"
 #include "nvml/include/libpmemobj++/transaction.hpp"
 
 #define LAYOUT "NVMTable"
 
-namespace pfabric
-{
+namespace pfabric {
 
-using nvml::obj::pool;
-using nvml::obj::pool_base;
+using nvml::obj::delete_persistent;
+using nvml::obj::make_persistent;
 using nvml::obj::p;
 using nvml::obj::persistent_ptr;
-using nvml::obj::make_persistent;
-using nvml::obj::delete_persistent;
+using nvml::obj::pool;
 using nvml::obj::transaction;
+using pfabric::nvm::persistent_table;
 
 template <typename RecordType, typename KeyType>
 class NVMIterator
@@ -66,7 +65,7 @@ class NVMIterator
 public:
   typedef std::function<bool(const RecordType &)> Predicate;
   typedef TuplePtr<RecordType> RecordTypePtr;
-  typedef nvm::persistent_table<RecordType, KeyType> pTable_type;
+  typedef persistent_table<RecordType, KeyType> pTable_type;
 
   explicit NVMIterator() {}
   explicit NVMIterator(persistent_ptr<pTable_type> _pTable, Predicate _pred) : pTable(_pTable), pred(_pred)
@@ -179,7 +178,7 @@ public:
   /**
    * Constructor for creating an empty table with a given schema.
    */
-  NVMTable(const TableInfo &tInfo) : BaseTable(tInfo)
+  NVMTable(const TableInfo & tInfo) : BaseTable(tInfo)
   {
     openOrCreateTable(tInfo);
   }
@@ -441,7 +440,9 @@ private:
   pool<root> pop;
   persistent_ptr<root> q;
   ObserverCallback mImmediateObservers, mDeferredObservers;
-};
-}
 
-#endif
+}; /* class NVMTable */
+
+} /* namespace pfabric */
+
+#endif /* NVMTable_hpp_ */

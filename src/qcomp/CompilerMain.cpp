@@ -8,6 +8,8 @@
 #include "SQLParser.hpp"
 #include "Plan.hpp"
 #include "QueryCompiler.hpp"
+#include "table/TableInfo.hpp"
+
 
 using namespace pfabric;
 

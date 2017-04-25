@@ -3,9 +3,9 @@
 
 #include <memory>
 #include <boost/variant.hpp>
+#include "table/TableInfo.hpp"
 
 #include "SQLParser.hpp"
-#include "table/TableInfo.hpp"
 
 namespace pfabric {
 

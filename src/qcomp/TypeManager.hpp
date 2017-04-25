@@ -1,10 +1,10 @@
 #ifndef TypeManager_hpp_
 #define TypeManager_hpp_
 
+#include <table/TableInfo.hpp>
 #include <string>
 #include <map>
 
-#include "table/TableInfo.hpp"
 #include "QueryCompileException.hpp"
 
 namespace pfabric {

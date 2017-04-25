@@ -37,19 +37,20 @@
 #include <utility>
 #include <vector>
 
-#include <core/PTuple.hpp>
-#include <core/serialize.hpp>
-#include <table/BDCCInfo.hpp>
-#include <table/TableException.hpp>
-#include <table/TableInfo.hpp>
+#include "core/serialize.hpp"
+#include "nvm/BDCCInfo.hpp"
+#include "nvm/ctree_map_persistent.hpp"
+#include "nvm/PTuple.hpp"
+#include "table/TableException.hpp"
+#include "table/TableInfo.hpp"
 
-#include <libpmemobj++/detail/persistent_ptr_base.hpp>
-#include <libpmemobj++/make_persistent.hpp>
-#include <libpmemobj++/p.hpp>
-#include <libpmemobj++/persistent_ptr.hpp>
-#include <libpmemobj++/pool.hpp>
-#include <libpmemobj++/transaction.hpp>
-#include <libpmemobj++/utils.hpp>
+#include "nvml/include/libpmemobj++/detail/persistent_ptr_base.hpp"
+#include "nvml/include/libpmemobj++/make_persistent.hpp"
+#include "nvml/include/libpmemobj++/p.hpp"
+#include "nvml/include/libpmemobj++/persistent_ptr.hpp"
+#include "nvml/include/libpmemobj++/pool.hpp"
+#include "nvml/include/libpmemobj++/transaction.hpp"
+#include "nvml/include/libpmemobj++/utils.hpp"
 
 using nvml::obj::pool;
 using nvml::obj::pool_by_vptr;
@@ -62,73 +63,6 @@ using nvml::obj::transaction;
 
 namespace pfabric { namespace nvm {
 
-namespace detail {
-
-typedef std::unordered_map<ColumnInfo, uint16_t> ColumnIntMap;
-
-/**************************************************************************//**
- * \brief Helper function to calculate the minipage sizes for a given schema.
- *
- * \param[in] tableInfo
- *   the table schema for which the minipages sizes should be calculated
- * \param[in] totalSize
- *   total available space/size
- * \param[in] customizations
- *   optional map of weightings for specific columns.
- * \return
- *   a mapping from ColumnInfo to the calculated minipage size
- *****************************************************************************/
-struct minipage_helper {
-  static ColumnIntMap calcMinipageSizes(const TableInfo& tableInfo, uint16_t totalSize,
-      ColumnIntMap customizations = ColumnIntMap()) {
-    size_t portions = 0;
-    ColumnIntMap mp_sizes = ColumnIntMap();
-    /* Get the sum of all column portitions */
-    for (auto &c : tableInfo) {
-      if (customizations.find(c) == customizations.end()) {
-        switch (c.mColType) {
-        case ColumnInfo::Int_Type:
-          portions += 1;
-          break;
-        case ColumnInfo::Double_Type:
-          portions += 2;
-          break;
-        case ColumnInfo::String_Type:
-          portions += 5;
-          break;
-        default:
-          throw TableException("unsupported column type\n");
-          break;
-        }
-      } else
-        portions += customizations[c];
-    }
-    /* Calculate and save the minipage sizes for all columns */
-    for (auto &c : tableInfo) {
-      if (customizations.find(c) == customizations.end()) {
-        switch (c.mColType) {
-        case ColumnInfo::Int_Type:
-          mp_sizes[c] = 1 * totalSize / portions;
-          break;
-        case ColumnInfo::Double_Type:
-          mp_sizes[c] = 2 * totalSize / portions;
-          break;
-        case ColumnInfo::String_Type:
-          mp_sizes[c] = 5 * totalSize / portions;
-          break;
-        default:
-          throw TableException("unsupported column type\n");
-          break;
-        }
-      } else
-        mp_sizes[c] = customizations[c] * totalSize / portions;
-    }
-    return mp_sizes;
-  }
-};
-} /* namespace detail */
-
-
 /**************************************************************************//**
  * \brief A persistent table used for PMEM technologies or emulations.
  *
@@ -139,13 +73,14 @@ class persistent_table {
 
 public:
   typedef persistent_ptr<Tuple> RecordType;
+  typedef std::unordered_map<ColumnInfo, uint16_t> ColumnIntMap;
 
   /************************************************************************//**
    * \brief Default Constructor.
    ***************************************************************************/
   persistent_table() {
     auto pop = pool_by_vptr(this);
-    transaction::exec_tx(pop, [&] {init(TableInfo(), detail::ColumnIntMap());});
+    transaction::exec_tx(pop, [&] {init(TableInfo(), ColumnIntMap());});
   }
 
   /************************************************************************//**
@@ -153,13 +88,13 @@ public:
    ***************************************************************************/
   persistent_table(const TableInfo &_tInfo) {
     auto pop = pool_by_vptr(this);
-    transaction::exec_tx(pop, [&] {init(_tInfo, detail::ColumnIntMap());});
+    transaction::exec_tx(pop, [&] {init(_tInfo, ColumnIntMap());});
   }
 
   /************************************************************************//**
    * \brief Constructor for a given schema and dimension clustering.
    ***************************************************************************/
-  persistent_table(const TableInfo &_tInfo, const detail::ColumnIntMap& _bdccInfo) {
+  persistent_table(const TableInfo &_tInfo, const ColumnIntMap& _bdccInfo) {
     auto pop = pool_by_vptr(this);
     transaction::exec_tx(pop, [&] {init(_tInfo, _bdccInfo);});
   }
@@ -193,6 +128,7 @@ public:
      * X Insert + adapt SMAs and count
      */
 
+    //TODO: Check if already inserted in Index
     auto dest_block = root->block_list;
     StreamType buf;
     rec.serializeToStream(buf);
@@ -280,8 +216,13 @@ public:
    *   the number of tuples deleted
    ***************************************************************************/
   int deleteByKey(KeyType key) {
-    //TODO: Also delete data
-    auto nres = index.erase(key);
+    //TODO: Also delete data?
+    size_t nres;
+    auto pop = pool_by_vptr(this);
+    transaction::exec_tx(pop, [&] {
+      //delete_persistent<PTuple<Tuple>>(getByKey(key));
+      nres = root->index->remove_free(key);
+    });
     return nres;
   }
 
@@ -296,10 +237,11 @@ public:
    * \return
    *   the PTuple associated with the given key
    ***************************************************************************/
-  PTuple<Tuple> getByKey(KeyType key) {
-    auto res = index.find(key);
-    if (res != index.end()) {
-      return res->second;
+  persistent_ptr<PTuple<Tuple>> getByKey(KeyType key) const {
+    auto map = *root->index;
+    //if (res != root->index->end()) {
+    if (map.lookup(key)) {
+      return *map.get(key);
     } else {
       throw TableException("key not found");
     }
@@ -314,10 +256,10 @@ public:
   void print(bool raw = false) {
 
     auto dest_block = root->block_list;
-    auto tInfo = *this->root->tInfo;
+    auto tInfo = root->tInfo;
 
     size_t colCnt = 0;
-    for (auto &c : tInfo)
+    for (auto &c : *tInfo)
       colCnt++;
 
     do {
@@ -355,11 +297,12 @@ public:
       /* Body/Column/Minipage data */
       if (cnt > 0) {
         size_t idx = 0;
-        for (auto &c : tInfo) {
+        for (auto &c : *tInfo) {
+          std::cout << "Column Info: " << c.getName() << ": " << c.getType() << std::endl;
           const auto& sma_pos = reinterpret_cast<const uint16_t&>(b->at(nvm::gSmaOffsetPos + idx * nvm::gAttrOffsetSize));
           const auto& data_pos = reinterpret_cast<const uint16_t&>(b->at(nvm::gDataOffsetPos + idx * nvm::gAttrOffsetSize));
 
-          switch (c.mColType) {
+          switch (c.getType()) {
           case ColumnInfo::Int_Type: {
             const auto& sma_min = reinterpret_cast<const int32_t&>(b->at(sma_pos));
             const auto& sma_max =reinterpret_cast<const int32_t&>(b->at(sma_pos + sizeof(int32_t)));
@@ -371,7 +314,7 @@ public:
               reinterpret_cast<const uint16_t&>(b->at(nvm::gSmaOffsetPos + (idx + 1) * nvm::gAttrOffsetSize));
             auto mp_free = next_sma_pos - data_pos - (cnt * sizeof(int32_t));
 
-            std::cout << "Column[" << idx << "]: " << c.mColName
+            std::cout << "Column[" << idx << "]: " << c.getName()
                       << "\n\tSpace left: " << mp_free << " Bytes"
                       << "\n\tsma_min: " << sma_min
                       << "\n\tsma_max: " << sma_max
@@ -395,7 +338,7 @@ public:
               reinterpret_cast<const uint16_t&>(b->at(nvm::gSmaOffsetPos + (idx + 1) * nvm::gAttrOffsetSize));
             uint16_t mp_free = next_sma_pos - data_pos - (cnt * sizeof(double));
 
-            std::cout << "Column[" << idx << "]: " << c.mColName
+            std::cout << "Column[" << idx << "]: " << c.getName()
                       << "\n\tSpace left: " << mp_free << " Bytes"
                       << "\n\tsma_min: " << sma_min
                       << "\n\tsma_max: " << sma_max
@@ -419,7 +362,7 @@ public:
             auto current_offset = reinterpret_cast<const uint16_t&>(b->at(current_offset_pos - nvm::gOffsetSize));
             auto mp_free = current_offset - current_offset_pos;
 
-            std::cout << "Column[" << idx << "]: " << c.mColName
+            std::cout << "Column[" << idx << "]: " << c.getName()
                       << "\n\tSpace left: " << mp_free << " Bytes"
                       << "\n\tsma_min: " << sma_min
                       << "\n\tsma_max: " << sma_max
@@ -473,13 +416,70 @@ private:
 
   struct root {
     persistent_ptr<struct nvm_block> block_list;
+    persistent_ptr<examples::ctree_map_p<KeyType, persistent_ptr<nvm::PTuple<Tuple>>>> index;
     persistent_ptr<const TableInfo> tInfo;
     persistent_ptr<BDCCInfo> bdccInfo;
   };
-
   persistent_ptr<struct root> root;
 
-  std::map<KeyType, nvm::PTuple<Tuple>> index;
+
+
+  /**************************************************************************//**
+   * \brief Helper function to calculate the minipage sizes for a given schema.
+   *
+   * \param[in] totalSize
+   *   total available space/size
+   * \param[in] customizations
+   *   optional map of weightings for specific columns.
+   * \return
+   *   a mapping from ColumnInfo to the calculated minipage size
+   *****************************************************************************/
+   ColumnIntMap calcMinipageSizes(uint16_t totalSize, ColumnIntMap customizations = ColumnIntMap()) {
+      size_t portions = 0;
+      ColumnIntMap mp_sizes = ColumnIntMap();
+      /* Get the sum of all column portitions */
+      for (auto &c : *root->tInfo) {
+        if (customizations.find(c) == customizations.end()) {
+          switch (c.getType()) {
+          case ColumnInfo::Int_Type:
+            portions += 1;
+            break;
+          case ColumnInfo::Double_Type:
+            portions += 2;
+            break;
+          case ColumnInfo::String_Type:
+            portions += 5;
+            break;
+          default:
+            throw TableException("unsupported column type\n");
+            break;
+          }
+        } else
+          portions += customizations[c];
+      }
+      /* Calculate and save the minipage sizes for all columns */
+      for (auto &c : *root->tInfo) {
+        if (customizations.find(c) == customizations.end()) {
+          switch (c.getType()) {
+          case ColumnInfo::Int_Type:
+            mp_sizes[c] = 1 * totalSize / portions;
+            break;
+          case ColumnInfo::Double_Type:
+            mp_sizes[c] = 2 * totalSize / portions;
+            break;
+          case ColumnInfo::String_Type:
+            mp_sizes[c] = 5 * totalSize / portions;
+            break;
+          default:
+            throw TableException("unsupported column type\n");
+            break;
+          }
+        } else
+          mp_sizes[c] = customizations[c] * totalSize / portions;
+      }
+      return mp_sizes;
+    }
+
 
   /************************************************************************//**
    * \brief Initialization function for creating the necessary structures.
@@ -487,14 +487,15 @@ private:
    * \param[in] _tInfo
    *   the underlying schema to use
    ***************************************************************************/
-  void init(const TableInfo& _tInfo, const detail::ColumnIntMap& _bdccInfo) {
+  void init(const TableInfo& _tInfo, const ColumnIntMap& _bdccInfo) {
     this->root = make_persistent<struct root>();
     this->root->tInfo = make_persistent<TableInfo>(_tInfo);
     this->root->bdccInfo = make_persistent<BDCCInfo>(BDCCInfo(_bdccInfo));
+    this->root->index = make_persistent<examples::ctree_map_p<KeyType, persistent_ptr<nvm::PTuple<Tuple>>>>();
     this->root->block_list = make_persistent<struct nvm_block>();
-    this->root->block_list->block = make_persistent<nvm::NVM_Block>(
-        nvm::NVM_Block(initBlock(0, ((1L << this->root->bdccInfo->numBins) - 1)))
-    );
+    auto block_ptr = make_persistent<nvm::NVM_Block>(initBlock(0, ((1L << this->root->bdccInfo->numBins) - 1)));
+    this->root->block_list->block = block_ptr;
+
   }
 
   /************************************************************************//**
@@ -520,7 +521,7 @@ private:
     uint16_t body_size = nvm::gBlockSize - header_size;
     auto minipage_size = body_size / colCnt;
 
-    auto sizes = detail::minipage_helper::calcMinipageSizes(*this->root->tInfo, body_size);
+    auto sizes = calcMinipageSizes(body_size);
 
     /* Set Offsets */
     size_t idx = 0;
@@ -529,7 +530,7 @@ private:
     for (auto &c : *this->root->tInfo) {
       uint16_t sma_offset;
       uint16_t data_offset;
-      switch (c.mColType) {
+      switch (c.getType()) {
       case ColumnInfo::Int_Type: {
         sma_offset = current_offset;
         data_offset = current_offset + 2 * sizeof(uint32_t);
@@ -594,7 +595,7 @@ private:
           const auto& sma_pos = reinterpret_cast<const uint16_t&>(b->at(nvm::gSmaOffsetPos + idx * nvm::gAttrOffsetSize));
           const auto& data_pos = reinterpret_cast<const uint16_t&>(b->at(nvm::gDataOffsetPos + idx * nvm::gAttrOffsetSize));
 
-          switch (c.mColType) {
+          switch (c.getType()) {
 
             case ColumnInfo::Int_Type: {
               /* Get Record Value */
@@ -738,7 +739,7 @@ private:
             default: {
               throw TableException("unsupported column type\n");
             }break;
-          } /* switch (c.mColType) */
+          } /* switch (c.getType()) */
           ++idx;
         } /* for (auto &c : tInfo) */
 
@@ -749,8 +750,8 @@ private:
         fspace -= record_size;
 
         /* Insert into index structure */
-        nvm::PTuple<decltype(rec)> ptp(b, pTupleOffsets);
-        index.insert( { key, ptp });
+        auto ptp = make_persistent<PTuple<Tuple>>(b, pTupleOffsets);
+        root->index->insert_new( key, ptp );
       }); /* end of transaction */
 
     } catch (std::exception& e) {
@@ -808,7 +809,7 @@ private:
               const auto& sma_pos = reinterpret_cast<const uint16_t&>(b0->at(nvm::gSmaOffsetPos + idx * nvm::gAttrOffsetSize));
               const auto& data_pos = reinterpret_cast<const uint16_t&>(b0->at(nvm::gDataOffsetPos + idx * nvm::gAttrOffsetSize));
 
-              switch (c.mColType) {
+              switch (c.getType()) {
 
                 case ColumnInfo::Int_Type: {
                   /* Get Record Value */
@@ -900,7 +901,7 @@ private:
                 default: {
                   throw TableException("unsupported column type\n");
                 }break;
-              } /* switch (c.mColType) */
+              } /* switch (c.getType()) */
               ++idx;
 
             }

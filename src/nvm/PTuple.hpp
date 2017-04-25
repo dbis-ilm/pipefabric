@@ -28,12 +28,13 @@
 #include <cstdint>
 #include <string>
 
-#include <core/PFabricTypes.hpp>
-#include <core/Tuple.hpp>
+#include "core/PFabricTypes.hpp"
+#include "core/Tuple.hpp"
 
-#include <libpmemobj++/persistent_ptr.hpp>
+#include "nvml/include/libpmemobj++/persistent_ptr.hpp"
 
 using nvml::obj::persistent_ptr;
+using nvml::obj::p;
 
 namespace pfabric {
 
@@ -300,7 +301,7 @@ public:
    ***************************************************************************/
   template<std::size_t ID>
   inline auto getAttribute() {
-    return detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets.data());
+    return detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets.get_ro().data());
   }
 
   /************************************************************************//**
@@ -313,7 +314,7 @@ public:
    ***************************************************************************/
   template<std::size_t ID>
   inline auto get() {
-    return detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets.data());
+    return detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets.get_ro().data());
   }
 
   /************************************************************************//**
@@ -326,7 +327,7 @@ public:
    ***************************************************************************/
   template<std::size_t ID>
   inline auto getAttribute() const {
-    return detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets.data());
+    return detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets.get_ro().data());
   }
 
   /************************************************************************//**
@@ -339,7 +340,7 @@ public:
    ***************************************************************************/
   template<std::size_t ID>
   inline auto get() const {
-    return detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets.data());
+    return detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets.get_ro().data());
   }
 
   /************************************************************************//**
@@ -349,13 +350,13 @@ public:
    *   the output stream to print the tuple
    ***************************************************************************/
   void print(std::ostream& os) {
-    detail::PTuplePrinter<Tuple, NUM_ATTRIBUTES>::print(os, block, offsets.data());
+    detail::PTuplePrinter<Tuple, NUM_ATTRIBUTES>::print(os, block, offsets.get_ro().data());
   }
 
 private:
 
   persistent_ptr<NVM_Block> block;
-  std::array<uint16_t, NUM_ATTRIBUTES> offsets;
+  p<std::array<uint16_t, NUM_ATTRIBUTES>> offsets;
 
 }; /* class PTuplePtr */
 

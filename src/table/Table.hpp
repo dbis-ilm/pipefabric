@@ -36,7 +36,6 @@
 
 #include "fmt/format.h"
 
-#include "table/TableInfo.hpp"
 #include "table/TableException.hpp"
 #include "table/BaseTable.hpp"
 
