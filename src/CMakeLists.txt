@@ -50,6 +50,7 @@ option(USE_NVML_TABLE
 	ON
 )
 
+
 # Force using intel compiler
 #include(CMakeForceCompiler)
 #CMAKE_FORCE_C_COMPILER(icc "Intel C Compiler")
@@ -127,13 +128,14 @@ if (USE_NVML_TABLE)
 	message(STATUS "using NVML based persistent table")
 	add_definitions(-DUSE_NVML_TABLE)
 	set (NVML_LIBRARIES
-#				"${THIRD_PARTY_DIR}/nvml/lib/libpmemblk.a"
-#				"${THIRD_PARTY_DIR}/nvml/lib/libpmemlog.a"
+				"${THIRD_PARTY_DIR}/nvml/lib/libpmemblk.a"
+				"${THIRD_PARTY_DIR}/nvml/lib/libpmemlog.a"
 				"${THIRD_PARTY_DIR}/nvml/lib/libpmemobj.a"
-#				"${THIRD_PARTY_DIR}/nvml/lib/libpmempool.a"
+  			"${THIRD_PARTY_DIR}/nvml/lib/libpmempool.a"
 				"${THIRD_PARTY_DIR}/nvml/lib/libpmem.a"
 #				"${THIRD_PARTY_DIR}/nvml/lib/libvmem.a"
 #				"${THIRD_PARTY_DIR}/nvml/lib/libvmmalloc.a"
+        ${DYLIB_LIBRARY}
 	)
   include_directories("${THIRD_PARTY_DIR}/nvml/include")
 else()
@@ -265,6 +267,7 @@ add_library(pfabric_core SHARED
 target_link_libraries(pfabric_core
   ${BOOST_LIBRARIES}
   ${ZEROMQ_LIBRARIES}
+  ${NVML_LIBRARIES}
 )
 
 #-----------------------------------------------------------------------------------------
@@ -285,13 +288,15 @@ target_link_libraries(pfabric_cep
 #
 # Experimental SQL query compiler
 #
-add_subdirectory(qcomp)
+if(!USE_NVML_TABLE)
+  add_subdirectory(qcomp)
+endif()
 
 #-----------------------------------------------------------------------------------------
 #
 # Demo project
 #
-#add_subdirectory(demo)
+add_subdirectory(demo)
 
 #-----------------------------------------------------------------------------------------
 #

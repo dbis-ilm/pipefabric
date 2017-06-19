@@ -31,5 +31,4 @@ target_link_libraries(CompilerMain
   ${Boost_LOG_LIBRARY}
   ${Boost_THREAD_LIBRARY}
   ${ROCKSDB_LIB}
-  ${NVML_LIBRARIES}
 )
