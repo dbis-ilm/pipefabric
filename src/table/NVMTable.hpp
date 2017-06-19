@@ -47,8 +47,6 @@
 #include "nvml/include/libpmemobj++/pool.hpp"
 #include "nvml/include/libpmemobj++/transaction.hpp"
 
-#define LAYOUT "NVMTable"
-
 namespace pfabric {
 
 using nvml::obj::delete_persistent;
@@ -398,12 +396,12 @@ private:
     std::string path = tableInfo.tableName() + ".db";
     if (access(path.c_str(), F_OK) != 0)
     {
-      pop = pool<root>::create(path, LAYOUT);//, (size_t)blockSize, 0666);
+      pop = pool<root>::create(path, nvm::LAYOUT);//, (size_t)blockSize, 0666);
       //throw TableException("failed to create pool\n");
     }
     else
     {
-      pop = pool<root>::open(path, LAYOUT);
+      pop = pool<root>::open(path, nvm::LAYOUT);
       //throw TableException("failed to open pool\n");
     }
     q = pop.get_root();

@@ -1,16 +1,20 @@
 #ifndef PTableInfo_hpp_
 #define PTableInfo_hpp_
 
+#include <cstddef>
+#include <cstring>
+#include <initializer_list>
 #include <iostream>
-#include <memory>
 #include <string>
-#include <array>
+#include <utility>
 #include <vector>
 
 #include "nvml/include/libpmemobj++/allocator.hpp"
 #include "nvml/include/libpmemobj++/detail/persistent_ptr_base.hpp"
 #include "nvml/include/libpmemobj++/make_persistent.hpp"
+#include "nvml/include/libpmemobj++/make_persistent_array.hpp"
 #include "nvml/include/libpmemobj++/p.hpp"
+#include "nvml/include/libpmemobj++/pool.hpp"
 #include "nvml/include/libpmemobj++/persistent_ptr.hpp"
 #include "nvml/include/libpmemobj++/transaction.hpp"
 #include "nvml/include/libpmemobj++/utils.hpp"
@@ -19,6 +23,7 @@ using nvml::obj::delete_persistent;
 using nvml::obj::make_persistent;
 using nvml::obj::p;
 using nvml::obj::persistent_ptr;
+using nvml::obj::pool_base;
 using nvml::obj::pool_by_vptr;
 using nvml::obj::transaction;
 
@@ -28,9 +33,14 @@ class ColumnInfo {
 public:
   enum ColumnType { Void_Type, Int_Type, Double_Type, String_Type };
 
-  ColumnInfo() : mColName(""), mColType(Void_Type) {}
+  ColumnInfo(pool_base pop) : ColumnInfo(pop, "", ColumnType::Void_Type) {}
 
-  ColumnInfo(const std::string& n, ColumnType ct) : mColName(n.c_str()), mColType(ct) {}
+  ColumnInfo(pool_base pop, const std::string& n, ColumnType ct) : mColType(ct) {
+    transaction::exec_tx(pop, [&] {
+      mColName = make_persistent<char[]>(n.length() +1);
+      strcpy(mColName.get(), n.c_str());
+    });
+  }
 
   const std::string getName() const { return mColName.get(); }
 
@@ -45,9 +55,11 @@ public:
   }
 
 private:
-  persistent_ptr<const char[]> mColName;
+  persistent_ptr<char[]> mColName;
   p<ColumnType> mColType;
 };
+
+typedef std::initializer_list<std::pair<std::string, ColumnInfo::ColumnType>> ColumnInitList;
 
 /** TODO: For later, template implementation
 template< bool isFixedSize >
@@ -97,12 +109,14 @@ class PTableInfo {
   PTableInfo(const std::string& name, ColumnInfo::ColumnType keyType = ColumnInfo::Void_Type)
     : mName(name.c_str()), mKeyType(keyType) {}
 
-  PTableInfo(const std::string& name, std::initializer_list<ColumnInfo> columns,
+  PTableInfo(const std::string& name, ColumnInitList columns,
       ColumnInfo::ColumnType keyType = ColumnInfo::Void_Type) :
       mName(name.c_str()), mKeyType(keyType) {
     auto pop = pool_by_vptr(this);
     transaction::exec_tx(pop, [&] {
-      mColumns = make_persistent<ColumnVector>(columns);
+      mColumns = make_persistent<ColumnVector>();
+      for (const auto &c : columns)
+        mColumns->push_back(ColumnInfo(pop, c.first, c.second));
     });
   }
 

@@ -25,8 +25,25 @@
 #include <nvm/PTableInfo.hpp>
 #include <map>
 #include <unordered_map>
+#include <algorithm>
+
+#include "nvml/include/libpmemobj++/allocator.hpp"
+#include "nvml/include/libpmemobj++/detail/persistent_ptr_base.hpp"
+#include "nvml/include/libpmemobj++/make_persistent.hpp"
+#include "nvml/include/libpmemobj++/p.hpp"
+#include "nvml/include/libpmemobj++/persistent_ptr.hpp"
+#include "nvml/include/libpmemobj++/transaction.hpp"
+#include "nvml/include/libpmemobj++/utils.hpp"
 
 namespace pfabric { namespace nvm {
+
+using nvml::obj::allocator;
+using nvml::obj::delete_persistent;
+using nvml::obj::make_persistent;
+using nvml::obj::p;
+using nvml::obj::persistent_ptr;
+using nvml::obj::pool_by_vptr;
+using nvml::obj::transaction;
 
 /**************************************************************************//**
  * \brief Info structure about the BDCC meta data.
@@ -34,15 +51,31 @@ namespace pfabric { namespace nvm {
  * It is used in persistent tables to store the BDCC meta data and statistics.
  *****************************************************************************/
 struct BDCCInfo {
-  typedef std::unordered_map<ColumnInfo, uint16_t> ColumnBitsMap;
+  typedef std::unordered_map<uint16_t, uint16_t> ColumnBitsMap; //<mapping from column id to number of bits
+  typedef std::vector<std::pair<uint16_t,uint16_t>, nvml::obj::allocator<std::pair<uint16_t, uint16_t>>> pColumnBitsMap;
 
-  BDCCInfo(ColumnBitsMap _bitMap) : bitMap(_bitMap),
-      numBins(std::accumulate(_bitMap.begin(), _bitMap.end(), 0,
-      [](const size_t sum, decltype(*_bitMap.begin()) p) { return sum + p.second; })) {}
+  explicit BDCCInfo(const ColumnBitsMap &_bitMap) {
+    auto pop = pool_by_vptr(this);
+    transaction::exec_tx(pop, [&] {
+      //bitMap = make_persistent<pColumnBitsMap>();
+      for (const auto& c : _bitMap) {
+        bitMap.insert(bitMap.cbegin(), std::make_pair(c.first, c.second));
+      }
+      numBins = std::accumulate(_bitMap.begin(), _bitMap.end(), 0,
+            [](const size_t sum, decltype(*_bitMap.begin()) p) { return sum + p.second; });
+    });
+  }
 
-  const ColumnBitsMap bitMap;
-  const size_t numBins;
-  std::map<uint32_t, std::size_t> histogram;
+  pColumnBitsMap::const_iterator find(uint16_t item) {
+    for (auto it = bitMap.cbegin(); it!= bitMap.cend(); it++) {
+      if (it->first == item) return it;
+    }
+    return bitMap.cend();
+  }
+
+  pColumnBitsMap bitMap;
+  p<size_t> numBins;
+  //std::map<uint32_t, std::size_t> histogram;
 
 };/* struct BDCCInfo */
 

@@ -39,12 +39,12 @@ TEST_CASE("Testing storing tuples in persistent_table", "[persistent_table]") {
   std::vector<typename std::chrono::duration<int64_t,micro>::rep> measures;
 
   pool<root> pop;
-  const std::string path = "/tmp/testdb.db";
+  const std::string path = "/mnt/pmem/tests/testdb.db";
 
-  std::remove(path.c_str());
+  //std::remove(path.c_str());
 
   if (access(path.c_str(), F_OK) != 0) {
-    pop = pool<root>::create(path, LAYOUT);
+    pop = pool<root>::create(path, LAYOUT, 16*1024*1024);
   } else {
     pop = pool<root>::open(path, LAYOUT);
   }
@@ -52,25 +52,33 @@ TEST_CASE("Testing storing tuples in persistent_table", "[persistent_table]") {
   auto q = pop.get_root();
   if (!q->pTable) {
     transaction::exec_tx(pop, [&] {
-      auto tInfo = make_persistent<pfabric::TableInfo, std::string, std::initializer_list<ColumnInfo>>("MyTable", {
+      /*auto tInfo = make_persistent<pfabric::TableInfo, std::string, std::initializer_list<ColumnInfo>>("MyTable", {
             ColumnInfo("a", ColumnInfo::Int_Type),
             ColumnInfo("b", ColumnInfo::Int_Type),
             ColumnInfo("c", ColumnInfo::String_Type),
             ColumnInfo("d", ColumnInfo::Double_Type)
-          });
-      auto dimInfo = BDCCInfo::ColumnBitsMap( {
+          });*/
+     /*auto dimInfo = BDCCInfo::ColumnBitsMap( {
             { ColumnInfo("a", ColumnInfo::Int_Type), 4},
             { ColumnInfo("d", ColumnInfo::Double_Type), 6}
-          });
-      q->pTable = make_persistent<pTable_type>(*tInfo, dimInfo);
-      //TODO: Rewrite constuctor
+          });*/
+      q->pTable = make_persistent<pTable_type, std::string, ColumnInitList, BDCCInfo::ColumnBitsMap> (
+          "MyTable",
+          {
+            std::make_pair("a", ColumnInfo::Int_Type),
+            std::make_pair("b", ColumnInfo::Int_Type),
+            std::make_pair("c", ColumnInfo::String_Type),
+            std::make_pair("d", ColumnInfo::Double_Type)
+          },
+          BDCCInfo::ColumnBitsMap({{0,4},{3,6}})
+      );
     });
   } else {
     std::cerr << "WARNING: Table already exists" << std::endl;
   }
 
 
-  for (unsigned int i = 0; i < 500; i++) {
+  for (unsigned int i = 0; i < 10; i++) {
     auto tup = MyTuple(i + 1,
                        (i + 1) * 100,
                        fmt::format("String #{0}", i),
@@ -95,6 +103,6 @@ TEST_CASE("Testing storing tuples in persistent_table", "[persistent_table]") {
 
 
   /* Clean up */
-  transaction::exec_tx(pop, [&] {delete_persistent<pTable_type>(q->pTable);});
+  //transaction::exec_tx(pop, [&] {delete_persistent<pTable_type>(q->pTable);});
   pop.close();
 }

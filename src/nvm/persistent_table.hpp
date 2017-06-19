@@ -52,6 +52,8 @@
 #include "nvml/include/libpmemobj++/transaction.hpp"
 #include "nvml/include/libpmemobj++/utils.hpp"
 
+namespace pfabric { namespace nvm {
+
 using nvml::obj::pool;
 using nvml::obj::pool_by_vptr;
 using nvml::obj::pool_base;
@@ -61,7 +63,7 @@ using nvml::obj::make_persistent;
 using nvml::obj::delete_persistent;
 using nvml::obj::transaction;
 
-namespace pfabric { namespace nvm {
+const std::string LAYOUT = "PTable";
 
 /**************************************************************************//**
  * \brief A persistent table used for PMEM technologies or emulations.
@@ -73,30 +75,31 @@ class persistent_table {
 
 public:
   typedef persistent_ptr<Tuple> RecordType;
-  typedef std::unordered_map<ColumnInfo, uint16_t> ColumnIntMap;
+  typedef std::unordered_map<uint16_t, uint16_t> ColumnIntMap;
+
 
   /************************************************************************//**
    * \brief Default Constructor.
    ***************************************************************************/
   persistent_table() {
     auto pop = pool_by_vptr(this);
-    transaction::exec_tx(pop, [&] {init(TableInfo(), ColumnIntMap());});
+    transaction::exec_tx(pop, [&] {init("", {}, ColumnIntMap());});
   }
 
   /************************************************************************//**
    * \brief Constructor for a given schema (TableInfo).
    ***************************************************************************/
-  persistent_table(const TableInfo &_tInfo) {
+  persistent_table(const std::string& tName, ColumnInitList columns) {
     auto pop = pool_by_vptr(this);
-    transaction::exec_tx(pop, [&] {init(_tInfo, ColumnIntMap());});
+    transaction::exec_tx(pop, [&] {init(tName, columns, ColumnIntMap());});
   }
 
   /************************************************************************//**
    * \brief Constructor for a given schema and dimension clustering.
    ***************************************************************************/
-  persistent_table(const TableInfo &_tInfo, const ColumnIntMap& _bdccInfo) {
+  persistent_table(const std::string& tName, ColumnInitList columns, const ColumnIntMap& _bdccInfo) {
     auto pop = pool_by_vptr(this);
-    transaction::exec_tx(pop, [&] {init(_tInfo, _bdccInfo);});
+    transaction::exec_tx(pop, [&] {init(tName, columns, _bdccInfo);});
   }
 
   /************************************************************************//**
@@ -256,10 +259,10 @@ public:
   void print(bool raw = false) {
 
     auto dest_block = root->block_list;
-    auto tInfo = root->tInfo;
+    auto& tInfo = *root->tInfo;
 
     size_t colCnt = 0;
-    for (auto &c : *tInfo)
+    for (auto &c : tInfo)
       colCnt++;
 
     do {
@@ -297,7 +300,7 @@ public:
       /* Body/Column/Minipage data */
       if (cnt > 0) {
         size_t idx = 0;
-        for (auto &c : *tInfo) {
+        for (auto &c : tInfo) {
           std::cout << "Column Info: " << c.getName() << ": " << c.getType() << std::endl;
           const auto& sma_pos = reinterpret_cast<const uint16_t&>(b->at(nvm::gSmaOffsetPos + idx * nvm::gAttrOffsetSize));
           const auto& data_pos = reinterpret_cast<const uint16_t&>(b->at(nvm::gDataOffsetPos + idx * nvm::gAttrOffsetSize));
@@ -438,8 +441,9 @@ private:
       size_t portions = 0;
       ColumnIntMap mp_sizes = ColumnIntMap();
       /* Get the sum of all column portitions */
-      for (auto &c : *root->tInfo) {
-        if (customizations.find(c) == customizations.end()) {
+      for (auto i = 0u; i < (*root->tInfo).numColumns(); i++) {
+        const auto &c = (*root->tInfo).columnInfo(i);
+        if (customizations.find(i) == customizations.end()) {
           switch (c.getType()) {
           case ColumnInfo::Int_Type:
             portions += 1;
@@ -455,27 +459,28 @@ private:
             break;
           }
         } else
-          portions += customizations[c];
+          portions += customizations[i];
       }
       /* Calculate and save the minipage sizes for all columns */
-      for (auto &c : *root->tInfo) {
-        if (customizations.find(c) == customizations.end()) {
+      for (auto i = 0u; i < (*root->tInfo).numColumns(); i++) {
+        const auto &c = (*root->tInfo).columnInfo(i);
+        if (customizations.find(i) == customizations.end()) {
           switch (c.getType()) {
           case ColumnInfo::Int_Type:
-            mp_sizes[c] = 1 * totalSize / portions;
+            mp_sizes[i] = 1 * totalSize / portions;
             break;
           case ColumnInfo::Double_Type:
-            mp_sizes[c] = 2 * totalSize / portions;
+            mp_sizes[i] = 2 * totalSize / portions;
             break;
           case ColumnInfo::String_Type:
-            mp_sizes[c] = 5 * totalSize / portions;
+            mp_sizes[i] = 5 * totalSize / portions;
             break;
           default:
             throw TableException("unsupported column type\n");
             break;
           }
         } else
-          mp_sizes[c] = customizations[c] * totalSize / portions;
+          mp_sizes[i] = customizations[i] * totalSize / portions;
       }
       return mp_sizes;
     }
@@ -487,15 +492,14 @@ private:
    * \param[in] _tInfo
    *   the underlying schema to use
    ***************************************************************************/
-  void init(const TableInfo& _tInfo, const ColumnIntMap& _bdccInfo) {
+  void init(const std::string& _tName, const ColumnInitList& _columns, const ColumnIntMap& _bdccInfo) {
     this->root = make_persistent<struct root>();
-    this->root->tInfo = make_persistent<TableInfo>(_tInfo);
-    this->root->bdccInfo = make_persistent<BDCCInfo>(BDCCInfo(_bdccInfo));
+    this->root->tInfo = make_persistent<TableInfo>(_tName, _columns);
+    this->root->bdccInfo = make_persistent<BDCCInfo>(_bdccInfo);
     this->root->index = make_persistent<examples::ctree_map_p<KeyType, persistent_ptr<nvm::PTuple<Tuple>>>>();
     this->root->block_list = make_persistent<struct nvm_block>();
     auto block_ptr = make_persistent<nvm::NVM_Block>(initBlock(0, ((1L << this->root->bdccInfo->numBins) - 1)));
     this->root->block_list->block = block_ptr;
-
   }
 
   /************************************************************************//**
@@ -527,7 +531,8 @@ private:
     size_t idx = 0;
     size_t sma_size = 0;
     uint16_t current_offset = header_size;
-    for (auto &c : *this->root->tInfo) {
+    for (auto i = 0u; i < (*this->root->tInfo).numColumns(); i++) {
+      const auto &c = (*this->root->tInfo).columnInfo(i);
       uint16_t sma_offset;
       uint16_t data_offset;
       switch (c.getType()) {
@@ -535,21 +540,21 @@ private:
         sma_offset = current_offset;
         data_offset = current_offset + 2 * sizeof(uint32_t);
         sma_size += 2 * sizeof(uint32_t);
-        current_offset += sizes[c];
+        current_offset += sizes[i];
       }
         break;
       case ColumnInfo::Double_Type: {
         sma_offset = current_offset;
         data_offset = current_offset + 2 * sizeof(uint64_t);
         sma_size += 2 * sizeof(uint64_t);
-        current_offset += sizes[c];
+        current_offset += sizes[i];
       }
         break;
       case ColumnInfo::String_Type: {
         sma_offset = current_offset;
         data_offset = current_offset + nvm::gAttrOffsetSize;
         sma_size += nvm::gAttrOffsetSize;
-        current_offset += sizes[c];
+        current_offset += sizes[i];
       }
         break;
       default: {
@@ -934,17 +939,19 @@ private:
 
   std::bitset<32> getBDCCFromTuple (Tuple tp) {
     //TODO: Just use integers and shift operations instead of bitset
-    auto bdccInfo = *this->root->bdccInfo;
-    auto tInfo = *this->root->tInfo;
+    const auto& bdccInfo = this->root->bdccInfo;
+    const auto& tInfo = *this->root->tInfo;
     auto colCnt = 0; // total column counter
     auto dimCnt = 0; // dimension column counter
     auto bdccSize = 0; // sum of bits used for bdcc
     std::bitset<32> xtr = 0; // extracted bdcc value
-    std::pair<int, std::bitset<32>> dimsBDCC[bdccInfo.bitMap.size()]; // (no. of bits, binned value)
+    std::pair<int, std::bitset<32>> dimsBDCC[bdccInfo->bitMap.size()]; // (no. of bits, binned value)
 
-    for (const auto &c : tInfo) {
-      if (bdccInfo.bitMap.find(c) != bdccInfo.bitMap.end()) {
-        auto nBits = bdccInfo.bitMap.at(c);
+
+    for (auto i = 0u; i < tInfo.numColumns(); i++) {
+      if(bdccInfo->find(i) != bdccInfo->bitMap.cend()) {
+      //if (bdccInfo->bitMap.find(i) != bdccInfo->bitMap.end()) {
+        auto nBits = bdccInfo->find(i)->second; //bitMap.at(i);
         //get value
         auto value = ns_types::dynamic_get(colCnt, tp);
         //get bin
@@ -966,7 +973,7 @@ private:
 
     /* Round robin the bins */
     while (bdccSize > 0) {
-      for (std::size_t k = 0; k < bdccInfo.bitMap.size(); ++k) {
+      for (auto k = 0u; k < bdccInfo->bitMap.size(); ++k) {
         if (dimsBDCC[k].first > 0) {
           xtr[bdccSize - 1] = dimsBDCC[k].second[dimsBDCC[k].first - 1];
           bdccSize--;
