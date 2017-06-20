@@ -8,10 +8,8 @@
 
 using namespace pfabric;
 
-typedef Tuple<int, int, int> InTuple;
-typedef TuplePtr<InTuple> InTuplePtr;
-typedef Tuple<int, int, int> OutTuple;
-typedef TuplePtr<OutTuple> OutTuplePtr;
+typedef TuplePtr<int, int, int> InTuplePtr;
+typedef TuplePtr<int, int, int> OutTuplePtr;
 typedef typename RelatedStateValue<InTuplePtr, int, int, 0>::RelatedStateValuePtr RelatedTuplePtr;
 
 TEST_CASE("Defining states and transitions using a DSL", "[CEP]") {

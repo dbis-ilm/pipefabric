@@ -64,8 +64,8 @@ public:
 
   HashMapIterator operator++(int) { auto tmp = *this; ++(*this); return tmp; }
   bool isValid() const { return i != end; }
-  TuplePtr<RecordType> operator*() { 
-    return TuplePtr<RecordType> (new RecordType(i->second));
+  SmartPtr<RecordType> operator*() { 
+    return SmartPtr<RecordType> (new RecordType(i->second));
   }
   // typename Iter::value_type::second_type* operator->() { return &i->second; }
 
@@ -312,14 +312,14 @@ public:
    * @param key the key value
    * @return the tuple associated with the given key
    */
-  const TuplePtr<RecordType> getByKey(KeyType key) throw (TableException) {
+  const SmartPtr<RecordType> getByKey(KeyType key) throw (TableException) {
     // make sure we have exclusive access
     std::lock_guard<std::mutex> lock(mMtx);
 
     auto res = mDataTable.find(key);
     if (res != mDataTable.end()) {
       // if we found the tuple we return a TuplePtr containing a copy of it
-      TuplePtr<RecordType> tptr (new RecordType(res->second));
+      SmartPtr<RecordType> tptr (new RecordType(res->second));
       return tptr;
     }
     else

@@ -20,8 +20,7 @@
 
 using namespace pfabric;
 
-typedef Tuple<int, double, std::string> MyTuple;
-typedef TuplePtr<MyTuple> MyTuplePtr;
+typedef TuplePtr<int, double, std::string> MyTuplePtr;
 
 /**
  * A test of the partition/merge operators.

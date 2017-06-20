@@ -11,6 +11,7 @@ macro( build_executable arg )
       ${Boost_SYSTEM_LIBRARY}
       ${ROCKSDB_LIB}
       ${NVML_LIBRARIES}
+      ${BENCHMARK_LIB}
       ${MALLOC_LIB}
     )
 endmacro( build_executable )

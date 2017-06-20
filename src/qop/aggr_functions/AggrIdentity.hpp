@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-16 The PipeFabric team,
+ * Copyright (c) 2014-17 The PipeFabric team,
  *                       All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
@@ -19,24 +19,50 @@
  * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
  */
  
-#ifndef AggregateFunctions_hpp_
-#define AggregateFunctions_hpp_
+#ifndef AggrIdentity_hpp_
+#define AggrIdentity_hpp_
+
+#include "AggregateFunc.hpp"
+
+#include <type_traits>
+
+
+namespace pfabric {
 
 /**
- * Utility Header for including all aggregation functions.
+ * @brief A aggregation function that just keeps the last value.
+ *
+ * A aggregation function that keeps the last value which can be used
+ * to store the grouping value.
+ *
+ * @tparam T
+ *    the type of the input/output argument
  */
+template<
+	typename T
+>
+class AggrIdentity : public AggregateFunc< T, T > {
+public:
+	AggrIdentity() {
+		init();
+	}
 
-#include "aggr_functions/AggrAvg.hpp"
-#include "aggr_functions/AggrCount.hpp"
-#include "aggr_functions/AggrDCount.hpp"
-#include "aggr_functions/AggrGlobalMin.hpp"
-#include "aggr_functions/AggrGlobalMax.hpp"
-#include "aggr_functions/AggrLRecent.hpp"
-#include "aggr_functions/AggrMedian.hpp"
-#include "aggr_functions/AggrMinMax.hpp"
-#include "aggr_functions/AggrMRecent.hpp"
-#include "aggr_functions/AggrSum.hpp"
-#include "aggr_functions/AggrIdentity.hpp"
+	virtual void init() override {
+	}
+
+	virtual void iterate(T const& data, bool outdated = false) override {
+ 	  mValue = data;
+	}
+
+	virtual T value() override {
+		return mValue;
+	}
+
+private:
+  T mValue;
+};
+
+} 
 
 
-#endif /* AggregateFunctions_hpp_ */
+#endif /* AggrIdentity_hpp_ */

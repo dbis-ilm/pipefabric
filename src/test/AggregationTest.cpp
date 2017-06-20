@@ -24,13 +24,10 @@
 
 using namespace pfabric;
 
-typedef Tuple<double> InTuple;
-typedef TuplePtr<InTuple> InTuplePtr;
-typedef Tuple<double, double, int> OutTuple;
-typedef TuplePtr<OutTuple> OutTuplePtr;
+typedef TuplePtr<double> InTuplePtr;
+typedef TuplePtr<double, double, int> OutTuplePtr;
 
-typedef Tuple<double, double, double, double> Out2Tuple;
-typedef TuplePtr<Out2Tuple> Out2TuplePtr;
+typedef TuplePtr<double, double, double, double> Out2TuplePtr;
 
 TEST_CASE( "Compute a simple aggregate on the entire stream", "[Aggregation]" ) {
 	typedef Aggregator3<InTuplePtr,

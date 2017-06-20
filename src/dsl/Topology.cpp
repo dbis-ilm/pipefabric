@@ -27,13 +27,19 @@ using namespace pfabric;
 
 Topology::~Topology() {
   // delete all pipes we have created
+  /*
   for (auto i : pipes) {
     delete i;
   }
+  */
 }
 
 void Topology::registerStartupFunction(StartupFunc func) {
   startupList.push_back(func);
+}
+
+void Topology::registerPrepareFunction(StartupFunc func) {
+  prepareList.push_back(func);
 }
 
 void Topology::startAsync() {
@@ -57,6 +63,12 @@ void Topology::start(bool async) {
     }
 }
 
+void Topology::prepare() {
+    for (auto pFunc : prepareList) {
+      (pFunc)();
+    }
+}
+
 void Topology::wait() {
     if (!asyncStarted)
       return;
@@ -67,17 +79,17 @@ void Topology::wait() {
       f.get();
 }
 
-Pipe Topology::newStreamFromFile(const std::string& fname, unsigned long limit) {
+Pipe<TStringPtr> Topology::newStreamFromFile(const std::string& fname, unsigned long limit) {
   // create a new TextFileSource
   auto op = std::make_shared<TextFileSource>(fname, limit);
   // register it's start function
   registerStartupFunction(std::bind(&TextFileSource::start, op.get()));
   // and create a new pipe; we use a raw pointer here because
   // we want to return a reference to a Pipe object
-  return Pipe(dataflow, dataflow->addPublisher(op));
+  return Pipe<TStringPtr>(dataflow, dataflow->addPublisher(op));
 }
 
-Pipe Topology::newStreamFromREST(unsigned int port,
+Pipe<TStringPtr> Topology::newStreamFromREST(unsigned int port,
                                   const std::string& path,
                                   RESTSource::RESTMethod method,
                                   unsigned short numThreads) {
@@ -87,20 +99,17 @@ Pipe Topology::newStreamFromREST(unsigned int port,
   registerStartupFunction(std::bind(&RESTSource::start, op.get()));
   // and create a new pipe; we use a raw pointer here because
   // we want to return a reference to a Pipe object
-  return Pipe(dataflow, dataflow->addPublisher(op));
+  return Pipe<TStringPtr>(dataflow, dataflow->addPublisher(op));
 }
 
-Pipe Topology::newStreamFromZMQ(const std::string& path,
-                                 ZMQParams::EncodingMode encoding,
+Pipe<TStringPtr> Topology::newAsciiStreamFromZMQ(const std::string& path,
                                  ZMQParams::SourceType stype) {
-  // depending on the encoding mode, we create a ZMQSource with
-  // different type parameters
-  if (encoding == ZMQParams::AsciiMode) {
     auto op = std::make_shared<ZMQSource<TStringPtr> >(path, stype);
-    return Pipe(dataflow, dataflow->addPublisher(op));
-  }
-  else {
+    return Pipe<TStringPtr>(dataflow, dataflow->addPublisher(op));
+}
+
+Pipe<TBufPtr> Topology::newBinaryStreamFromZMQ(const std::string& path,
+                                 ZMQParams::SourceType stype) {
     auto op = std::make_shared<ZMQSource<TBufPtr> >(path, stype);
-    return Pipe(dataflow, dataflow->addPublisher(op));
-  }
+    return Pipe<TBufPtr>(dataflow, dataflow->addPublisher(op));
 }

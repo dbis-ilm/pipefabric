@@ -48,7 +48,7 @@ public:
 	 */
 	template< typename... Types >
 	struct getElementType {
-		typedef TuplePtr< Tuple< typename std::decay< Types >::type... > > type;
+		typedef TuplePtr< typename std::decay< Types >::type... > type;
 	};
 
 	/**
@@ -66,7 +66,7 @@ public:
 	template< typename... Args >
 	static typename getElementType< Args... >::type create( Args&&... args ) {
 		typedef Tuple< typename std::decay< Args >::type... > ResultTuple;
-		return TuplePtr< ResultTuple >( new ResultTuple( std::forward< Args >(args)...) );
+		return boost::intrusive_ptr< ResultTuple >( new ResultTuple( std::forward< Args >(args)...) );
 	}
 };
 

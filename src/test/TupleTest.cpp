@@ -27,8 +27,7 @@ using namespace ns_types;
  */
 TEST_CASE( "Tuple creation", "[Tuple]" ) {
 
-	typedef Tuple<int, int, long, std::string, double, boost::posix_time::ptime> TheTuple;
-	typedef TuplePtr< TheTuple > TheTuplePtr;
+	typedef TuplePtr<int, int, long, std::string, double, boost::posix_time::ptime> TheTuplePtr;
 
 	boost::posix_time::ptime tm (boost::posix_time::microsec_clock::local_time());
 
@@ -48,12 +47,11 @@ TEST_CASE( "Tuple creation", "[Tuple]" ) {
  * Test #2: Create a tuple from a string array.
  */
 TEST_CASE( "Tuple creation from string", "[Tuple]" ) {
-	typedef Tuple<int, int, long, std::string, double, boost::posix_time::ptime> TheTuple;
-	typedef TuplePtr< TheTuple > TheTuplePtr;
+	typedef TuplePtr<int, int, long, std::string, double, boost::posix_time::ptime> TheTuplePtr;
 
 	boost::posix_time::ptime tm (boost::posix_time::microsec_clock::local_time());
 	StringTuple data = { "1", "2", "3", "Nine", "4.5678", boost::posix_time::to_iso_string(tm) };
-	TheTuplePtr tup (new TheTuple(data));
+	TheTuplePtr tup (new TheTuplePtr::element_type(data));
 	REQUIRE(tup->getAttribute<0>() == 1);
 	REQUIRE(tup->getAttribute<1>() == 2);
 	REQUIRE(tup->getAttribute<2>() == 3L);
@@ -66,8 +64,7 @@ TEST_CASE( "Tuple creation from string", "[Tuple]" ) {
  * Test #3: Create some tuples and check comparison operators.
  */
 TEST_CASE( "Tuple comparison", "[Tuple]" ) {
-	typedef Tuple<int, int, long, std::string, double> TheTuple;
-	typedef TuplePtr< TheTuple > TheTuplePtr;
+	typedef TuplePtr<int, int, long, std::string, double> TheTuplePtr;
 
 	TheTuplePtr t1 = makeTuplePtr(1, 2, 3L, std::string("9"), 4.5678);
 	TheTuplePtr t2 = makeTuplePtr(1, 2, 3L, std::string("9"), 4.5678);
@@ -86,8 +83,7 @@ TEST_CASE( "Tuple comparison", "[Tuple]" ) {
  * Test #4: Create a tuple, serialize it to a buffer, and try to deserialize it again.
  */
 TEST_CASE( "Tuple serialization", "[Tuple]" ) {
-	typedef Tuple<int, std::string, double> TheTuple;
-	typedef TuplePtr< TheTuple > TheTuplePtr;
+	typedef TuplePtr<int, std::string, double> TheTuplePtr;
 
 	StreamType res;
 
@@ -103,8 +99,7 @@ TEST_CASE( "Tuple serialization", "[Tuple]" ) {
  * Test #5: Check handling of null values.
  */
 TEST_CASE("Tuple null fields", "[Tuple]") {
-	typedef Tuple<int, int, long, std::string, double> TheTuple;
-	typedef TuplePtr< TheTuple > TheTuplePtr;
+	typedef TuplePtr<int, int, long, std::string, double> TheTuplePtr;
 
 	TheTuplePtr tp = makeTuplePtr(1, 2, 3L, std::string("9"), 4.5678);
 	REQUIRE(! tp->isNull(0));
@@ -159,8 +154,7 @@ TEST_CASE("Tuple microbenchmarking", "[Tuple]") {
 
 BOOST_AUTO_TEST_CASE(MatrixTest)
 {
-	typedef Tuple<int, std::string, Eigen::MatrixXd> MTuple;
-	typedef TuplePtr< MTuple > TheTuplePtr;
+	typedef TuplePtr<int, std::string, Eigen::MatrixXd> MTuplePtr;
 
 	Eigen::MatrixXd m = Eigen::MatrixXd::Constant(3, 3, 1.0);
 	auto tup = makeTuplePtr(1, std::string("Matrix"), m);

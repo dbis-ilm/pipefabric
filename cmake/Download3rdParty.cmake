@@ -71,6 +71,7 @@ add_custom_command(
                 ${THIRD_PARTY_DIR}/SimpleWeb)
 
 #--------------------------------------------------------------------------------
+if (BUILD_GOOGLE_BENCH)
 # Google Benchmark framework
 download_project(PROJ               benchmark
                 GIT_REPOSITORY      https://github.com/google/benchmark.git
@@ -78,29 +79,46 @@ download_project(PROJ               benchmark
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
+add_custom_command(
+	    OUTPUT ${THIRD_PARTY_DIR}/benchmark
+	    COMMAND ${CMAKE_COMMAND} -E chdir ${benchmark_SOURCE_DIR} cmake -DCMAKE_BUILD_TYPE=Release
+		COMMAND ${CMAKE_COMMAND} -E chdir ${benchmark_SOURCE_DIR} $(MAKE)
+	    COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/benchmark/include
+	    COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/benchmark/lib
+	    COMMAND ${CMAKE_COMMAND} -E copy_directory
+	            ${benchmark_SOURCE_DIR}/include
+	            ${THIRD_PARTY_DIR}/benchmark/include
+	    COMMAND ${CMAKE_COMMAND} -E copy
+	            ${benchmark_SOURCE_DIR}/src/libbenchmark.a
+	            ${THIRD_PARTY_DIR}/benchmark/lib
+)
+endif()
 
 #--------------------------------------------------------------------------------
+if(USE_ROCKSDB_TABLE)
 # RocksDB key-value store
 download_project(PROJ               rocksdb
-                GIT_REPOSITORY      https://github.com/facebook/rocksdb
-                GIT_TAG             master
-                UPDATE_DISCONNECTED 1
-                QUIET
+	            GIT_REPOSITORY      https://github.com/facebook/rocksdb
+	            GIT_TAG             v5.1.4
+	            UPDATE_DISCONNECTED 1
+	            QUIET
 )
 add_custom_command(
-        OUTPUT ${THIRD_PARTY_DIR}/rocksdb
-        COMMAND ${CMAKE_COMMAND} -E chdir ${rocksdb_SOURCE_DIR} $(MAKE) static_lib
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/rocksdb/include
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/rocksdb/lib
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-                ${rocksdb_SOURCE_DIR}/include
-                ${THIRD_PARTY_DIR}/rocksdb/include
-        COMMAND ${CMAKE_COMMAND} -E copy
-                ${rocksdb_SOURCE_DIR}/librocksdb.a
-                ${THIRD_PARTY_DIR}/rocksdb/lib
+	    OUTPUT ${THIRD_PARTY_DIR}/rocksdb
+	    COMMAND ${CMAKE_COMMAND} -E chdir ${rocksdb_SOURCE_DIR} $(MAKE) static_lib
+	    COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/rocksdb/include
+	    COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/rocksdb/lib
+	    COMMAND ${CMAKE_COMMAND} -E copy_directory
+	            ${rocksdb_SOURCE_DIR}/include
+	            ${THIRD_PARTY_DIR}/rocksdb/include
+	    COMMAND ${CMAKE_COMMAND} -E copy
+	            ${rocksdb_SOURCE_DIR}/librocksdb.a
+	            ${THIRD_PARTY_DIR}/rocksdb/lib
 )
+endif()
 
 #--------------------------------------------------------------------------------
+if(USE_NVML_TABLE)
 # Non-Volatile Memory Library (pmem.io)
 download_project(PROJ               nvml
                 GIT_REPOSITORY      https://github.com/pmem/nvml.git
@@ -117,3 +135,4 @@ add_custom_command(
 				#				 ${nvml_SOURCE_DIR}/src/include
 				#        ${THIRD_PARTY_DIR}/nvml/include
 )
+endif()

@@ -15,11 +15,10 @@
 
 using namespace pfabric;
 
-typedef Tuple< int, int, int > MyTuple;
-typedef TuplePtr< MyTuple > MyTuplePtr;
+typedef TuplePtr< int, int, int > MyTuplePtr;
 
 /**
- * A simple test of the projection operator.
+ * A simple test of the queue operator.
  */
 TEST_CASE("Decoupling producer and consumer via a queue", "[Queue]") {
   std::vector<MyTuplePtr> input = {

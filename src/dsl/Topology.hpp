@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-16 The PipeFabric team,
+ * Copyright (c) 2014-17 The PipeFabric team,
  *                       All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
@@ -35,6 +35,7 @@
 #include "qop/TextFileSource.hpp"
 #include "qop/RESTSource.hpp"
 #include "qop/ZMQSource.hpp"
+#include "qop/MemorySource.hpp"
 #include "qop/ToTable.hpp"
 #include "qop/FromTable.hpp"
 #include "qop/SelectFromTable.hpp"
@@ -77,8 +78,9 @@ namespace pfabric {
     /// the signature of a startup function
     typedef std::function<unsigned long()> StartupFunc;
 
-    std::list<Pipe*> pipes;               //< the list of pipes created for this topology
+//    std::list<Pipe*> pipes;               //< the list of pipes created for this topology
     std::vector<StartupFunc> startupList; //< the list of functions to be called for startup
+    std::vector<StartupFunc> prepareList; //< the list of functions to be called for startup
     bool asyncStarted;                    //< true if we started asynchronously
     std::vector<std::future<unsigned long> > startupFutures; //< futures for the startup functions
     std::mutex mMutex;                    //< mutex for accessing startupFutures
@@ -97,6 +99,8 @@ namespace pfabric {
      *    a function pointer for the startup member function
      */
     void registerStartupFunction(StartupFunc func);
+
+    void registerPrepareFunction(StartupFunc func);
 
     /**
      * @brief Invokes the start functions asynchronously.
@@ -129,6 +133,8 @@ namespace pfabric {
      */
     void start(bool async = true);
 
+    void prepare();
+
     /**
      * @brief Waits until the execution of the topology stopped.
      *
@@ -151,7 +157,7 @@ namespace pfabric {
      * @return
      *    a new pipe where TextFileSource acts as a producer.
      */
-    Pipe newStreamFromFile(const std::string& fname, unsigned long limit = 0);
+    Pipe<TStringPtr> newStreamFromFile(const std::string& fname, unsigned long limit = 0);
 
     /**
      * @brief Creates a pipe from a REST source as input.
@@ -171,7 +177,7 @@ namespace pfabric {
      * @return
      *    a new pipe where RESTSource acts as a producer.
      */
-    Pipe newStreamFromREST(unsigned int port,
+    Pipe<TStringPtr> newStreamFromREST(unsigned int port,
                             const std::string& path,
                             RESTSource::RESTMethod method,
                             unsigned short numThreads = 1);
@@ -194,8 +200,10 @@ namespace pfabric {
      * @return
      *    a new pipe where ZMQSource acts as a producer.
      */
-    Pipe newStreamFromZMQ(const std::string& path,
-      ZMQParams::EncodingMode encoding = ZMQParams::AsciiMode,
+    Pipe<TStringPtr> newAsciiStreamFromZMQ(const std::string& path,
+      ZMQParams::SourceType stype = ZMQParams::SubscriberSource);
+
+    Pipe<TBufPtr> newBinaryStreamFromZMQ(const std::string& path,
       ZMQParams::SourceType stype = ZMQParams::SubscriberSource);
 
     /**
@@ -218,10 +226,10 @@ namespace pfabric {
      *    a new pipe where RESTSource acts as a producer.
      */
     template<typename T, typename KeyType = DefaultKeyType>
-    Pipe newStreamFromTable(std::shared_ptr<Table<typename T::element_type, KeyType>> tbl,
+    Pipe<T> newStreamFromTable(std::shared_ptr<Table<typename T::element_type, KeyType>> tbl,
                              TableParams::NotificationMode mode = TableParams::Immediate) {
       auto op = std::make_shared<FromTable<T, KeyType>>(tbl, mode);
-      return Pipe(dataflow, dataflow->addPublisher(op));
+      return Pipe<T>(dataflow, dataflow->addPublisher(op));
     }
 
     /**
@@ -234,13 +242,13 @@ namespace pfabric {
      *    a new pipe where the stream acts as the producer.
      */
     template <typename T>
-    Pipe fromStream(Dataflow::BaseOpPtr stream) throw (TopologyException) {
+    Pipe<T> fromStream(Dataflow::BaseOpPtr stream) throw (TopologyException) {
       // check whether stream is a Queue<T> operator
       auto pOp = dynamic_cast<Queue<T>*>(stream.get());
       if (pOp == nullptr) {
         throw TopologyException("Incompatible tuple type of stream object.");
       }
-      return Pipe(dataflow, dataflow->addPublisher(stream));
+      return Pipe<T>(dataflow, dataflow->addPublisher(stream));
     }
 
     /**
@@ -261,11 +269,11 @@ namespace pfabric {
      *    a new pipe where the table acts as the source
      */
     template<typename T, typename KeyType = DefaultKeyType>
-    Pipe selectFromTable(std::shared_ptr<Table<typename T::element_type, KeyType>> tbl,
+    Pipe<T> selectFromTable(std::shared_ptr<Table<typename T::element_type, KeyType>> tbl,
         typename Table<typename T::element_type, KeyType>::Predicate pred = nullptr) {
       auto op = std::make_shared<SelectFromTable<T, KeyType>>(tbl, pred);
       registerStartupFunction([=]() -> unsigned long { return op->start(); });
-      return Pipe(dataflow, dataflow->addPublisher(op));
+      return Pipe<T>(dataflow, dataflow->addPublisher(op));
     }
 
     /**
@@ -283,10 +291,18 @@ namespace pfabric {
      *    a new pipe where the generator acts as the source
      */
     template<typename T>
-    Pipe streamFromGenerator(typename StreamGenerator<T>::Generator gen, unsigned long num) {
+    Pipe<T> streamFromGenerator(typename StreamGenerator<T>::Generator gen, unsigned long num) {
       auto op = std::make_shared<StreamGenerator<T>>(gen, num);
       registerStartupFunction([=]() -> unsigned long { return op->start(); });
-      return Pipe(dataflow, dataflow->addPublisher(op));
+      return Pipe<T>(dataflow, dataflow->addPublisher(op));
+    }
+
+    template<typename T>
+    Pipe<T> newStreamFromMemory(const std::string& fname, char delim = ',', unsigned long num = 0) {
+      auto op = std::make_shared<MemorySource<T>>(fname, delim, num);
+      registerStartupFunction([=]() -> unsigned long { return op->start(); });
+      registerPrepareFunction([=]() -> unsigned long { return op->prepare(); });
+      return Pipe<T>(dataflow, dataflow->addPublisher(op));
     }
   };
 

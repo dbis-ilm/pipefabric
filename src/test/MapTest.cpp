@@ -17,11 +17,9 @@
 
 using namespace pfabric;
 
-typedef Tuple< int, int, int > InTuple;
-typedef TuplePtr< InTuple > InTuplePtr;
+typedef TuplePtr< int, int, int > InTuplePtr;
 
-typedef Tuple< int, int, int, int > OutTuple;
-typedef TuplePtr< OutTuple > OutTuplePtr;
+typedef TuplePtr< int, int, int, int > OutTuplePtr;
 
 /**
  * A simple test of the projection operator.

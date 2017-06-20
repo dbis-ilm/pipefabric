@@ -6,7 +6,7 @@ using namespace pfabric;
 std::string VTableInfo::generateTypeDef() const {
   std::ostringstream os;
   bool first = true;
-  os << "TuplePtr<Tuple<";
+  os << "TuplePtr<";
   for (auto& col : mColumns) {
     if (first)
       first = false;
@@ -14,7 +14,7 @@ std::string VTableInfo::generateTypeDef() const {
       os << ", ";
     os << col.mColType;
   }
-  os << ">>";
+  os << ">";
   return os.str();
 }
 

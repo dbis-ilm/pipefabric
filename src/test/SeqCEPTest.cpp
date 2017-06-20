@@ -26,10 +26,8 @@ using namespace std;
 using namespace boost::assign;
 using namespace pfabric;
 
-typedef Tuple<int, int, int> InTuple;
-typedef TuplePtr<InTuple> InTuplePtr;
-typedef Tuple<int, int, int> OutTuple;
-typedef TuplePtr<OutTuple> OutTuplePtr;
+typedef TuplePtr<int, int, int> InTuplePtr;
+typedef TuplePtr<int, int, int> OutTuplePtr;
 
 TEST_CASE("Verifying the correct behavior of the CEP operator", "[CEP]") {
 	typedef typename RelatedStateValue<InTuplePtr, int, int, 0>::RelatedStateValuePtr RelatedTuplePtr;
@@ -70,7 +68,7 @@ TEST_CASE("Verifying the correct behavior of the CEP operator", "[CEP]") {
 TEST_CASE("Verifying the correct behavior of the CEP operator with related values", "[CEP]") {
 	typedef typename RelatedStateValue<InTuplePtr, int, int, 0>::RelatedStateValuePtr RelatedTuplePtr1;
 	typedef typename RelatedStateValue<InTuplePtr, int, int, 0>::RelatedStateValuePtr RelatedTuplePtr2;
-	typedef TuplePtr<Tuple<RelatedTuplePtr1, RelatedTuplePtr2>> RelatedTuplePtr;
+	typedef TuplePtr<RelatedTuplePtr1, RelatedTuplePtr2> RelatedTuplePtr;
 
 	auto mockup = std::make_shared< StreamMockup<InTuplePtr, OutTuplePtr> >("cep_test.in", "cep_test.res");
 
@@ -158,8 +156,8 @@ TEST_CASE("Verifying the correct behavior of the CEP operator using Topology", "
 	Topology t;
 	auto s = t.newStreamFromFile(inputFile)
 	    		.extract<InTuplePtr>(',')
-				.matchByNFA<InTuplePtr, OutTuplePtr, RelatedTuplePtr>(nfa)
-				.print<OutTuplePtr>(strm);
+				.matchByNFA<OutTuplePtr, RelatedTuplePtr>(nfa)
+				.print(strm);
 
 	t.start(false);
 	REQUIRE(strm.str() == expected);
@@ -181,8 +179,8 @@ TEST_CASE("Verifying the correct behavior of the CEP operator using Topology & D
 	Topology t;
 	auto s = t.newStreamFromFile(inputFile)
 	    		.extract<InTuplePtr>(',')
-				  .matcher<InTuplePtr, OutTuplePtr, RelatedTuplePtr>(a >> b >> c >> d)
-				  .print<OutTuplePtr>(strm);
+				  .matcher<OutTuplePtr, RelatedTuplePtr>(a >> b >> c >> d)
+				  .print(strm);
 
 	t.start(false);
 	REQUIRE(strm.str() == expected);

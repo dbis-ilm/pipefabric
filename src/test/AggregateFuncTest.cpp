@@ -183,3 +183,23 @@ TEST_CASE("Calculate distinct count", "[AggregateFunc]") {
 
 	REQUIRE(dcount.value() == 110);
 }
+
+
+TEST_CASE("Test AggrIdentity function", "[AggregateFunc]") {
+  AggrIdentity<int> aggr1;
+
+  for (int i = 0; i < 10; i++)
+    aggr1.iterate(i);
+
+  REQUIRE(aggr1.value() == 9);
+
+  /* ------------------------------- */
+
+  AggrIdentity<std::string> aggr2;
+	std::vector<std::string> data = { "aaa", "bbb", "ccc", "ddd", "eee" };
+
+  for (unsigned i = 0; i < data.size(); i++)
+    aggr2.iterate(data[i]);
+
+  REQUIRE(aggr2.value() == "eee");
+}
