@@ -23,8 +23,7 @@
 
 using namespace pfabric;
 
-typedef Tuple< int, double, std::string > MyTuple;
-typedef TuplePtr< MyTuple > MyTuplePtr;
+typedef TuplePtr< int, double, std::string > MyTuplePtr;
 
 /**
  * A simple test of the ZMQSource/ZMQSink operators.

@@ -13,11 +13,9 @@
 using namespace pfabric;
 
 
-typedef Tuple<int, int, int, int> ResTuple;
-typedef TuplePtr<ResTuple> ResTuplePtr;
+typedef TuplePtr<int, int, int, int> ResTuplePtr;
 
-typedef Tuple<int, int> MyTuple;
-typedef TuplePtr<MyTuple> MyTuplePtr;
+typedef TuplePtr<int, int> MyTuplePtr;
 
 
 template<

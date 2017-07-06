@@ -35,7 +35,7 @@
 namespace pfabric {
 
 	typedef Tuple<StringRef> TString;      //< a tuple containing a line of text
-	typedef TuplePtr<TString> TStringPtr;  //< tuple pointer
+	typedef TuplePtr<StringRef> TStringPtr;  //< tuple pointer
 
 /**
  * @brief TextFileSource is a source operator for reading a text file line by

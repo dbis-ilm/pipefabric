@@ -91,6 +91,7 @@ public:
 	 */
 	void processPunctuation( const PunctuationPtr& punctuation ) {
 		for (auto it : mPartitions) {
+      //std::cout << "PartitionBy::processPunctuation" << std::endl;
 			auto qop = it.second;
 			auto slot = qop->template getInputChannelByID<1>().getSlot();
 			slot(punctuation);
@@ -125,8 +126,9 @@ public:
    * @param dataChannel the input data channel of the operator associated with this partition
 	 * @param	punctuationChannel the input punctuation channel of the operator
 	 */
-	void connectChannelsForPartition(PartitionID id, InputDataChannel& dataChannel,
-				InputPunctuationChannel& punctuationChannel) {
+  template <typename DataChannel, typename PunctuationChannel>
+	void connectChannelsForPartition(PartitionID id, DataChannel& dataChannel,
+				PunctuationChannel& punctuationChannel) {
 		BOOST_ASSERT_MSG(id >= 0 && id < mNumPartitions, "invalid partition id");
 		// we decouple the channels by introducing a Queue operator which
 		// runs the consumer side within a separate thread

@@ -348,6 +348,9 @@ private:
 	std::bitset<std::tuple_size<Base>::value > mNulls; //< a bitset where a bit indicates that the corresponding field contains a null value
 };
 
+template< typename ...Types >
+using TuplePtr = boost::intrusive_ptr<Tuple<Types...> >;
+
 } // namespace pfabric
 
 
@@ -384,8 +387,8 @@ std::ostream& operator<< (std::ostream& os, const pfabric::Tuple<Types ...>& tp)
  * @param[in] tp
  * @return
  */
-template<typename TupleType>
-std::ostream& operator<< (std::ostream& os, const pfabric::TuplePtr< TupleType >& tp) {
+template<typename ...Types>
+std::ostream& operator<< (std::ostream& os, const pfabric::TuplePtr<Types ...>& tp) {
 	os << *tp;
 	return os;
 }

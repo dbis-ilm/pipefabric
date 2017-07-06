@@ -285,8 +285,7 @@ void QueryCompiler::generateQuery(std::ostream& os, PFabricContext& ctx,
     switch (op->mOpType) {
       case BasePlanOp::Where_Op: {
         auto whereOp = static_pointer_cast<PlanOp<WhereInfo>>(op);
-        os << "\t\t.where<" << mTypeMgr.nameOfType(whereOp->mOutputSchema)
-           << ">([](auto tp, bool) -> bool {\n\t\t\treturn "
+        os << "\t\t.where([](auto tp, bool) -> bool {\n\t\t\treturn "
            << generateWhereExpression(whereOp->payload()) << "; })\n";
         break;
       }
@@ -294,8 +293,7 @@ void QueryCompiler::generateQuery(std::ostream& os, PFabricContext& ctx,
         auto mapOp = static_pointer_cast<PlanOp<MapInfo>>(op);
         auto inputSchema = mapOp->mChild->mOutputSchema;
         auto resTypeName = mTypeMgr.nameOfType(mapOp->mOutputSchema);
-        os << "\t\t.map<" << mTypeMgr.nameOfType(inputSchema) << ", "
-           << resTypeName << ">([](auto tp, bool) -> " << resTypeName << " {\n"
+        os << "\t\t.map<" << resTypeName << ">([](auto tp, bool) -> " << resTypeName << " {\n"
            << "\t\t\treturn makeTuplePtr("
            << generateMapExpression(mapOp->payload()) << "); })\n";
         break;
@@ -312,8 +310,7 @@ void QueryCompiler::generateQuery(std::ostream& os, PFabricContext& ctx,
         break;
     }
   });
-  auto resultSchema = plan->sinkOperator()->mOutputSchema;
-  os << "\t\t.print<" << mTypeMgr.nameOfType(resultSchema) << ">();\n";
+  os << "\t\t.print();\n";
 }
 
 void QueryCompiler::generateEndClassDefinition(std::ostream& os,

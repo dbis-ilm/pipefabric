@@ -46,7 +46,7 @@ namespace pfabric {
  * Typedefs for a tuple containing only a byte array for serializing tuples.
  */
 typedef Tuple<StreamType> TBuf;
-typedef TuplePtr<TBuf> TBufPtr;
+typedef TuplePtr<StreamType> TBufPtr;
 
 /**
  * ZMQSourceImpl provides the basic implementation of ZMQSource to

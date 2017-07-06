@@ -19,8 +19,7 @@
 
 using namespace pfabric;
 
-typedef Tuple<int> MyTuple;
-typedef TuplePtr<MyTuple> MyTuplePtr;
+typedef TuplePtr<int> MyTuplePtr;
 
 struct BarrierCounter {
   std::atomic<int> counter;

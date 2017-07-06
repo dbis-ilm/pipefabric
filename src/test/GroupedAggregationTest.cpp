@@ -19,12 +19,9 @@
 using namespace pfabric;
 
 
-typedef Tuple<int, double> InTuple;
-typedef TuplePtr<InTuple> InTuplePtr;
-typedef Tuple<int, double, double, int> OutTuple;
-typedef TuplePtr<OutTuple> OutTuplePtr;
-typedef Tuple<int, double, double, double> OutTuple2;
-typedef TuplePtr<OutTuple2> OutTuple2Ptr;
+typedef TuplePtr<int, double> InTuplePtr;
+typedef TuplePtr<int, double, double, int> OutTuplePtr;
+typedef TuplePtr<int, double, double, double> OutTuple2Ptr;
 
 /*----------------------------------------------------------------------- */
 

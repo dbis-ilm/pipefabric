@@ -17,19 +17,18 @@
 
 using namespace pfabric;
 
-typedef Tuple< int, int, int > MyTuple;
-typedef TuplePtr< MyTuple > MyTuplePtr;
+typedef TuplePtr< int, int, int > MyTuplePtr;
 
 /**
  * A simple test of the FromTable operator.
  */
 TEST_CASE("Producing a data stream from inserts into a table", "[FromTable]") {
-  typedef Table<MyTuple, int> MyTable;
+  typedef Table<MyTuplePtr::element_type, int> MyTable;
   auto testTable = std::make_shared<MyTable>("MyTable");
 
   for (int i = 0; i < 10; i++) {
-    auto tp = MyTuple(i, i + 10, i + 100);
-    testTable->insert(i, tp);
+    auto tp = makeTuplePtr(i, i + 10, i + 100);
+    testTable->insert(i, *tp);
   }
 
   auto op = std::make_shared<FromTable<MyTuplePtr, int> >(testTable);
@@ -46,8 +45,8 @@ TEST_CASE("Producing a data stream from inserts into a table", "[FromTable]") {
 	CREATE_DATA_LINK(op, mockup);
 
   for (int i = 20; i < 30; i++) {
-    auto tp = MyTuple(i, i + 10, i + 100);
-    testTable->insert(i, tp);
+    auto tp = makeTuplePtr(i, i + 10, i + 100);
+    testTable->insert(i, *tp);
   }
 
   using namespace std::chrono_literals;

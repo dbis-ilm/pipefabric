@@ -34,8 +34,7 @@ public:
     std::ofstream ofs(fileName);
 
     for (int i = 0; i < ntuples; i++) {
-        ofs << fmt::format("{},This is a string field,{}\n", i, i * 100 + 0.5);
-        // i << "," << "This is a string field" << "," << i * 100 + 0.5 << '\n';
+        ofs << fmt::format("{},This is a string field,{:.1f}\n", i, (double)(i * 100 + 0.5));
     }
     ofs.close();
 #ifdef COMPRESSED_FILE_SOURCE

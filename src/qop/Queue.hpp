@@ -204,7 +204,8 @@ namespace pfabric {
 		 * @param punctuation the incoming punctuation tuple
 		 */
 		void processPunctuation( const PunctuationPtr& punctuation ) {
-      mQueue.push(std::make_tuple(punctuation->ptype(), nullptr, false));
+     if (punctuation != nullptr)
+        mQueue.push(std::make_tuple(punctuation->ptype(), nullptr, false));
 		}
 
 		/**

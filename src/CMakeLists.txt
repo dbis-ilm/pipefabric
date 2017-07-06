@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.2)
 project (pipefabric)
 
 set(CMAKE_MACOSX_RPATH 1)
@@ -8,13 +8,6 @@ set (PipeFabric_VERSION_MINOR 2)
 
 include(CTest)
 
-# Add our CMake directory to CMake's module path
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/")
-
-# We download some 3rdparty modules from github.com before building
-# the project.
-include(Download3rdParty)
-
 #############################
 # customization section
 #############################
@@ -23,6 +16,8 @@ include(Download3rdParty)
 # Installation path
 set(PIPEFABRIC_DIR "/usr/local/pfabric")
 
+#The following variables enable or disable additional functionalities, which can be switched off to reduce build time.
+
 # Use the boost::spirit parser for converting strings to numbers
 option(USE_BOOST_SPIRIT_PARSER
     "use the boost::spirit::qi parsers for converting strings to tuple attributes"
@@ -30,10 +25,43 @@ option(USE_BOOST_SPIRIT_PARSER
 )
 
 # Use RocksDB key-value store for implementing tables
+# If switched to off, it will not be downloaded, saving initial building time.
 option(USE_ROCKSDB_TABLE
   "use RocksDB for implementing persistent tables"
   ON
 )
+
+# Build only pipefabric libraries (cep and core)
+# If switched to on, no other components (like RestDemo, QueryCompiler,...) will be built.
+# Building test cases is independent from this.
+option(BUILD_ONLY_LIBS
+  "build only the two pipefabric libraries"
+  OFF
+)
+
+# Build test cases for pipefabric functionality
+# If switched to off, no tests will be build
+option(BUILD_TEST_CASES
+  "build tests for pipefabric functionality"
+  ON
+)
+
+#Build google benchmark library
+option(BUILD_GOOGLE_BENCH
+  "build google benchmark"
+  ON
+)
+
+# Build benchmark test
+option(BUILD_BENCHMARKS
+  "build benchmarks for pipefabric"
+  ON
+)
+
+# Benchmark test requires benchmark library
+if (BUILD_BENCHMARKS)
+  set(BUILD_GOOGLE_BENCH ON)
+endif()
 
 # Force using intel compiler
 #include(CMakeForceCompiler)
@@ -54,6 +82,14 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused -Wno-uninitialized")
 
 # End of customization section
 #---------------------------------------------------------------------------
+
+# Add our CMake directory to CMake's module path
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/")
+
+# We download some 3rdparty modules from github.com before building
+# the project.
+include(Download3rdParty)
+
 if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread")
@@ -76,6 +112,17 @@ elseif(JEMALLOC_FOUND)
 	 set(MALLOC_LIB ${JEMALLOC_LIBRARIES})
 else()
      set(MALLOC_LIB "")
+endif()
+
+########################
+# Google benchmark library
+########################
+#
+if (BUILD_GOOGLE_BENCH)
+  include_directories("${THIRD_PARTY_DIR}/benchmark/include")
+  set (BENCHMARK_LIB "${THIRD_PARTY_DIR}/benchmark/lib/libbenchmark.a")
+else()
+  set (BENCHMARK_LIB "")
 endif()
 
 ########################
@@ -108,7 +155,7 @@ endif()
 # Boost C++ library
 ######################
 #
-SET(BOOST_MIN_VERSION "1.61.0")
+SET(BOOST_MIN_VERSION "1.60.0")
 find_package(Boost ${BOOST_MIN_VERSION} REQUIRED COMPONENTS
     program_options
     system
@@ -142,13 +189,13 @@ set(BOOST_LIBRARIES
 		${Boost_LOG_LIBRARY}
 		${Boost_COROUTINE_LIBRARY}
 		${Boost_IOSTREAMS_LIBRARY}
-    ${Boost_FILESYSTEM_LIBRARY}
+        ${Boost_FILESYSTEM_LIBRARY}
 		${Boost_SYSTEM_LIBRARY}
 		${Boost_CHRONO_LIBRARY}
 		${Boost_TIMER_LIBRARY}
 		${Boost_THREAD_LIBRARY}
 		${Boost_REGEX_LIBRARY}
-	${DYLIB_LIBRARY}
+	    ${DYLIB_LIBRARY}
 )
 
 ######################
@@ -182,7 +229,7 @@ else()
 set (ZEROMQ_SOURCES "")
 endif (ZEROMQ_FOUND)
 
-add_library(pfabric_core SHARED
+set(core_sources
   core/TimestampHelper.cpp
   core/Punctuation.cpp
   qop/TextFileSource.cpp
@@ -198,14 +245,30 @@ add_library(pfabric_core SHARED
   ${THIRD_PARTY_DIR}/json
   ${THIRD_PARTY_DIR}/fmt
   ${THIRD_PARTY_DIR}/SimpleWeb
-  ${THIRD_PARTY_DIR}/rocksdb
   ${THIRD_PARTY_DIR}/catch
 )
 
+if(USE_ROCKSDB_TABLE)
+  set(core_sources
+    ${core_sources}
+    ${THIRD_PARTY_DIR}/rocksdb
+  )
+endif()
+
+if(BUILD_GOOGLE_BENCH)
+  set(core_sources
+    ${core_sources}
+    ${THIRD_PARTY_DIR}/benchmark
+  )
+endif()
+
+add_library(pfabric_core SHARED
+  ${core_sources}
+)
 
 target_link_libraries(pfabric_core
 		${BOOST_LIBRARIES}
-		 ${ZEROMQ_LIBRARIES}
+		${ZEROMQ_LIBRARIES}
 )
 
 #-----------------------------------------------------------------------------------------
@@ -244,6 +307,11 @@ target_include_directories(Catch INTERFACE test)
 enable_testing()
 add_subdirectory(test)
 
+#-----------------------------------------------------------------------------------------
+#
+# Micro-benchmarking using Google Benchmark
+#
+add_subdirectory(bench)
 #-----------------------------------------------------------------------------------------
 #
 # Installation

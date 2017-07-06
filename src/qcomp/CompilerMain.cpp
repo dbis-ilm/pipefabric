@@ -13,7 +13,7 @@ using namespace pfabric;
 
 namespace po = boost::program_options;
 
-typedef TuplePtr<Tuple<int, double> > InTuplePtr;
+typedef TuplePtr<int, double> InTuplePtr;
 
 PFabricContext::TopologyPtr createStreamQuery(PFabricContext& ctx) {
   auto myTable = ctx.getTable<InTuplePtr::element_type, int>("SENSOR_DATA");
@@ -22,9 +22,9 @@ PFabricContext::TopologyPtr createStreamQuery(PFabricContext& ctx) {
 
   auto s = topology->newStreamFromREST(8099, "^/publish$", RESTSource::POST_METHOD)
     .extractJson<InTuplePtr>({"key", "data"})
-    .keyBy<InTuplePtr, 0, int>()
+    .keyBy<0, int>()
     // .print<InTuplePtr>();
-    .toTable<InTuplePtr, int>(myTable);
+    .toTable<int>(myTable);
 
   return topology;
 }

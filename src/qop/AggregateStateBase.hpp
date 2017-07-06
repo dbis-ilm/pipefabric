@@ -89,6 +89,14 @@ public:
 };
 
 /**
+ * AggrStateTraits is a trait to check whether a class satisfies
+ * the requirements of an aggregator class, i.e. to define a
+ * @c ResultTypePtr.
+ */
+template<typename T>
+struct AggrStateTraits : std::false_type{};
+
+/**
  * Aggregator1 represents the aggregation state for a single aggregation
  * function.
  * The following example defines the aggregation state for calculate the sum
@@ -112,7 +120,7 @@ public:
 	/**
 	 * The tuple type representing the aggregation result.
 	 */
-	typedef TuplePtr<Tuple<typename Aggr1Func::ResultType>> ResultTypePtr;
+	typedef TuplePtr<typename Aggr1Func::ResultType> ResultTypePtr;
 
 	/**
 	 * Typedef for a pointer to the aggregation state.
@@ -155,6 +163,9 @@ public:
 	}
 };
 
+template <typename StreamElement, typename Aggr1Func, int Aggr1Col>
+struct AggrStateTraits<Aggregator1<StreamElement, Aggr1Func, Aggr1Col>> : std::true_type{};
+
 /**
  * Aggregator2 represents the aggregation state for two aggregation
  * functions.
@@ -185,8 +196,8 @@ public:
 	/**
 	 * The tuple type representing the aggregation result.
 	 */
-	typedef TuplePtr<Tuple<typename Aggr1Func::ResultType,
-												 typename Aggr2Func::ResultType>> ResultTypePtr;
+	typedef TuplePtr<typename Aggr1Func::ResultType,
+									 typename Aggr2Func::ResultType> ResultTypePtr;
 	/**
 	 * Typedef for a pointer to the aggregation state.
 	 */
@@ -231,6 +242,16 @@ public:
 	}
 };
 
+template <
+	typename StreamElement,
+	typename Aggr1Func, int Aggr1Col,
+	typename Aggr2Func, int Aggr2Col
+>
+struct AggrStateTraits<Aggregator2<StreamElement, 
+  Aggr1Func, Aggr1Col,
+  Aggr2Func, Aggr2Col
+  >> : std::true_type{};
+
 /**
  * Aggregator3 represents the aggregation state for three aggregation
  * functions.
@@ -268,9 +289,9 @@ public:
 	/**
 	 * The tuple type representing the aggregation result.
 	 */
-	typedef TuplePtr<Tuple<typename Aggr1Func::ResultType,
-												 typename Aggr2Func::ResultType,
-												 typename Aggr3Func::ResultType>> ResultTypePtr;
+	typedef TuplePtr<typename Aggr1Func::ResultType,
+									 typename Aggr2Func::ResultType,
+									 typename Aggr3Func::ResultType> ResultTypePtr;
 
 	/**
 	 * Typedef for a pointer to the aggregation state.
@@ -318,6 +339,18 @@ public:
 	}
 };
 
+template <
+	typename StreamElement,
+	typename Aggr1Func, int Aggr1Col,
+	typename Aggr2Func, int Aggr2Col,
+	typename Aggr3Func, int Aggr3Col
+>
+struct AggrStateTraits<Aggregator3<StreamElement, 
+  Aggr1Func, Aggr1Col,
+  Aggr2Func, Aggr2Col,
+  Aggr3Func, Aggr3Col
+  >> : std::true_type{};
+
 /**
  * Aggregator4 represents the aggregation state for four aggregation
  * functions.
@@ -362,10 +395,10 @@ public:
 	/**
 	 * The tuple type representing the aggregation result.
 	 */
-	typedef TuplePtr<Tuple<typename Aggr1Func::ResultType,
-												 typename Aggr2Func::ResultType,
-												 typename Aggr3Func::ResultType,
-												 typename Aggr4Func::ResultType>> ResultTypePtr;
+	typedef TuplePtr<typename Aggr1Func::ResultType,
+									 typename Aggr2Func::ResultType,
+									 typename Aggr3Func::ResultType,
+									 typename Aggr4Func::ResultType> ResultTypePtr;
 
 	/**
 	 * Typedef for a pointer to the aggregation state.
@@ -415,6 +448,21 @@ public:
 												state->aggr3_.value(), state->aggr4_.value());
 	}
 };
+
+template <
+	typename StreamElement,
+	typename Aggr1Func, int Aggr1Col,
+	typename Aggr2Func, int Aggr2Col,
+	typename Aggr3Func, int Aggr3Col,
+	typename Aggr4Func, int Aggr4Col
+>
+struct AggrStateTraits<Aggregator4<StreamElement, 
+  Aggr1Func, Aggr1Col,
+  Aggr2Func, Aggr2Col,
+  Aggr3Func, Aggr3Col,
+  Aggr4Func, Aggr4Col
+  >> : std::true_type{};
+
 } /* end namespace pfabric */
 
 
