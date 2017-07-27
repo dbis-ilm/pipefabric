@@ -59,7 +59,7 @@ include_directories("${THIRD_PARTY_DIR}/fmt")
 # the SimpleWeb library
 download_project(PROJ               SimpleWeb
                 GIT_REPOSITORY      https://github.com/eidheim/Simple-Web-Server.git
-                GIT_TAG             master
+                GIT_TAG             v2.1.1
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
