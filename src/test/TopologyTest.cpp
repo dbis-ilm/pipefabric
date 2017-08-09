@@ -349,3 +349,39 @@ TEST_CASE("Tuplifying a stream of RDF strings", "[Tuplifier]") {
   t.start(false);
   REQUIRE(results.size() == 3);
 }
+
+TEST_CASE("Using a window with and without additional function", "[Window]") {
+  typedef TuplePtr<int, std::string, double> T1;
+  typedef Aggregator1<T1, AggrSum<double>, 2> AggrStateSum;
+
+  TestDataGenerator tgen("file.csv");
+  tgen.writeData(10);
+
+  std::stringstream strm;
+  std::string expected = "0.5\n101\n301.5\n601.5\n901.5\n1201.5\n1501.5\n1801.5\n2101.5\n2401.5\n";
+
+  Topology t1;
+  auto s1 = t1.newStreamFromFile("file.csv")
+    .extract<T1>(',')
+    .slidingWindow(WindowParams::RowWindow, 3)
+    .aggregate<AggrStateSum>()
+    .print(strm);
+
+  t1.start(false);
+  REQUIRE(strm.str() == expected);
+
+  std::stringstream strm2;
+  expected = "1.5\n103\n304.5\n604.5\n904.5\n1204.5\n1504.5\n1804.5\n2104.5\n2404.5\n";
+
+  auto winFunc = [](auto tp) { get<2>(tp)++; return tp; }; //just increment incoming tuples double-attribute by one
+
+  Topology t2;
+  auto s2 = t2.newStreamFromFile("file.csv")
+    .extract<T1>(',')
+    .slidingWindow(WindowParams::RowWindow, 3, winFunc)
+    .aggregate<AggrStateSum>()
+    .print(strm2);
+
+  t2.start(false);
+  REQUIRE(strm2.str() == expected);
+}

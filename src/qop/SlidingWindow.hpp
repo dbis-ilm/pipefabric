@@ -65,12 +65,15 @@ namespace pfabric {
      * @param func a function for extracting the timestamp value from the stream element
      * @param wt the type of the window (range or row)
      * @param sz the window size (seconds or number of tuples)
+     * @param windowFunc optional function for modifying incoming tuples
      * @param ei ei the eviction interval, i.e., time for triggering the eviction (in milliseconds)
      */
     SlidingWindow(typename Window<StreamElement>::TimestampExtractorFunc func,
                   const WindowParams::WinType& wt,
-                  const unsigned int sz, const unsigned int ei = 0) :
-    WindowBase(func, wt, sz, ei ) {
+                  const unsigned int sz,
+                  typename Window<StreamElement>::WindowOpFunc windowFunc = nullptr,
+                  const unsigned int ei = 0) :
+    WindowBase(func, wt, sz, windowFunc, ei ) {
       if (ei == 0) {
         // sliding window where the incoming tuple evicts outdated tuples
         this->mEvictFun = std::bind( this->mWinType == WindowParams::RangeWindow ?
@@ -92,11 +95,14 @@ namespace pfabric {
      *
      * @param wt the type of the window (range or row)
      * @param sz the window size (seconds or number of tuples)
+     * @param windowFunc optional function for modifying incoming tuples
      * @param ei ei the eviction interval, i.e., time for triggering the eviction (in milliseconds)
      */
     SlidingWindow(const WindowParams::WinType& wt,
-                  const unsigned int sz, const unsigned int ei = 0) :
-    WindowBase(wt, sz, ei ) {
+                  const unsigned int sz,
+                  typename Window<StreamElement>::WindowOpFunc windowFunc = nullptr,
+                  const unsigned int ei = 0) :
+    WindowBase(wt, sz, windowFunc, ei ) {
       if (ei == 0) {
         // sliding window where the incoming tuple evicts outdated tuples
         this->mEvictFun = std::bind( this->mWinType == WindowParams::RangeWindow ?
@@ -147,22 +153,43 @@ namespace pfabric {
       if( outdated == true ) {
         // not sure if this is really necessary
         this->getOutputDataChannel().publish(data, outdated);
-      }
-      else {
-        // insert the tuple into buffer
-        {
-          std::lock_guard<std::mutex> guard(this->mMtx);
-          this->mTupleBuf.push_back(data);
-          this->mCurrSize++;
-        }
+      } else {
+        // if function available
+        if(this->mWindowOpFunc!=nullptr) {
+          // apply function on tuple
+          auto res = this->mWindowOpFunc(data);
 
-        // check for outdated tuples
-        if (!this->mEvictThread) {
-          this->mEvictFun();
-        }
+          // insert the tuple into buffer
+          { //necessary for lock scope!
+            std::lock_guard<std::mutex> guard(this->mMtx);
+            this->mTupleBuf.push_back(res);
+            this->mCurrSize++;
+          }
 
-        // finally, forward the incoming tuple
-        this->getOutputDataChannel().publish(data, outdated);
+          // check for outdated tuples
+          if (!this->mEvictThread) {
+            this->mEvictFun();
+          }
+
+          // finally, forward the incoming tuple
+          this->getOutputDataChannel().publish(res, outdated);
+
+        } else {
+          // insert the tuple into buffer
+          { //necessary for lock scope!
+            std::lock_guard<std::mutex> guard(this->mMtx);
+            this->mTupleBuf.push_back(data);
+            this->mCurrSize++;
+          }
+
+          // check for outdated tuples
+          if (!this->mEvictThread) {
+            this->mEvictFun();
+          }
+
+          // finally, forward the incoming tuple
+          this->getOutputDataChannel().publish(data, outdated);
+        }
       }
     }
 

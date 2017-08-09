@@ -73,6 +73,8 @@ namespace pfabric {
   public:
     typedef std::function<Timestamp(const StreamElement&)> TimestampExtractorFunc;
 
+    typedef std::function<StreamElement(const StreamElement&)> WindowOpFunc; //lambda function applied to incoming tuples in window
+
   protected:
     PFABRIC_UNARY_TRANSFORM_TYPEDEFS(StreamElement, StreamElement);
 
@@ -82,11 +84,12 @@ namespace pfabric {
      * @param func a function for extracting the timestamp value from the stream element
      * @param wt the type of the window (range or row)
      * @param sz the window size (seconds or number of tuples)
+     * @param winOpFunc optional function for modifying incoming tuples
      * @param ei the eviction interval, i.e., time for triggering the eviction (in milliseconds)
      */
     Window(TimestampExtractorFunc func, const WindowParams::WinType& wt,
-           const unsigned int sz, const unsigned int ei = 0) :
-    mTimestampExtractor(func), mWinType(wt), mWinSize(sz), mEvictInterval(ei), mCurrSize(0) {
+           const unsigned int sz, WindowOpFunc winOpFunc = nullptr, const unsigned int ei = 0) :
+    mTimestampExtractor(func), mWinType(wt), mWinSize(sz), mWindowOpFunc(winOpFunc), mEvictInterval(ei), mCurrSize(0) {
       mDiffTime = (mWinType == WindowParams::RangeWindow ?
                    boost::posix_time::seconds(mWinSize).total_microseconds() : 0
                    );
@@ -100,11 +103,12 @@ namespace pfabric {
      *
      * @param wt the type of the window (range or row)
      * @param sz the window size (seconds or number of tuples)
+     * @param winOpFunc optional function for modifying incoming tuples
      * @param ei ei the eviction interval, i.e., time for triggering the eviction (in milliseconds)
      */
     Window(const WindowParams::WinType& wt,
-           const unsigned int sz, const unsigned int ei = 0) :
-    mWinType(wt), mWinSize(sz), mEvictInterval(ei), mCurrSize(0), mDiffTime(0) {
+           const unsigned int sz, WindowOpFunc winOpFunc = nullptr, const unsigned int ei = 0) :
+    mWinType(wt), mWinSize(sz), mWindowOpFunc(winOpFunc), mEvictInterval(ei), mCurrSize(0), mDiffTime(0) {
       BOOST_ASSERT_MSG(mWinType == WindowParams::RowWindow, "RowWindow requires timestamp extractor function.");
     }
 
@@ -125,6 +129,8 @@ namespace pfabric {
     EvictionThread mEvictThread;                //< the thread for running the eviction function
                                                 //< (if the eviction interval > 0)
     mutable std::mutex mMtx;                    //< mutex for accessing the tuple buffer
+
+    WindowOpFunc mWindowOpFunc;                 //< function for modifying incoming tuples
   };
 
   /**
