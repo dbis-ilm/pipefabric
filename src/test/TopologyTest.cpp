@@ -352,6 +352,7 @@ TEST_CASE("Tuplifying a stream of RDF strings", "[Tuplifier]") {
 
 TEST_CASE("Using a window with and without additional function", "[Window]") {
   typedef TuplePtr<int, std::string, double> T1;
+  typedef TuplePtr<int> T2;
   typedef Aggregator1<T1, AggrSum<double>, 2> AggrStateSum;
 
   TestDataGenerator tgen("file.csv");
@@ -373,7 +374,8 @@ TEST_CASE("Using a window with and without additional function", "[Window]") {
   std::stringstream strm2;
   expected = "1.5\n103\n304.5\n604.5\n904.5\n1204.5\n1504.5\n1804.5\n2104.5\n2404.5\n";
 
-  auto winFunc = [](auto beg, auto end, auto tp) { get<2>(tp)++; return tp; }; //just increment incoming tuples double-attribute by one
+  //just increment incoming tuples double-attribute by one
+  auto winFunc = [](auto beg, auto end, auto tp) { get<2>(tp)++; return tp; };
 
   Topology t2;
   auto s2 = t2.newStreamFromFile("file.csv")
@@ -384,4 +386,27 @@ TEST_CASE("Using a window with and without additional function", "[Window]") {
 
   t2.start(false);
   REQUIRE(strm2.str() == expected);
+
+  std::stringstream strm3;
+  expected = "0\n1\n1\n2\n2\n3\n4\n5\n6\n7\n";
+
+  //find median of ints
+  auto winFuncMedian = [](auto beg, auto end, auto tp) {
+    std::vector<int> winInts(0);
+    for(auto it=beg; it!=end; ++it) {
+      winInts.push_back(get<0>(*it));
+    }
+    std::sort(winInts.begin(), winInts.end());
+    return makeTuplePtr(winInts[winInts.size()/2]);
+  };
+
+  Topology t3;
+  auto s3 = t3.newStreamFromFile("file.csv")
+    .extract<T1>(',')
+    .map<T2>([](auto tp, bool outdated) -> T2 { return makeTuplePtr(get<0>(tp)); })
+    .slidingWindow(WindowParams::RowWindow, 5, winFuncMedian)
+    .print(strm3);
+
+  t3.start(false);
+  REQUIRE(strm3.str() == expected);
 }

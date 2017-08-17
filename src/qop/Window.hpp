@@ -128,6 +128,7 @@ namespace pfabric {
     TimestampExtractorFunc mTimestampExtractor; //< a function for extracting timestamps from a tuple
     WindowParams::WinType mWinType;             //< the type of window
     unsigned int mWinSize;                      //< the size of window (time or number of tuples)
+    WindowOpFunc mWindowOpFunc;                 //< function for modifying incoming tuples
     unsigned int mEvictInterval;                //< the slide length of window (time or number of tuples)
     TupleList mTupleBuf;                        //< the actual window buffer
     unsigned int mCurrSize;                     //< the current number of tuples in the window
@@ -137,8 +138,6 @@ namespace pfabric {
     EvictionThread mEvictThread;                //< the thread for running the eviction function
                                                 //< (if the eviction interval > 0)
     mutable std::mutex mMtx;                    //< mutex for accessing the tuple buffer
-
-    WindowOpFunc mWindowOpFunc;                 //< function for modifying incoming tuples
   };
 
   /**
