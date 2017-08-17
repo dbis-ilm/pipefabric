@@ -71,9 +71,17 @@ namespace pfabric {
   public UnaryTransform< StreamElement, StreamElement > // use default unary transform
   {
   public:
+    typedef typename std::list<StreamElement>::const_iterator ElementIterator;
+
     typedef std::function<Timestamp(const StreamElement&)> TimestampExtractorFunc;
 
-    typedef std::function<StreamElement(const StreamElement&)> WindowOpFunc; //lambda function applied to incoming tuples in window
+    /**
+     * An optional function that can be applied to the entire window
+     * when a new tuple arrives.
+     */
+    typedef std::function<StreamElement(ElementIterator beg,
+       ElementIterator end,
+      const StreamElement&)> WindowOpFunc;
 
   protected:
     PFABRIC_UNARY_TRANSFORM_TYPEDEFS(StreamElement, StreamElement);

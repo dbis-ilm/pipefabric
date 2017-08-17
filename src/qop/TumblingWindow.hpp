@@ -131,18 +131,19 @@ namespace pfabric {
       }
       else {
         // if function available
-        if(this->mWindowOpFunc!=nullptr) {
-          // apply function on tuple
-          auto res = this->mWindowOpFunc(data);
-
+        if(this->mWindowOpFunc != nullptr) {
           // insert the tuple into buffer
           { //necessary for lock scope!
             std::lock_guard<std::mutex> guard(this->mMtx);
-            this->mTupleBuf.push_back(res);
+            this->mTupleBuf.push_back(data);
             this->mCurrSize++;
           }
 
-          //forward the incoming tuple
+          // apply function on tuple
+          auto res = this->mWindowOpFunc(this->mTupleBuf.begin(),
+            this->mTupleBuf.end(), data);
+
+        //forward the incoming tuple
           this->getOutputDataChannel().publish(res, outdated);
 
           // check for outdated tuples

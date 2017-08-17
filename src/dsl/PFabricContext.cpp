@@ -32,6 +32,12 @@ PFabricContext::TopologyPtr PFabricContext::createTopology() {
   return std::make_shared<Topology>();
 }
 
+bool PFabricContext::tableExists(const std::string& tblName) const {
+    // look for the table
+    auto it = mTableSet.find(tblName);
+    return (it != mTableSet.end()); 
+}
+
 TableInfoPtr PFabricContext::getTableInfo(const std::string& tblName) {
     // look for the table
     auto it = mTableSet.find(tblName);

@@ -340,7 +340,7 @@ TEST_CASE("Tuplifying a stream of RDF strings", "[Tuplifier]") {
   Topology t;
   auto s = t.newStreamFromFile(std::string(TEST_DATA_DIRECTORY) + "tuplifier_test1.in")
     .extract<Triple>(',')
-    .tuplify<RDFTuple>({ "http://data.org/name", "http://data.org/price", "http://data.org/someOther" }, 
+    .tuplify<RDFTuple>({ "http://data.org/name", "http://data.org/price", "http://data.org/someOther" },
         TuplifierParams::ORDERED)
     .notify([&](auto tp, bool outdated) {
       std::lock_guard<std::mutex> lock(r_mutex);
@@ -373,7 +373,7 @@ TEST_CASE("Using a window with and without additional function", "[Window]") {
   std::stringstream strm2;
   expected = "1.5\n103\n304.5\n604.5\n904.5\n1204.5\n1504.5\n1804.5\n2104.5\n2404.5\n";
 
-  auto winFunc = [](auto tp) { get<2>(tp)++; return tp; }; //just increment incoming tuples double-attribute by one
+  auto winFunc = [](auto beg, auto end, auto tp) { get<2>(tp)++; return tp; }; //just increment incoming tuples double-attribute by one
 
   Topology t2;
   auto s2 = t2.newStreamFromFile("file.csv")

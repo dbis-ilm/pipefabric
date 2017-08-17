@@ -155,14 +155,11 @@ namespace pfabric {
         this->getOutputDataChannel().publish(data, outdated);
       } else {
         // if function available
-        if(this->mWindowOpFunc!=nullptr) {
-          // apply function on tuple
-          auto res = this->mWindowOpFunc(data);
-
-          // insert the tuple into buffer
+        if(this->mWindowOpFunc != nullptr) {
+        // insert the tuple into buffer
           { //necessary for lock scope!
             std::lock_guard<std::mutex> guard(this->mMtx);
-            this->mTupleBuf.push_back(res);
+            this->mTupleBuf.push_back(data);
             this->mCurrSize++;
           }
 
@@ -170,6 +167,9 @@ namespace pfabric {
           if (!this->mEvictThread) {
             this->mEvictFun();
           }
+          // apply the window function - we do this after the window was updated
+          auto res = this->mWindowOpFunc(this->mTupleBuf.begin(),
+           this->mTupleBuf.end(), data);
 
           // finally, forward the incoming tuple
           this->getOutputDataChannel().publish(res, outdated);
