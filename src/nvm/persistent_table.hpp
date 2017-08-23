@@ -39,7 +39,8 @@
 
 #include "core/serialize.hpp"
 #include "nvm/BDCCInfo.hpp"
-#include "nvm/ctree_map_persistent.hpp"
+#include "nvm/PBPTree.hpp"
+#include "nvm/PTableInfo.hpp"
 #include "nvm/PTuple.hpp"
 #include "table/TableException.hpp"
 #include "table/TableInfo.hpp"
@@ -72,10 +73,48 @@ const std::string LAYOUT = "PTable";
  *****************************************************************************/
 template<class Tuple, typename KeyType>
 class persistent_table {
-
-public:
+  typedef PBPTree<KeyType, PTuple<Tuple>, 4096, 4096> IndexType;
   typedef persistent_ptr<Tuple> RecordType;
+
+  public:
   typedef std::unordered_map<uint16_t, uint16_t> ColumnIntMap;
+
+  /************************************************************************//**
+   * \brief Public Iterator to iterate over all inserted tuples.
+   ***************************************************************************/
+  class iterator {
+    typename IndexType::iterator tree_iter;
+
+    public:
+    iterator() : tree_iter() {}
+    iterator(typename IndexType::iterator iter) : tree_iter(iter) {}
+
+    iterator& operator++() {
+      tree_iter++;
+      return *this;
+    }
+    iterator& next() {
+      tree_iter++;
+      return *this;
+    }
+    iterator operator++(int) {iterator retval = *this; ++(*this); return retval;}
+
+    bool operator==(iterator other) const {return (tree_iter == other.tree_iter);}
+    bool operator!=(iterator other) const {return !(*this == other.tree_iter);}
+
+    PTuple<Tuple> operator*() {
+      return (*tree_iter).second;
+    }
+
+    // iterator traits
+    using difference_type = long;
+    using value_type = PTuple<Tuple>;
+    using pointer = const PTuple<Tuple>*;
+    using reference = const PTuple<Tuple>&;
+    using iterator_category = std::forward_iterator_tag;
+  };
+  iterator begin() { return iterator(root->index->begin()); }
+  iterator end() { return iterator(); }
 
 
   /************************************************************************//**
@@ -95,6 +134,14 @@ public:
   }
 
   /************************************************************************//**
+   * \brief Constructor for a given schema (using TableInfo).
+   ***************************************************************************/
+  persistent_table(const TableInfo& tInfo) {
+    auto pop = pool_by_vptr(this);
+    transaction::exec_tx(pop, [&] {init(tInfo, ColumnIntMap());});
+  }
+
+  /************************************************************************//**
    * \brief Constructor for a given schema and dimension clustering.
    ***************************************************************************/
   persistent_table(const std::string& tName, ColumnInitList columns, const ColumnIntMap& _bdccInfo) {
@@ -103,11 +150,19 @@ public:
   }
 
   /************************************************************************//**
+   * \brief Constructor for a given schema (using TableInfo) and dimension clustering.
+   ***************************************************************************/
+  persistent_table(const TableInfo& tInfo, const ColumnIntMap& _bdccInfo) {
+    auto pop = pool_by_vptr(this);
+    transaction::exec_tx(pop, [&] {init(tInfo, _bdccInfo);});
+  }
+
+  /************************************************************************//**
    * \brief Default Destructor.
    ***************************************************************************/
   ~persistent_table() {
     //TODO: Complete this
-    root->block_list->clear();
+    //root->block_list->clear();
   }
 
   /************************************************************************//**
@@ -132,38 +187,42 @@ public:
      */
 
     //TODO: Check if already inserted in Index
-    auto dest_block = root->block_list;
-    StreamType buf;
-    rec.serializeToStream(buf);
+    auto pop = pool_by_vptr(this);
+    transaction::exec_tx(pop, [&] {
+      auto dest_block = root->block_list;
+      StreamType buf;
+      rec.serializeToStream(buf);
 
-    /* Calculate BDCC value for input tuple*/
-    auto xtr = static_cast<uint32_t>(getBDCCFromTuple(rec).to_ulong());
-
-    /* Search for correct Block */
-    do {
-      /* Retrieve DDC Range */
-      const auto& ddc_min = reinterpret_cast<const uint32_t &>(dest_block->block->at(nvm::gDDCRangePos1));
-      const auto& ddc_max = reinterpret_cast<const uint32_t &>(dest_block->block->at(nvm::gDDCRangePos2));
-
-      if (xtr >= ddc_min && xtr <= ddc_max) break; //Found correct block
-
-      auto cur_block = dest_block->next;
-      dest_block = cur_block;
-    } while (dest_block != nullptr); /* Should not reach end! */
-
-    /* Check for enough space in target block */
-    auto& space = reinterpret_cast<uint16_t&>(dest_block->block->at(nvm::gFreeSpacePos));
-    if (space < buf.size()) {
-      auto newBlocks = splitBlock(dest_block);
-      const auto& splitValue = reinterpret_cast<uint32_t &>(newBlocks.first->block->at(nvm::gDDCRangePos2));
+      /* Calculate BDCC value for input tuple*/
       auto xtr = static_cast<uint32_t>(getBDCCFromTuple(rec).to_ulong());
-      if (xtr <= splitValue)
-        return insertTuple(key, rec, newBlocks.first);
-      else
-        return insertTuple(key, rec, newBlocks.second);
-    }
 
-    return insertTuple(key, rec, dest_block);
+      /* Search for correct Block */
+      do {
+        /* Retrieve DDC Range */
+        const auto &ddc_min = reinterpret_cast<const uint32_t &>(dest_block->block->at(nvm::gDDCRangePos1));
+        const auto &ddc_max = reinterpret_cast<const uint32_t &>(dest_block->block->at(nvm::gDDCRangePos2));
+
+        if (xtr >= ddc_min && xtr <= ddc_max) break; //Found correct block
+
+        auto cur_block = dest_block->next;
+        dest_block = cur_block;
+      } while (dest_block != nullptr); /* Should not reach end! */
+
+      /* Check for enough space in target block */
+      auto &space = reinterpret_cast<uint16_t &>(dest_block->block->at(nvm::gFreeSpacePos));
+      if (space < buf.size()) {
+        auto newBlocks = splitBlock(dest_block);
+        const auto &splitValue = reinterpret_cast<uint32_t &>(newBlocks.first->block->at(nvm::gDDCRangePos2));
+        auto xtr = static_cast<uint32_t>(getBDCCFromTuple(rec).to_ulong());
+        if (xtr <= splitValue)
+          return insertTuple(key, rec, newBlocks.first);
+        else
+          return insertTuple(key, rec, newBlocks.second);
+      }
+
+      return insertTuple(key, rec, dest_block);
+    });
+    return -1;
   }
 
   /************************************************************************//**
@@ -220,11 +279,11 @@ public:
    ***************************************************************************/
   int deleteByKey(KeyType key) {
     //TODO: Also delete data?
-    size_t nres;
+    std::size_t nres;
     auto pop = pool_by_vptr(this);
     transaction::exec_tx(pop, [&] {
       //delete_persistent<PTuple<Tuple>>(getByKey(key));
-      nres = root->index->remove_free(key);
+      nres = static_cast<std::size_t>(root->index->erase(key));
     });
     return nres;
   }
@@ -240,14 +299,30 @@ public:
    * \return
    *   the PTuple associated with the given key
    ***************************************************************************/
-  persistent_ptr<PTuple<Tuple>> getByKey(KeyType key) const {
-    auto map = *root->index;
-    //if (res != root->index->end()) {
-    if (map.lookup(key)) {
-      return *map.get(key);
+  PTuple<Tuple> getByKey(KeyType key) const {
+    PTuple<Tuple> val;
+    if (root->index->lookup(key, &val)) {
+      return val;
     } else {
       throw TableException("key not found");
     }
+  }
+
+  /************************************************************************//**
+   * @brief Return the number of tuples stored in the table.
+   *
+   * @return the number of tuples
+   ***************************************************************************/
+  unsigned long size() const {
+      auto cnt = 0ul;
+      auto dest_block = root->block_list;
+      do {
+          auto b = dest_block->block;
+          cnt+=reinterpret_cast<const uint32_t&>(b->at(nvm::gCountPos));
+          auto& cur_block = dest_block->next;
+          dest_block = cur_block;
+      } while (dest_block != nullptr);
+      return cnt;
   }
 
   /************************************************************************//**
@@ -300,7 +375,7 @@ public:
       /* Body/Column/Minipage data */
       if (cnt > 0) {
         size_t idx = 0;
-        for (auto &c : tInfo) {
+        for (const auto &c : tInfo) {
           std::cout << "Column Info: " << c.getName() << ": " << c.getType() << std::endl;
           const auto& sma_pos = reinterpret_cast<const uint16_t&>(b->at(nvm::gSmaOffsetPos + idx * nvm::gAttrOffsetSize));
           const auto& data_pos = reinterpret_cast<const uint16_t&>(b->at(nvm::gDataOffsetPos + idx * nvm::gAttrOffsetSize));
@@ -419,8 +494,8 @@ private:
 
   struct root {
     persistent_ptr<struct nvm_block> block_list;
-    persistent_ptr<examples::ctree_map_p<KeyType, persistent_ptr<nvm::PTuple<Tuple>>>> index;
-    persistent_ptr<const TableInfo> tInfo;
+    persistent_ptr<IndexType> index;
+    persistent_ptr<PTableInfo> tInfo;
     persistent_ptr<BDCCInfo> bdccInfo;
   };
   persistent_ptr<struct root> root;
@@ -489,14 +564,36 @@ private:
   /************************************************************************//**
    * \brief Initialization function for creating the necessary structures.
    *
-   * \param[in] _tInfo
-   *   the underlying schema to use
+   * \param[in] _tName
+   *   the name of the table
+   * \param[in] _columns
+   *   a list of column name and type pairs
+   * \param[in] _bdccInfo
+   *   a mapping of column ids to number of BDCC bits to use
    ***************************************************************************/
   void init(const std::string& _tName, const ColumnInitList& _columns, const ColumnIntMap& _bdccInfo) {
     this->root = make_persistent<struct root>();
-    this->root->tInfo = make_persistent<TableInfo>(_tName, _columns);
+    this->root->tInfo = make_persistent<PTableInfo>(_tName, _columns);
     this->root->bdccInfo = make_persistent<BDCCInfo>(_bdccInfo);
-    this->root->index = make_persistent<examples::ctree_map_p<KeyType, persistent_ptr<nvm::PTuple<Tuple>>>>();
+    this->root->index = make_persistent<IndexType>();
+    this->root->block_list = make_persistent<struct nvm_block>();
+    auto block_ptr = make_persistent<nvm::NVM_Block>(initBlock(0, ((1L << this->root->bdccInfo->numBins) - 1)));
+    this->root->block_list->block = block_ptr;
+  }
+
+  /************************************************************************//**
+   * \brief Initialization function for creating the necessary structures.
+   *
+   * \param[in] _tInfo
+   *   the underlying schema to use
+   * \param[in] _bdccInfo
+   *   a mapping of column ids to number of BDCC bits to use
+   ***************************************************************************/
+  void init(const TableInfo& _tInfo, const ColumnIntMap& _bdccInfo) {
+    this->root = make_persistent<struct root>();
+    this->root->tInfo = make_persistent<PTableInfo>(_tInfo);
+    this->root->bdccInfo = make_persistent<BDCCInfo>(_bdccInfo);
+    this->root->index = make_persistent<IndexType>();
     this->root->block_list = make_persistent<struct nvm_block>();
     auto block_ptr = make_persistent<nvm::NVM_Block>(initBlock(0, ((1L << this->root->bdccInfo->numBins) - 1)));
     this->root->block_list->block = block_ptr;
@@ -755,8 +852,8 @@ private:
         fspace -= record_size;
 
         /* Insert into index structure */
-        auto ptp = make_persistent<PTuple<Tuple>>(b, pTupleOffsets);
-        root->index->insert_new( key, ptp );
+        //auto ptp = make_persistent<PTuple<Tuple>>(b, pTupleOffsets);
+        root->index->insert( key, PTuple<Tuple>(b, pTupleOffsets) );
       }); /* end of transaction */
 
     } catch (std::exception& e) {
@@ -957,12 +1054,12 @@ private:
         //get bin
         int x = 0;
         if (value.type() == typeid(std::string)) {
-          x = *reinterpret_cast<const int*>(boost::get<std::string>(value).c_str())
+          x = *reinterpret_cast<const int*>(boost::relaxed_get<std::string>(value).c_str())
               & ((1L << nBits) - 1);
         } else if (value.type() == typeid(int)) {
-          x = boost::get<int>(value) & ((1L << nBits) - 1);
+          x = boost::relaxed_get<int>(value) & ((1L << nBits) - 1);
         } else if (value.type() == typeid(double)) {
-          x = static_cast<int>(boost::get<double>(value)) & ((1L << nBits) - 1);
+          x = static_cast<int>(boost::relaxed_get<double>(value)) & ((1L << nBits) - 1);
         }
         dimsBDCC[dimCnt] = std::make_pair(nBits, std::bitset<32>(x));
         bdccSize += nBits;

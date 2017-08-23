@@ -48,23 +48,3 @@ int PTableInfo::findColumnByName(const std::string& colName) const {
   }
   return -1;
 }
-
-std::ostream& operator<<(std::ostream& os, pfabric::nvm::ColumnInfo::ColumnType ct) {
-  using namespace pfabric::nvm;
-
-  switch (ct) {
-    case ColumnInfo::Void_Type:
-      os << "";
-      break;
-    case ColumnInfo::Int_Type:
-      os << "int";
-      break;
-    case ColumnInfo::Double_Type:
-      os << "double";
-      break;
-    case ColumnInfo::String_Type:
-      os << "std::string";
-      break;
-  }
-  return os;
-}

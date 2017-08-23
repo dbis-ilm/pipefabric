@@ -1,46 +1,65 @@
-/*
- * Copyright (c) 2014-17 The PipeFabric team,
- *                       All Rights Reserved.
- *
- * This file is part of the PipeFabric package.
- *
- * PipeFabric is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License (GPL) as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This package is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; see the file LICENSE.
- * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
- */
-
 #ifndef TableInfo_hpp_
 #define TableInfo_hpp_
 
-#if defined(USE_NVML_TABLE)
-
-#include "nvm/PTableInfo.hpp"
-
-namespace pfabric {
-using TableInfo = pfabric::nvm::PTableInfo;
-using ColumnInfo = pfabric::nvm::ColumnInfo;
-}
-
-#else
-
-#include <table/VTableInfo.hpp>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace pfabric {
-using TableInfo = pfabric::VTableInfo;
-using ColumnInfo = pfabric::ColumnInfo;
+
+class ColumnInfo {
+public:
+  enum ColumnType { Void_Type, Int_Type, Double_Type, String_Type };
+
+  ColumnInfo(const std::string& n, ColumnType ct) : mColName(n), mColType(ct) {}
+
+  const std::string& getName() const { return mColName; }
+
+  const ColumnType& getType() const { return mColType; }
+
+private:
+  std::string mColName;
+  ColumnType mColType;
+};
+
+class TableInfo {
+ public:
+  typedef std::vector<ColumnInfo>::const_iterator ColumnIterator;
+
+  TableInfo() {}
+
+  TableInfo(const std::string& name, std::initializer_list<ColumnInfo> columns,
+            ColumnInfo::ColumnType keyType = ColumnInfo::Void_Type)
+      : mName(name), mColumns(columns), mKeyType(keyType) {}
+
+  TableInfo(const std::string& name) : mName(name), mColumns(), mKeyType(ColumnInfo::Void_Type) {}
+
+  const std::string& tableName() const { return mName; }
+
+  std::string typeSignature() const;
+
+  std::string generateTypeDef() const;
+
+  ColumnInfo::ColumnType typeOfKey() const { return mKeyType; }
+
+  int findColumnByName(const std::string& colName) const;
+  const ColumnInfo& columnInfo(int pos) const { return mColumns[pos]; }
+
+  void setColumns(const std::vector<ColumnInfo>& vec) { mColumns = vec; }
+
+  ColumnIterator begin() const { return mColumns.begin(); }
+  ColumnIterator end() const { return mColumns.end(); }
+
+ private:
+  std::string mName;
+  std::vector<ColumnInfo> mColumns;
+  ColumnInfo::ColumnType mKeyType;
+};
+
+typedef std::shared_ptr<TableInfo> TableInfoPtr;
 }
 
-#endif
+std::ostream& operator<<(std::ostream& os, pfabric::ColumnInfo::ColumnType ct);
 
 #endif
-

@@ -1,9 +1,9 @@
-#include <table/VTableInfo.hpp>
+#include <table/TableInfo.hpp>
 #include <sstream>
 
 using namespace pfabric;
 
-std::string VTableInfo::generateTypeDef() const {
+std::string TableInfo::generateTypeDef() const {
   std::ostringstream os;
   bool first = true;
   os << "TuplePtr<";
@@ -12,17 +12,17 @@ std::string VTableInfo::generateTypeDef() const {
       first = false;
     else
       os << ", ";
-    os << col.mColType;
+    os << col.getType();
   }
   os << ">";
   return os.str();
 }
 
-std::string VTableInfo::typeSignature() const {
+std::string TableInfo::typeSignature() const {
   std::ostringstream os;
   os << "[";
   for (auto& col : mColumns) {
-    switch (col.mColType) {
+    switch (col.getType()) {
       case ColumnInfo::Void_Type:
         os << "V";
         break;
@@ -41,9 +41,9 @@ std::string VTableInfo::typeSignature() const {
   return os.str();
 }
 
-int VTableInfo::findColumnByName(const std::string& colName) const {
+int TableInfo::findColumnByName(const std::string& colName) const {
   for (std::size_t i = 0; i < mColumns.size(); i++) {
-    if (mColumns[i].mColName == colName) return (int)i;
+    if (mColumns[i].getName() == colName) return (int)i;
   }
   return -1;
 }

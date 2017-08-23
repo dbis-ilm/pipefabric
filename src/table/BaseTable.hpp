@@ -74,7 +74,7 @@ protected:
   /**
    * Constructor for creating an empty table with a given schema.
    */
-  BaseTable(const TableInfo& tInfo) : mTableInfo(tInfo.makeShared()) {}
+  BaseTable(const TableInfo& tInfo) : mTableInfo(std::make_shared<TableInfo>(tInfo)) {}
 
 public:
   virtual ~BaseTable() {}

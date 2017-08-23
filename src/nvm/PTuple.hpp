@@ -128,7 +128,7 @@ struct get_helper {
  *****************************************************************************/
 template<std::size_t ID>
 struct get_helper<std::string, ID> {
-  static char (&( apply(persistent_ptr<NVM_Block> block, const uint16_t *offsets)))[] {
+  static std::string apply(persistent_ptr<NVM_Block> block, const uint16_t *offsets) {
     return reinterpret_cast<char (&)[]>(block->at(offsets[ID]));
   }
 };
@@ -142,9 +142,9 @@ struct get_helper<std::string, ID> {
  *   the index of the requested attribute
  *****************************************************************************/
 template<std::size_t ID>
-struct get_helper<int32_t, ID> {
-  static int32_t& apply(persistent_ptr<NVM_Block> block, const uint16_t *offsets) {
-    return reinterpret_cast<int32_t&>(block->at(offsets[ID]));
+struct get_helper<int, ID> {
+  static int apply(persistent_ptr<NVM_Block> block, const uint16_t *offsets) {
+    return reinterpret_cast<int&>(block->at(offsets[ID]));
   }
 };
 
@@ -158,8 +158,56 @@ struct get_helper<int32_t, ID> {
  *****************************************************************************/
 template<std::size_t ID>
 struct get_helper<double, ID> {
-  static double& apply(persistent_ptr<NVM_Block> block, const uint16_t *offsets) {
+  static double apply(persistent_ptr<NVM_Block> block, const uint16_t *offsets) {
     return reinterpret_cast<double&>(block->at(offsets[ID]));
+  }
+};
+
+/**************************************************************************//**
+ * \brief getAll_helper is a helper function to add all attributes of a PTuple
+ *        to a passed TuplePtr instance.
+ *
+ * \tparam Tuple
+ *   the underlying and desired Tuple type of the PTuple
+ * \tparam CurrentIndex
+ *   the index of the attribute to set next
+ *****************************************************************************/
+template<class Tuple, std::size_t CurrentIndex>
+struct getAll_helper;
+
+/**************************************************************************//**
+ * \brief General overload for setting Tuples with more than 1 element to add.
+ *
+ * This specialization will add the remaining elements first and then set the
+ * current attribute value.
+ *
+ * \tparam Tuple
+ *   the underlying and desired Tuple type of the PTuple
+ * \tparam CurrentIndex
+ *   the index of the attribute to add next
+ *****************************************************************************/
+template<class Tuple, std::size_t CurrentIndex>
+struct getAll_helper {
+  static void apply(SmartPtr<Tuple> tptr, persistent_ptr<NVM_Block> block, const uint16_t* const offsets) {
+    getAll_helper<Tuple, CurrentIndex - 1>::apply(tptr, block, offsets);
+    auto val = get_helper<typename Tuple::template getAttributeType<CurrentIndex-1>::type, CurrentIndex - 1>::apply(block, offsets);
+    tptr->template setAttribute<CurrentIndex-1>(val);
+  }
+};
+
+/**************************************************************************//**
+ * \brief Specialization for setting the first attribute.
+ *
+ * This specialization will just set the first attribute value.
+ *
+ * \tparam Tuple
+ *    the underlying tuple type having one element
+ *****************************************************************************/
+template<class Tuple>
+struct getAll_helper<Tuple, 1> {
+  static void apply(SmartPtr<Tuple> tptr, persistent_ptr<NVM_Block> block, const uint16_t* const offsets) {
+    auto val = get_helper<typename Tuple::template getAttributeType<0>::type, 0>::apply(block, offsets);
+    tptr->template setAttribute<0>(val);
   }
 };
 
@@ -194,7 +242,8 @@ template<class Tuple, std::size_t CurrentIndex>
 struct PTuplePrinter {
   static void print(std::ostream& os, persistent_ptr<NVM_Block> block, const uint16_t* offsets) {
     PTuplePrinter<Tuple, CurrentIndex - 1>::print(os, block, offsets);
-    os << "," << get_helper<typename Tuple::template getAttributeType<CurrentIndex-1>::type, CurrentIndex - 1>::apply(block, offsets);
+    auto val = get_helper<typename Tuple::template getAttributeType<CurrentIndex-1>::type, CurrentIndex - 1>::apply(block, offsets);
+    os << "," << val;
   }
 };
 
@@ -226,7 +275,6 @@ struct PTuplePrinter<Tuple, 0> {
   static void print(std::ostream& os, persistent_ptr<NVM_Block> block, const uint16_t* offsets) {
   }
 };
-
 
 } /* end namespace detail */
 
@@ -260,6 +308,7 @@ struct PTuplePrinter<Tuple, 0> {
 template<class Tuple>
 class PTuple {
 public:
+
   /************************************************************************//**
    * \brief the number of attributes for this tuple type.
    ***************************************************************************/
@@ -291,6 +340,8 @@ public:
       block(_block), offsets(_offsets) {
   }
 
+  PTuple() : block(nullptr), offsets(std::array<uint16_t, Tuple::NUM_ATTRIBUTES>()) {}
+
   /************************************************************************//**
    * \brief Get a specific attribute value from the persistent tuple.
    *
@@ -300,8 +351,10 @@ public:
    *   a reference to the persistent tuple's attribute with the requested \c ID
    ***************************************************************************/
   template<std::size_t ID>
-  inline auto getAttribute() {
-    return detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets.get_ro().data());
+  typename getAttributeType< ID >::type& getAttribute() {
+    auto val = new typename getAttributeType<ID>::type;
+    *val = detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets.get_ro().data());
+    return *val;
   }
 
   /************************************************************************//**
@@ -326,7 +379,7 @@ public:
    *   a reference to the persistent tuple's attribute with the requested \c ID
    ***************************************************************************/
   template<std::size_t ID>
-  inline auto getAttribute() const {
+  const typename getAttributeType< ID >::type& getAttribute() const {
     return detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets.get_ro().data());
   }
 
@@ -353,14 +406,30 @@ public:
     detail::PTuplePrinter<Tuple, NUM_ATTRIBUTES>::print(os, block, offsets.get_ro().data());
   }
 
+  /************************************************************************//**
+   * \brief Create a new Tuple from this PTuple and return a pointer to it.
+   *
+   * \return
+   *   a smart pointer to the newly created Tuple
+   ***************************************************************************/
+  SmartPtr<Tuple> createTuple() const {
+    typename Tuple::Base tp{};
+    SmartPtr<Tuple> tptr(new Tuple(tp));
+    detail::getAll_helper<Tuple, NUM_ATTRIBUTES>::apply(tptr, block, offsets.get_ro().data());
+    return tptr;
+  }
+
 private:
 
   persistent_ptr<NVM_Block> block;
   p<std::array<uint16_t, NUM_ATTRIBUTES>> offsets;
 
-}; /* class PTuplePtr */
+}; /* class PTuple */
 
 } /* end namespace nvm */
+
+template<class Tuple>
+using PTuplePtr = persistent_ptr<nvm::PTuple<Tuple>>;
 
 /**************************************************************************//**
  * \brief Get a specific attribute reference from the PTuple.

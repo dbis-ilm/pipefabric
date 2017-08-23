@@ -269,6 +269,7 @@ set(core_sources
   dsl/Topology.cpp
   dsl/Dataflow.cpp
   dsl/PFabricContext.cpp
+  table/TableInfo.cpp
   ${ZEROMQ_SOURCES}
   # we need this as dependency to download the sources from github
   ${THIRD_PARTY_DIR}/json
@@ -296,11 +297,6 @@ if(USE_NVML_TABLE)
     ${core_sources}
     nvm/PTableInfo.cpp
     ${THIRD_PARTY_DIR}/nvml
-  )
-else()
-  set(core_sources
-    ${core_sources}
-    nvm/VTableInfo.cpp
   )
 endif()
 
