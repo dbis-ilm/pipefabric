@@ -149,6 +149,8 @@ public:
       return std::shared_ptr<Table<RecordType, KeyType>>();
   }
 
+  bool tableExists(const std::string& tblName) const;
+
   TableInfoPtr getTableInfo(const std::string& tblName);
 
   /**

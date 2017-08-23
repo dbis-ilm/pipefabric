@@ -371,14 +371,17 @@ class Pipe {
    *      the type of the window (row or range)
    * @param[in] sz
    *      the window size (in number of tuples for row window or in milliseconds
-   * for range
+   *      for range
    *      windows)
+   * @param[in] windowFunc
+   *      optional function applied on each incoming tuple
    * @param[in] ei
    *      the eviction interval, i.e., time for triggering the eviction (in
-   * milliseconds)
+   *      milliseconds)
    * @return a new pipe
    */
   Pipe<T> slidingWindow(const WindowParams::WinType& wt, const unsigned int sz,
+                        typename Window<T>::WindowOpFunc windowFunc = nullptr,
                         const unsigned int ei = 0) throw(TableException) {
     typedef typename Window<T>::TimestampExtractorFunc ExtractorFunc;
     ExtractorFunc fn;
@@ -392,9 +395,9 @@ class Pipe {
         if (wt == WindowParams::RangeWindow) {
           // a range window requires a timestamp extractor
           fn = boost::any_cast<ExtractorFunc>(timestampExtractor);
-          op = std::make_shared<SlidingWindow<T>>(fn, wt, sz, ei);
+          op = std::make_shared<SlidingWindow<T>>(fn, wt, sz, windowFunc, ei);
         } else
-          op = std::make_shared<SlidingWindow<T>>(wt, sz, ei);
+          op = std::make_shared<SlidingWindow<T>>(wt, sz, windowFunc, ei);
         auto iter = addPublisher<SlidingWindow<T>, DataSource<T>>(op);
         return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor,
                        partitioningState, numPartitions);
@@ -404,11 +407,11 @@ class Pipe {
           // a range window requires a timestamp extractor
           fn = boost::any_cast<ExtractorFunc>(timestampExtractor);
           for (auto i = 0u; i < numPartitions; i++) {
-            ops.push_back(std::make_shared<SlidingWindow<T>>(fn, wt, sz, ei));
+            ops.push_back(std::make_shared<SlidingWindow<T>>(fn, wt, sz, windowFunc, ei));
           }
         } else {
           for (auto i = 0u; i < numPartitions; i++) {
-            ops.push_back(std::make_shared<SlidingWindow<T>>(wt, sz, ei));
+            ops.push_back(std::make_shared<SlidingWindow<T>>(wt, sz, windowFunc, ei));
           }
         }
         auto iter = addPartitionedPublisher<SlidingWindow<T>, T>(ops);
@@ -433,13 +436,14 @@ class Pipe {
    *      the type of the window (row or range)
    * @param[in] sz
    *      the window size (in number of tuples for row window or in
-   * milliseconds
-   * for range
-   *      windows)
+   *      milliseconds for range windows)
+   * @param[in] windowFunc
+   *      optional function applied on each incoming tuple
    * @return a new pipe
    */
   Pipe<T> tumblingWindow(const WindowParams::WinType& wt,
-                         const unsigned int sz) throw(TableException) {
+                         const unsigned int sz,
+                         typename Window<T>::WindowOpFunc windowFunc = nullptr) throw(TableException) {
     typedef typename Window<T>::TimestampExtractorFunc ExtractorFunc;
     ExtractorFunc fn;
 
@@ -450,9 +454,9 @@ class Pipe {
         if (wt == WindowParams::RangeWindow) {
           // a range window requires a timestamp extractor
           fn = boost::any_cast<ExtractorFunc>(timestampExtractor);
-          op = std::make_shared<TumblingWindow<T>>(fn, wt, sz);
+          op = std::make_shared<TumblingWindow<T>>(fn, wt, sz, windowFunc);
         } else
-          op = std::make_shared<TumblingWindow<T>>(wt, sz);
+          op = std::make_shared<TumblingWindow<T>>(wt, sz, windowFunc);
         auto iter = addPublisher<TumblingWindow<T>, DataSource<T>>(op);
         return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor,
                        partitioningState, numPartitions);
@@ -462,11 +466,11 @@ class Pipe {
           // a range window requires a timestamp extractor
           fn = boost::any_cast<ExtractorFunc>(timestampExtractor);
           for (auto i = 0u; i < numPartitions; i++) {
-            ops.push_back(std::make_shared<TumblingWindow<T>>(fn, wt, sz));
+            ops.push_back(std::make_shared<TumblingWindow<T>>(fn, wt, sz, windowFunc));
           }
         } else {
           for (auto i = 0u; i < numPartitions; i++) {
-            ops.push_back(std::make_shared<TumblingWindow<T>>(wt, sz));
+            ops.push_back(std::make_shared<TumblingWindow<T>>(wt, sz, windowFunc));
           }
         }
         auto iter = addPartitionedPublisher<TumblingWindow<T>, T>(ops);
