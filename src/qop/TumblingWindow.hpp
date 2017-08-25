@@ -55,10 +55,12 @@ namespace pfabric {
      * @param func a function for extracting the timestamp value from the stream element
      * @param wt the type of the window (range or row)
      * @param sz the window size (seconds or number of tuples)
+     * @param windowFunc optional function for modifying incoming tuples
      */
     TumblingWindow(typename Window<StreamElement>::TimestampExtractorFunc func,
-                   const WindowParams::WinType& wt, const unsigned int sz ) :
-    WindowBase(func, wt, sz, sz ) {
+                   const WindowParams::WinType& wt, const unsigned int sz,
+                   typename Window<StreamElement>::WindowOpFunc windowFunc = nullptr) :
+    WindowBase(func, wt, sz, windowFunc ) {
       if( this->mWinType == WindowParams::RowWindow ) {
         this->mEvictFun = std::bind(&TumblingWindow::evictByCount, this);
       }
@@ -72,9 +74,11 @@ namespace pfabric {
      *
      * @param wt the type of the window (range or row)
      * @param sz the window size (seconds or number of tuples)
+     * @param windowFunc optional function for modifying incoming tuples
      */
-    TumblingWindow(const WindowParams::WinType& wt, const unsigned int sz ) :
-    WindowBase(wt, sz, sz ) {
+    TumblingWindow(const WindowParams::WinType& wt, const unsigned int sz,
+    typename Window<StreamElement>::WindowOpFunc windowFunc = nullptr) :
+    WindowBase(wt, sz, windowFunc ) {
       if( this->mWinType == WindowParams::RowWindow ) {
         this->mEvictFun = std::bind(&TumblingWindow::evictByCount, this);
       }
@@ -126,19 +130,42 @@ namespace pfabric {
         return;
       }
       else {
-        // insert the tuple into buffer
-        {
-          std::lock_guard<std::mutex> guard(this->mMtx);
-          this->mTupleBuf.push_back(data);
-          this->mCurrSize++;
-        }
+        // if function available
+        if(this->mWindowOpFunc != nullptr) {
+          // insert the tuple into buffer
+          { //necessary for lock scope!
+            std::lock_guard<std::mutex> guard(this->mMtx);
+            this->mTupleBuf.push_back(data);
+            this->mCurrSize++;
+          }
+
+          // apply function on tuple
+          auto res = this->mWindowOpFunc(this->mTupleBuf.begin(),
+            this->mTupleBuf.end(), data);
 
         //forward the incoming tuple
-        this->getOutputDataChannel().publish(data, outdated);
+          this->getOutputDataChannel().publish(res, outdated);
 
-        // check for outdated tuples
-        if (!this->mEvictThread) {
-          this->mEvictFun();
+          // check for outdated tuples
+          if (!this->mEvictThread) {
+            this->mEvictFun();
+          }
+
+        } else {
+          // insert the tuple into buffer
+          { //necessary for lock scope!
+            std::lock_guard<std::mutex> guard(this->mMtx);
+            this->mTupleBuf.push_back(data);
+            this->mCurrSize++;
+          }
+
+          //forward the incoming tuple
+          this->getOutputDataChannel().publish(data, outdated);
+
+          // check for outdated tuples
+          if (!this->mEvictThread) {
+            this->mEvictFun();
+          }
         }
       }
     }

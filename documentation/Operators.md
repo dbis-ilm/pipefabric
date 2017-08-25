@@ -326,11 +326,12 @@ auto s = t.newStreamFromFile("data.csv")
 
 #### slidingWindow ####
 
-`Pipe<T> Pipe::slidingWindow(WindowParams::WinType wt, unsigned int sz, unsigned int ei)`
+`Pipe<T> Pipe::slidingWindow(WindowParams::WinType wt, unsigned int sz, WindowOpFunc windowFunc, unsigned int ei)`
 
 This operator defines a sliding window of the given type and size on the stream. The window type `wt` can be 
-row (count-based) or range (time-based) for which `sz` specifies the size (in tuples or milliseconds). 
-In case of a range (time-based) window the `assignTimestamps` operator has to defined before on the stream. 
+row (count-based) or range (time-based) for which `sz` specifies the size (in tuples or milliseconds).
+In case of a range (time-based) window the `assignTimestamps` operator has to defined before on the stream.
+The optional `windowFunc` parameter can be used with a lambda function to modify each incoming tuple of the window.
 The optional parameter `ei` denotes the eviction interval, i.e. the time interval (in milliseconds) for
 for triggering the eviction of tuples from the window.
 In the following example a time-based sliding window of 60 seconds is created. The timestamp of the tuples is
@@ -347,10 +348,11 @@ auto s = s.createStreamFromFile()
 
 #### tumblingWindow ####
 
-`Pipe<T> Pipe::tumblingWindow(WindowParams::WinType wt, unsigned int sz)`
+`Pipe<T> Pipe::tumblingWindow(WindowParams::WinType wt, unsigned int sz, WindowOpFunc windowFunc)`
 
-The `tumblingWindow` operator creates a row or range-based tumbling window of the given size `sz`. In 
-contrast to a sliding window a tumbling window invalidates all tuples as soon as the window is completely
+The `tumblingWindow` operator creates a row or range-based tumbling window of the given size `sz`.
+The optional `windowFunc` parameter can be used with a lambda function to modify each incoming tuple of the window.
+In contrast to a sliding window a tumbling window invalidates all tuples as soon as the window is completely
 filled - either by its size (row) or time difference of the oldest and most recent tuple. As in 
 `slidingWindow` a range-based window requires to specify the timestamp column with `assignTimestamps`.
 The following example code creates  tumbling window that outdates the tuples after every 100 processed

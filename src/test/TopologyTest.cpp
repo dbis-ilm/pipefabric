@@ -340,7 +340,7 @@ TEST_CASE("Tuplifying a stream of RDF strings", "[Tuplifier]") {
   Topology t;
   auto s = t.newStreamFromFile(std::string(TEST_DATA_DIRECTORY) + "tuplifier_test1.in")
     .extract<Triple>(',')
-    .tuplify<RDFTuple>({ "http://data.org/name", "http://data.org/price", "http://data.org/someOther" }, 
+    .tuplify<RDFTuple>({ "http://data.org/name", "http://data.org/price", "http://data.org/someOther" },
         TuplifierParams::ORDERED)
     .notify([&](auto tp, bool outdated) {
       std::lock_guard<std::mutex> lock(r_mutex);
@@ -348,4 +348,65 @@ TEST_CASE("Tuplifying a stream of RDF strings", "[Tuplifier]") {
     });
   t.start(false);
   REQUIRE(results.size() == 3);
+}
+
+TEST_CASE("Using a window with and without additional function", "[Window]") {
+  typedef TuplePtr<int, std::string, double> T1;
+  typedef TuplePtr<int> T2;
+  typedef Aggregator1<T1, AggrSum<double>, 2> AggrStateSum;
+
+  TestDataGenerator tgen("file.csv");
+  tgen.writeData(10);
+
+  std::stringstream strm;
+  std::string expected = "0.5\n101\n301.5\n601.5\n901.5\n1201.5\n1501.5\n1801.5\n2101.5\n2401.5\n";
+
+  Topology t1;
+  auto s1 = t1.newStreamFromFile("file.csv")
+    .extract<T1>(',')
+    .slidingWindow(WindowParams::RowWindow, 3)
+    .aggregate<AggrStateSum>()
+    .print(strm);
+
+  t1.start(false);
+  REQUIRE(strm.str() == expected);
+
+  std::stringstream strm2;
+  expected = "1.5\n103\n304.5\n604.5\n904.5\n1204.5\n1504.5\n1804.5\n2104.5\n2404.5\n";
+
+  //just increment incoming tuples double-attribute by one
+  auto winFunc = [](auto beg, auto end, auto tp) { get<2>(tp)++; return tp; };
+
+  Topology t2;
+  auto s2 = t2.newStreamFromFile("file.csv")
+    .extract<T1>(',')
+    .slidingWindow(WindowParams::RowWindow, 3, winFunc)
+    .aggregate<AggrStateSum>()
+    .print(strm2);
+
+  t2.start(false);
+  REQUIRE(strm2.str() == expected);
+
+  std::stringstream strm3;
+  expected = "0\n1\n1\n2\n2\n3\n4\n5\n6\n7\n";
+
+  //find median of ints
+  auto winFuncMedian = [](auto beg, auto end, auto tp) {
+    std::vector<int> winInts(0);
+    for(auto it=beg; it!=end; ++it) {
+      winInts.push_back(get<0>(*it));
+    }
+    std::sort(winInts.begin(), winInts.end());
+    return makeTuplePtr(winInts[winInts.size()/2]);
+  };
+
+  Topology t3;
+  auto s3 = t3.newStreamFromFile("file.csv")
+    .extract<T1>(',')
+    .map<T2>([](auto tp, bool outdated) -> T2 { return makeTuplePtr(get<0>(tp)); })
+    .slidingWindow(WindowParams::RowWindow, 5, winFuncMedian)
+    .print(strm3);
+
+  t3.start(false);
+  REQUIRE(strm3.str() == expected);
 }
