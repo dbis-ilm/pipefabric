@@ -21,9 +21,6 @@
 #ifndef SHJoin_hpp_
 #define SHJoin_hpp_
 
-#include <boost/core/ignore_unused.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/lock_guard.hpp>
 #include <boost/unordered/unordered_map.hpp>
 
 #include "qop/BinaryTransform.hpp"
@@ -82,12 +79,6 @@ namespace pfabric {
       /// the join algorithm to be used for concatenating the input elements
       typedef ElementJoinTraits< ElementJoinImpl > ElementJoin;
 
-      /// a mutex for protecting join processing from concurrent sources
-      typedef boost::mutex JoinMutex;
-
-      /// a scoped lock for the mutex
-      typedef boost::lock_guard< JoinMutex > Lock;
-
 
     public:
 
@@ -139,11 +130,10 @@ namespace pfabric {
        *    flag indicating whether the tuple is new or invalidated now
        */
       void processLeftDataElement( const LeftInputStreamElement& left, const bool outdated ) {
-        Lock lock( mMtx );
 
         // 1. insert the tuple in the corresponding hash table or remove it if outdated
         auto keyval = mLKeyExtractor( left );
-        updateHashTable( mLTable, keyval, left, outdated, lock );
+        updateHashTable( mLTable, keyval, left, outdated);
 
         // 2. find join partners in the other hash table
         auto rightEqualElements = mRTable.equal_range(keyval);
@@ -165,11 +155,10 @@ namespace pfabric {
        *    flag indicating whether the tuple is new or invalidated now
        */
       void processRightDataElement( const RightInputStreamElement& right, const bool outdated ) {
-        Lock lock( mMtx );
 
         // 1. insert the tuple in the corresponding hash table or remove it if outdated
         auto keyval = mRKeyExtractor( right );
-        updateHashTable( mRTable, keyval, right, outdated, lock );
+        updateHashTable( mRTable, keyval, right, outdated);
 
         // 2. find join partners in the other hash table
         auto leftEqualElements = mLTable.equal_range( keyval );
@@ -215,8 +204,7 @@ namespace pfabric {
       typename StreamElement
       >
       static void updateHashTable( HashTable& hashTable, const key_t& key,
-                                  const StreamElement& newElement, const bool outdated, const Lock& lock ) {
-        boost::ignore_unused( lock );
+                                  const StreamElement& newElement, const bool outdated) {
 
         if( !outdated ) {
           hashTable.insert( { key, newElement });
@@ -268,7 +256,6 @@ namespace pfabric {
       JoinPredicateFunc mJoinPredicate; //< a pointer to the function implementing the join predicate
       LKeyExtractorFunc mLKeyExtractor;         //< hash function for the lhs stream
       RKeyExtractorFunc mRKeyExtractor;         //< hash function for the rhs stream
-      mutable JoinMutex mMtx;           //< mutex for synchronizing access to the hash tables
     };
 
 } /* end namespace pfabric */
