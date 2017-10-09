@@ -30,6 +30,7 @@
 
 #include "core/PFabricTypes.hpp"
 #include "core/Tuple.hpp"
+#include "nvm/DataNode.hpp"
 
 #include "nvml/include/libpmemobj++/persistent_ptr.hpp"
 
@@ -39,53 +40,6 @@ using nvml::obj::p;
 namespace pfabric {
 
 namespace nvm {
-
-//TODO: Find a more suitable position for these constants
-/* Positions in NVM_Block */
-const int gDDCRangePos1  =  0;
-const int gDDCRangePos2  =  4;
-const int gCountPos      =  8;
-const int gFreeSpacePos  = 12;
-const int gSmaOffsetPos  = 14;
-const int gDataOffsetPos = 16;
-
-/* Sizes/Lengths in NVM_Block */
-const int gFixedHeaderSize = 14;
-const int gDDCValueSize    =  4;
-const int gAttrOffsetSize  =  4;
-const int gOffsetSize      =  2;
-
-/** The size of a single block in persistent memory */
-static constexpr uint16_t gBlockSize = 1 << 15; // 32KB
-
-/**
- * \brief This type represents a byte array used for persistent structures.
- *
- * A NVM_Block is a PAX oriented data block with the following structure for 32KB:
- * <ddc_range><ddc_cnt><sma_offset_0><data_offset_0> ...<sma_offset_n><data_offset_n>
- * <sma_min_0><sma_max_0><data_vector_0> ... <sma_min_n><sma_max_n><data_vector_n>
- *  0 ddc_range          -> long (x2) - 8 Byte
- *  8 ddc_cnt            -> long - 4 Byte
- * 12 free_space         -> unsigned short
- * for each attribute:
- * 14 sma_offset_x       -> unsigned short - 2 Byte (depends on block size)
- * 16 data_offset_x      -> unsigned short
- * ...
- *
- * for each attribute (int, double):
- *  . sma_min_x          -> size of attributes data type
- *  . sma_max_x          -> size of attributes data type
- *  . data_vector        -> size of attributes data type * ddc_cnt
- *  ...
- *
- * for each attribute (string - data starts at the end of the minipage):
- *  . sma_min_offset_x   -> unsigned short
- *  . sma_max_offset_x   -> unsigned short
- *  . data_offset_vector -> unsigned short * ddc_cnt
- *  . ...
- *  . data               -> size of all strings + ddc_cnt (Nul termination)
- */
-typedef typename std::array<uint8_t, gBlockSize> NVM_Block;
 
 namespace detail {
 
@@ -110,7 +64,7 @@ struct get_helper;
  *****************************************************************************/
 template<typename T, std::size_t ID>
 struct get_helper {
-  static T apply(persistent_ptr<NVM_Block> block, const uint16_t *offsets) {
+  static T apply(persistent_ptr<BDCC_Block> block, const uint16_t *offsets) {
     T val;
     uint8_t* ptr = reinterpret_cast<uint8_t*>(&val);
     std::copy(block->begin() + offsets[ID], block->begin() + offsets[ID] + sizeof(T), ptr);
@@ -128,7 +82,7 @@ struct get_helper {
  *****************************************************************************/
 template<std::size_t ID>
 struct get_helper<std::string, ID> {
-  static std::string apply(persistent_ptr<NVM_Block> block, const uint16_t *offsets) {
+  static std::string apply(persistent_ptr<BDCC_Block> block, const uint16_t *offsets) {
     return reinterpret_cast<char (&)[]>(block->at(offsets[ID]));
   }
 };
@@ -143,7 +97,7 @@ struct get_helper<std::string, ID> {
  *****************************************************************************/
 template<std::size_t ID>
 struct get_helper<int, ID> {
-  static int apply(persistent_ptr<NVM_Block> block, const uint16_t *offsets) {
+  static int apply(persistent_ptr<BDCC_Block> block, const uint16_t *offsets) {
     return reinterpret_cast<int&>(block->at(offsets[ID]));
   }
 };
@@ -158,7 +112,7 @@ struct get_helper<int, ID> {
  *****************************************************************************/
 template<std::size_t ID>
 struct get_helper<double, ID> {
-  static double apply(persistent_ptr<NVM_Block> block, const uint16_t *offsets) {
+  static double apply(persistent_ptr<BDCC_Block> block, const uint16_t *offsets) {
     return reinterpret_cast<double&>(block->at(offsets[ID]));
   }
 };
@@ -188,7 +142,7 @@ struct getAll_helper;
  *****************************************************************************/
 template<class Tuple, std::size_t CurrentIndex>
 struct getAll_helper {
-  static void apply(SmartPtr<Tuple> tptr, persistent_ptr<NVM_Block> block, const uint16_t* const offsets) {
+  static void apply(SmartPtr<Tuple> tptr, persistent_ptr<BDCC_Block> block, const uint16_t* const offsets) {
     getAll_helper<Tuple, CurrentIndex - 1>::apply(tptr, block, offsets);
     auto val = get_helper<typename Tuple::template getAttributeType<CurrentIndex-1>::type, CurrentIndex - 1>::apply(block, offsets);
     tptr->template setAttribute<CurrentIndex-1>(val);
@@ -205,7 +159,7 @@ struct getAll_helper {
  *****************************************************************************/
 template<class Tuple>
 struct getAll_helper<Tuple, 1> {
-  static void apply(SmartPtr<Tuple> tptr, persistent_ptr<NVM_Block> block, const uint16_t* const offsets) {
+  static void apply(SmartPtr<Tuple> tptr, persistent_ptr<BDCC_Block> block, const uint16_t* const offsets) {
     auto val = get_helper<typename Tuple::template getAttributeType<0>::type, 0>::apply(block, offsets);
     tptr->template setAttribute<0>(val);
   }
@@ -240,7 +194,7 @@ struct PTuplePrinter;
  *****************************************************************************/
 template<class Tuple, std::size_t CurrentIndex>
 struct PTuplePrinter {
-  static void print(std::ostream& os, persistent_ptr<NVM_Block> block, const uint16_t* offsets) {
+  static void print(std::ostream& os, persistent_ptr<BDCC_Block> block, const uint16_t* offsets) {
     PTuplePrinter<Tuple, CurrentIndex - 1>::print(os, block, offsets);
     auto val = get_helper<typename Tuple::template getAttributeType<CurrentIndex-1>::type, CurrentIndex - 1>::apply(block, offsets);
     os << "," << val;
@@ -257,7 +211,7 @@ struct PTuplePrinter {
  *****************************************************************************/
 template<class Tuple>
 struct PTuplePrinter<Tuple, 1> {
-  static void print(std::ostream& os, persistent_ptr<NVM_Block> block, const uint16_t* offsets) {
+  static void print(std::ostream& os, persistent_ptr<BDCC_Block> block, const uint16_t* offsets) {
     os << get_helper<typename Tuple::template getAttributeType<0>::type, 0>::apply(block, offsets);
   }
 };
@@ -272,7 +226,7 @@ struct PTuplePrinter<Tuple, 1> {
  *****************************************************************************/
 template<class Tuple>
 struct PTuplePrinter<Tuple, 0> {
-  static void print(std::ostream& os, persistent_ptr<NVM_Block> block, const uint16_t* offsets) {
+  static void print(std::ostream& os, persistent_ptr<BDCC_Block> block, const uint16_t* offsets) {
   }
 };
 
@@ -286,7 +240,7 @@ struct PTuplePrinter<Tuple, 0> {
  * attributes of the tuple within the \c block.
  *
  * \code
- * persistent_ptr<NVM_Block> block;
+ * persistent_ptr<BDCC_Block> block;
  * std::vector<uint16_t> tupleOffsets;
  *
  * // Insert into block and save the offsets ...
@@ -322,7 +276,7 @@ public:
    ***************************************************************************/
   template<AttributeIdx ID>
   struct getAttributeType {
-    typedef typename Tuple::template getAttributeType<ID>::type type;
+    using type = typename Tuple::template getAttributeType<ID>::type;
   };
 
   /************************************************************************//**
@@ -336,7 +290,7 @@ public:
    * \param[in] _offsets
    *   the offsets for each tuple element
    ***************************************************************************/
-  PTuple(persistent_ptr<NVM_Block> _block, std::array<uint16_t, NUM_ATTRIBUTES> _offsets) :
+  PTuple(persistent_ptr<BDCC_Block> _block, std::array<uint16_t, NUM_ATTRIBUTES> _offsets) :
       block(_block), offsets(_offsets) {
   }
 
@@ -421,7 +375,7 @@ public:
 
 private:
 
-  persistent_ptr<NVM_Block> block;
+  persistent_ptr<BDCC_Block> block;
   p<std::array<uint16_t, NUM_ATTRIBUTES>> offsets;
 
 }; /* class PTuple */
@@ -481,14 +435,5 @@ std::ostream& operator<<(std::ostream& os, pfabric::nvm::PTuple<Tuple>& ptp) {
   ptp.print(os);
   return os;
 }
-
-/*
-namespace std {
-template< std::size_t ID, typename Tuple >
-auto get( pfabric::nvm::PTuple<Tuple>& ptp ) -> decltype(ptp.template getAttribute<ID>()) {
-  return ptp.template getAttribute<ID>();
-}
-}
-*/
 
 #endif /* PTuple_hpp_ */

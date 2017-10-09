@@ -23,8 +23,6 @@
 
 #include "dsl/PFabricContext.hpp"
 #include "dsl/Topology.hpp"
-#include "table/BaseTable.hpp"
-#include "table/TableInfo.hpp"
 
 using namespace pfabric;
 

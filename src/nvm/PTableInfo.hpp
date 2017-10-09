@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "table/TableInfo.hpp"
+#include "nvm/PString.hpp"
 
 #include "nvml/include/libpmemobj++/allocator.hpp"
 #include "nvml/include/libpmemobj++/detail/persistent_ptr_base.hpp"
@@ -51,20 +52,20 @@ private:
   p<ColumnInfo::ColumnType> mColType;
 };
 
-typedef std::initializer_list<std::pair<std::string, ColumnInfo::ColumnType>> ColumnInitList;
+using ColumnInitList = std::initializer_list<std::pair<std::string, ColumnInfo::ColumnType>>;
 
 class PTableInfo {
  public:
-  typedef persistent_ptr<PTableInfo> PTableInfoPtr;
-  typedef std::vector<PColumnInfo, nvml::obj::allocator<PColumnInfo>> ColumnVector;
-  typedef ColumnVector::const_iterator ColumnIterator;
+  using PTableInfoPtr = persistent_ptr<PTableInfo>;
+  using ColumnVector = std::vector<PColumnInfo, nvml::obj::allocator<PColumnInfo>>;
+  using ColumnIterator = ColumnVector::const_iterator;
 
   PTableInfo(){}
 
-  PTableInfo(const TableInfo& _tInfo, ColumnInfo::ColumnType keyType = ColumnInfo::Void_Type)
-    : mName(_tInfo.tableName().c_str()), mKeyType(keyType){
+  PTableInfo(const TableInfo& _tInfo, ColumnInfo::ColumnType keyType = ColumnInfo::Void_Type) : mKeyType(keyType){
     auto pop = pool_by_vptr(this);
     transaction::exec_tx(pop, [&] {
+      mName.set(const_cast<std::string*>(& _tInfo.tableName()));
       mColumns = make_persistent<ColumnVector>();
       for (const auto &c : _tInfo)
         mColumns->push_back(PColumnInfo(pop, c.getName(), c.getType()));
@@ -72,10 +73,10 @@ class PTableInfo {
   }
 
   PTableInfo(const std::string& name, ColumnInitList columns,
-             ColumnInfo::ColumnType keyType = ColumnInfo::Void_Type) :
-      mName(name.c_str()), mKeyType(keyType) {
+             ColumnInfo::ColumnType keyType = ColumnInfo::Void_Type) : mKeyType(keyType) {
     auto pop = pool_by_vptr(this);
     transaction::exec_tx(pop, [&] {
+      mName.set(const_cast<std::string*>(&name));
       mColumns = make_persistent<ColumnVector>();
       for (const auto &c : columns)
         mColumns->push_back(PColumnInfo(pop, c.first, c.second));
@@ -83,15 +84,15 @@ class PTableInfo {
   }
 
   PTableInfo(const std::string& name, const ColumnVector& columns,
-             ColumnInfo::ColumnType keyType = ColumnInfo::Void_Type) :
-        mName(name.c_str()), mKeyType(keyType) {
+             ColumnInfo::ColumnType keyType = ColumnInfo::Void_Type) : mKeyType(keyType) {
     auto pop = pool_by_vptr(this);
     transaction::exec_tx(pop, [&] {
+      mName.set(const_cast<std::string*>(&name));
       mColumns = make_persistent<ColumnVector>(columns.begin(), columns.end());
     });
   }
 
-  const std::string tableName() const { return std::string(mName.get()); }
+  const std::string tableName() const { return std::string(mName.data()); }
 
   std::string typeSignature() const;
 
@@ -117,7 +118,7 @@ class PTableInfo {
     auto pop = pool_by_vptr(this);
     PTableInfoPtr tInfo_ptr = nullptr;
     transaction::exec_tx(pop, [&] {
-       tInfo_ptr = make_persistent<PTableInfo>(std::string(mName.get()), *mColumns, mKeyType.get_ro());
+       tInfo_ptr = make_persistent<PTableInfo>(std::string(mName.data()), *mColumns, mKeyType.get_ro());
     });
     return tInfo_ptr;
   }
@@ -125,14 +126,14 @@ class PTableInfo {
   ColumnIterator begin() const { return mColumns->begin(); }
   ColumnIterator end() const { return mColumns->end(); }
 
- private:
-  persistent_ptr<const char[]> mName;
+// private:
+  PString mName;
   persistent_ptr<ColumnVector> mColumns;
   p<ColumnInfo::ColumnType> mKeyType;
 };
 
 }
-typedef persistent_ptr<nvm::PTableInfo> PTableInfoPtr;
+using PTableInfoPtr = persistent_ptr<nvm::PTableInfo>;
 
 } /* namespace pfabric::nvm */
 

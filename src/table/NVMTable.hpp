@@ -40,7 +40,7 @@
 #include "fmt/format.h"
 
 #include "core/Tuple.hpp"
-#include "nvm/persistent_table.hpp"
+#include "nvm/PTable.hpp"
 #include "nvm/PTableInfo.hpp"
 #include "nvm/PTuple.hpp"
 #include "table/TableException.hpp"
@@ -119,19 +119,19 @@ namespace pfabric {
   using nvml::obj::persistent_ptr;
   using nvml::obj::pool;
   using nvml::obj::transaction;
-  using pfabric::nvm::persistent_table;
+  using pfabric::nvm::PTable;
 
 
   template<typename RecordType, typename KeyType>
   class NVMIterator {
     public:
     typedef std::function<bool(const nvm::PTuple<RecordType> &)> Predicate;
-    typedef persistent_table<RecordType, KeyType> pTable_type;
+    typedef PTable<RecordType, KeyType> PTableType;
 
     explicit NVMIterator() {
     }
 
-    explicit NVMIterator(typename pTable_type::iterator&& _iter, typename pTable_type::iterator&& _end, Predicate _pred) :
+    explicit NVMIterator(typename PTableType::iterator&& _iter, typename PTableType::iterator&& _end, Predicate _pred) :
       iter(std::move(_iter)), end(std::move(_end)), pred(_pred) {
 
       while (isValid() && !pred(*iter))
@@ -160,8 +160,8 @@ namespace pfabric {
     }
 
     protected:
-    // persistent_table Iterator
-    typename pTable_type::iterator iter, end;
+    // PTable Iterator
+    typename PTableType::iterator iter, end;
     // Selection predicate
     Predicate pred;
 
@@ -169,8 +169,8 @@ namespace pfabric {
 
   template<typename RecordType, typename KeyType>
   inline NVMIterator<RecordType, KeyType> makeNVMIterator(
-    typename persistent_table<RecordType, KeyType>::iterator&& iter,
-    typename persistent_table<RecordType, KeyType>::iterator&& end,
+    typename PTable<RecordType, KeyType>::iterator&& iter,
+    typename PTable<RecordType, KeyType>::iterator&& end,
     typename NVMIterator<RecordType, KeyType>::Predicate pred) {
       return NVMIterator<RecordType, KeyType>(std::move(iter), std::move(end), pred);
   }
@@ -191,10 +191,10 @@ namespace pfabric {
   template<typename RecordType, typename KeyType = DefaultKeyType>
   class NVMTable : public BaseTable {
     public:
-    typedef nvm::persistent_table<RecordType, KeyType> pTable_type;
+    typedef nvm::PTable<RecordType, KeyType> PTableType;
 
     struct root {
-      persistent_ptr<pTable_type> pTable;
+      persistent_ptr<PTableType> pTable;
     };
 
     //< typedef for a updater function which returns a modification of the parameter tuple
@@ -392,7 +392,7 @@ namespace pfabric {
      * @return the number of tuples
      */
     unsigned long size() const {
-      return pTable->size();
+      return pTable->count();
     }
 
     /**
@@ -417,7 +417,7 @@ namespace pfabric {
 
     void drop() {
       transaction::exec_tx(pop, [&] {
-        delete_persistent<pTable_type>(pTable);
+        delete_persistent<PTableType>(pTable);
         pTable = nullptr;
         delete_persistent<root>(q);
         q = nullptr;
@@ -438,7 +438,7 @@ namespace pfabric {
       if (access(path.c_str(), F_OK) != 0) {
         pop = pool<root>::create(path, nvm::LAYOUT, 16*1024*1024);    //, (size_t)blockSize, 0666);
         transaction::exec_tx(pop, [&] {
-          auto tbl = make_persistent<pTable_type>(tableInfo);
+          auto tbl = make_persistent<PTableType>(tableInfo);
           pop.get_root()->pTable = tbl;
         });
       } else {
@@ -469,7 +469,7 @@ namespace pfabric {
 
     pool<root> pop;
     persistent_ptr<struct root> q;
-    persistent_ptr<pTable_type> pTable;
+    persistent_ptr<PTableType> pTable;
     ObserverCallback mImmediateObservers, mDeferredObservers;
 
   }; /* class NVMTable */

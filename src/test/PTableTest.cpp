@@ -7,7 +7,7 @@
 #include "fmt/format.h"
 
 #include "nvm/BDCCInfo.hpp"
-#include "nvm/persistent_table.hpp"
+#include "nvm/PTable.hpp"
 #include "nvm/PTableInfo.hpp"
 #include "table/TableInfo.hpp"
 #include "core/Tuple.hpp"
@@ -28,14 +28,11 @@ using nvml::obj::pool;
 using nvml::obj::transaction;
 
 typedef pfabric::Tuple<int, int, string, double> MyTuple;
-typedef persistent_table<MyTuple, int> pTable_type;
+typedef PTable<MyTuple, int> PTableType;
 
-TEST_CASE("Testing storing tuples in persistent_table", "[persistent_table]") {
-  std::chrono::high_resolution_clock::time_point start, end;
-  std::vector<typename std::chrono::duration<int64_t,micro>::rep> measures;
-
+TEST_CASE("Testing storing tuples in PTable", "[PTable]") {
   struct root {
-    persistent_ptr<pTable_type> pTable;
+    persistent_ptr<PTableType> pTable;
   };
 
   pool<root> pop;
@@ -54,7 +51,7 @@ TEST_CASE("Testing storing tuples in persistent_table", "[persistent_table]") {
         ColumnInfo("c", ColumnInfo::String_Type),
         ColumnInfo("d", ColumnInfo::Double_Type)
       });
-      pop.get_root()->pTable = make_persistent<pTable_type>(tInfo, BDCCInfo::ColumnBitsMap({{0,4},{3,6}}));
+      pop.get_root()->pTable = make_persistent<PTableType>(tInfo, BDCCInfo::ColumnBitsMap({{0,4},{3,6}}));
     });
   } else {
     std::cerr << "WARNING: Table already exists" << std::endl;
@@ -68,26 +65,13 @@ TEST_CASE("Testing storing tuples in persistent_table", "[persistent_table]") {
                        (i + 1) * 100,
                        fmt::format("String #{0}", i),
                        i * 12.345);
-    start = std::chrono::high_resolution_clock::now();
     pTable->insert(i+1, tup);
-    end = std::chrono::high_resolution_clock::now();
-    auto diff = std::chrono::duration_cast<std::chrono::microseconds>(end-start).count();
-    measures.push_back(diff);
   }
 
-  auto avg = std::accumulate(measures.begin(), measures.end(), 0) / measures.size();
-  auto minmax = std::minmax_element(std::begin(measures), std::end(measures));
-  std::cout << "\nInsert Statistics in µs: "
-            << "\n\tAverage: " << avg
-            << "\n\tMin: "     << *minmax.first
-            << "\n\tMax: "     << *minmax.second << '\n';
 
   auto ptp = pTable->getByKey(5);
-  std::cout << "Tuple 5: " << ptp << '\n';
-  pTable->print(false);
-
 
   /* Clean up */
-  //transaction::exec_tx(pop, [&] {delete_persistent<pTable_type>(q->pTable);});
+  //transaction::exec_tx(pop, [&] {delete_persistent<PTableType>(q->pTable);});
   pop.close();
 }

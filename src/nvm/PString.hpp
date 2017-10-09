@@ -14,39 +14,45 @@ using nvml::obj::delete_persistent;
 using nvml::obj::make_persistent;
 using nvml::obj::persistent_ptr;
 
+namespace pfabric { namespace nvm {
+
 #define SSO_CHARS 15
 #define SSO_SIZE (SSO_CHARS + 1)
 
-class PString {
-public:
-  char* data() const { return str ? str.get() : const_cast<char*>(sso); }
-  void reset();
-  void set(std::string* value);
-private:
-  char sso[SSO_SIZE];
-  persistent_ptr<char[]> str;
-};
+    class PString {
+      public:
+      char *data() const { return str ? str.get() : const_cast<char *>(sso); }
 
-void PString::reset() {
-  pmemobj_tx_add_range_direct(sso, 1);
-  sso[0] = 0;
-  if (str) delete_persistent<char[]>(str, strlen(str.get()) + 1);
-}
+      void reset();
 
-void PString::set(std::string* value) {
-  unsigned long length = value->length();
-  if (length <= SSO_CHARS) {
-    if (str) {
-      delete_persistent<char[]>(str, strlen(str.get()) + 1);
-      str = nullptr;
+      void set(std::string *value);
+
+      private:
+      char sso[SSO_SIZE];
+      persistent_ptr<char[]> str;
+    };
+
+    inline void PString::reset() {
+      pmemobj_tx_add_range_direct(sso, 1);
+      sso[0] = 0;
+      if (str) delete_persistent<char[]>(str, strlen(str.get()) + 1);
     }
-    pmemobj_tx_add_range_direct(sso, SSO_SIZE);
-    strcpy(sso, value->c_str());
-  } else {
-    if (str) delete_persistent<char[]>(str, strlen(str.get()) + 1);
-    str = make_persistent<char[]>(length + 1);
-    strcpy(str.get(), value->c_str());
-  }
-}
+
+    inline void PString::set(std::string *value) {
+      unsigned long length = value->length();
+      if (length <= SSO_CHARS) {
+        if (str) {
+          delete_persistent<char[]>(str, strlen(str.get()) + 1);
+          str = nullptr;
+        }
+        pmemobj_tx_add_range_direct(sso, SSO_SIZE);
+        strcpy(sso, value->c_str());
+      } else {
+        if (str) delete_persistent<char[]>(str, strlen(str.get()) + 1);
+        str = make_persistent<char[]>(length + 1);
+        strcpy(str.get(), value->c_str());
+      }
+    }
+}} /* namespace pfabric::nvm */
 
 #endif

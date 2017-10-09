@@ -28,13 +28,13 @@ option(USE_BOOST_SPIRIT_PARSER
 # If switched to off, it will not be downloaded, saving initial building time.
 option(USE_ROCKSDB_TABLE
 	"use RocksDB for implementing persistent tables"
-	OFF
+  OFF
 )
 
 # Use Non-Volatile Memory Library for implementing tables
 option(USE_NVML_TABLE
 	"use nvml for implementing persistent memory tables"
-	ON
+  ON
 )
 
 # Build only pipefabric libraries (cep and core)
@@ -55,7 +55,7 @@ option(BUILD_TEST_CASES
 #Build google benchmark library
 option(BUILD_GOOGLE_BENCH
   "build google benchmark"
-  ON
+  OFF
 )
 
 # Build benchmark test
@@ -75,7 +75,7 @@ endif()
 #CMAKE_FORCE_CXX_COMPILER(icpc "Intel C++ Compiler")
 
 # C++ compiler flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated -g -O3 -Wsign-compare")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated -g -O2 -Wsign-compare")
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedefs -Wno-#pragma-messages")
 elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
@@ -278,13 +278,6 @@ set(core_sources
   ${THIRD_PARTY_DIR}/catch
 )
 
-if(USE_ROCKSDB_TABLE)
-  set(core_sources
-    ${core_sources}
-    ${THIRD_PARTY_DIR}/rocksdb
-  )
-endif()
-
 if(BUILD_GOOGLE_BENCH)
   set(core_sources
     ${core_sources}
@@ -292,23 +285,36 @@ if(BUILD_GOOGLE_BENCH)
   )
 endif()
 
+if(USE_ROCKSDB_TABLE)
+  set(core_sources
+    ${core_sources}
+    ${THIRD_PARTY_DIR}/rocksdb)
+  add_library(pfabric_core SHARED
+    ${core_sources})
+  target_link_libraries(pfabric_core
+    ${BOOST_LIBRARIES}
+    ${ZEROMQ_LIBRARIES}
+    ${ROCKSDB_LIB})
+  add_executable(rock_test rock_test.cpp)
+  target_link_libraries(rock_test pfabric_core ${ROCKSDB_LIB})
+endif()
+
 if(USE_NVML_TABLE)
   set(core_sources
     ${core_sources}
     nvm/PTableInfo.cpp
-    ${THIRD_PARTY_DIR}/nvml
-  )
-endif()
-
-add_library(pfabric_core SHARED
+    ${THIRD_PARTY_DIR}/nvml)
+  add_library(pfabric_core SHARED
     ${core_sources}
-)
+  )
+  target_link_libraries(pfabric_core
+    ${BOOST_LIBRARIES}
+    ${ZEROMQ_LIBRARIES}
+    ${NVML_LIBRARIES})
 
-target_link_libraries(pfabric_core
-  ${BOOST_LIBRARIES}
-  ${ZEROMQ_LIBRARIES}
-  ${NVML_LIBRARIES}
-)
+  add_executable(nvm_test nvm_test.cpp)
+  target_link_libraries(nvm_test pfabric_core)
+endif()
 
 #-----------------------------------------------------------------------------------------
 #

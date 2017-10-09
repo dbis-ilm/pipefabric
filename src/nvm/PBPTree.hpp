@@ -39,7 +39,7 @@ class PBPTree {
 #ifndef UNIT_TESTS
  private:
 #else
- public:
+ public:f
 #endif
 
   // Forward declarations
@@ -52,21 +52,15 @@ class PBPTree {
     LeafOrBranchNode(const LeafOrBranchNode& other) { copy(other); };
 
     void copy (const LeafOrBranchNode& other) throw() {
-//      NodeType tempTag = tag;
       tag = other.tag;
-//      other.tag = tempTag;
 
       switch (tag) {
       case LEAF: {
-//        persistent_ptr<LeafNode> tempLeaf(leaf);
         leaf = other.leaf;
-//        other.leaf = tempLeaf;
         break;
       }
       case BRANCH: {
-//        persistent_ptr<BranchNode> tempBranch(branch);
         branch = other.branch;
-//        other.branch = tempBranch;
         break;
       }
       default: break;
@@ -115,7 +109,7 @@ class PBPTree {
       auto node = root;
       while (d-- > 0) {
         auto n = node.branch;
-        node = n->children->at(0);
+        node = n->children.get_ro()[0];
       }
       currentNode = node.leaf;
       currentPosition = 0;
@@ -137,7 +131,7 @@ class PBPTree {
     bool operator!=(iterator other) const {return !(*this == other);}
 
     std::pair<KeyType, ValueType> operator*() {
-      return std::make_pair(currentNode->keys->at(currentPosition), currentNode->values->at(currentPosition));
+      return std::make_pair(currentNode->keys.get_ro()[currentPosition], currentNode->values.get_ro()[currentPosition]);
     }
 
     // iterator traits
@@ -153,8 +147,7 @@ class PBPTree {
   /**
    * Typedef for a function passed to the scan method.
    */
-  typedef std::function<void(const KeyType &key, const ValueType &val)>
-      ScanFunc;
+  using ScanFunc = std::function<void(const KeyType &key, const ValueType &val)>;
 
   /**
    * Constructor for creating a new B+ tree.
@@ -198,9 +191,9 @@ class PBPTree {
         if (wasSplit) {
           // we had an overflow in the node and therefore the node is split
           auto root = newBranchNode();
-          root->keys->at(0) = splitInfo.key;
-          root->children->at(0) = splitInfo.leftChild;
-          root->children->at(1) = splitInfo.rightChild;
+          root->keys.get_rw()[0] = splitInfo.key;
+          root->children.get_rw()[0] = splitInfo.leftChild;
+          root->children.get_rw()[1] = splitInfo.rightChild;
           root->numKeys = root->numKeys + 1;
           rootNode.branch = root;
           depth = depth + 1;
@@ -223,9 +216,9 @@ class PBPTree {
 
     auto leafNode = findLeafNode(key);
     auto pos = lookupPositionInLeafNode(leafNode, key);
-    if (pos < leafNode->numKeys && leafNode->keys->at(pos) == key) {
+    if (pos < leafNode->numKeys && leafNode->keys.get_ro()[pos] == key) {
       // we found it!
-      *val = leafNode->values->at(pos);
+      *val = leafNode->values.get_ro()[pos];
       result = true;
     }
     return result;
@@ -277,14 +270,14 @@ class PBPTree {
     while ( d-- > 0) {
       // as long as we aren't at the leaf level we follow the path down
       auto n = node.branch;
-      node = n->children->at(0);
+      node = n->children.get_ro()[0];
     }
     auto leaf = node.leaf;
     while (leaf != nullptr) {
       // for each key-value pair call func
       for (auto i = 0u; i < leaf->numKeys; i++) {
-        auto &key = leaf->keys->at(i);
-        auto &val = leaf->values->at(i);
+        auto &key = leaf->keys.get_ro()[i];
+        auto &val = leaf->values.get_ro()[i];
         func(key, val);
       }
       // move to the next leaf node
@@ -306,10 +299,10 @@ class PBPTree {
     while (leaf != nullptr) {
       // for each key-value pair within the range call func
       for (auto i = 0u; i < leaf->numKeys; i++) {
-        auto &key = leaf->keys->at(i);
+        auto &key = leaf->keys.get_ro()[i];
         if (key > maxKey) return;
 
-        auto &val = leaf->values->at(i);
+        auto &val = leaf->values.get_ro()[i];
         func(key, val);
       }
       // move to the next leaf node
@@ -334,10 +327,10 @@ class PBPTree {
   bool eraseFromLeafNode(persistent_ptr<LeafNode> node, const KeyType &key) {
     bool deleted = false;
     auto pos = lookupPositionInLeafNode(node, key);
-    if (node->keys->at(pos) == key) {
+    if (node->keys.get_rw()[pos] == key) {
       for (auto i = pos; i < node->numKeys - 1; i++) {
-        node->keys->at(i) = node->keys->at(i + 1);
-        node->values->at(i) = node->values->at(i + 1);
+        node->keys.get_rw()[i] = node->keys.get_ro()[i + 1];
+        node->values.get_rw()[i] = node->values.get_ro()[i + 1];
       }
       node->numKeys--;
       deleted = true;
@@ -365,11 +358,11 @@ class PBPTree {
     if (pos > 0 && leaf->prevLeaf->numKeys > middle) {
       // we have a sibling at the left for rebalancing the keys
       balanceLeafNodes(leaf->prevLeaf, leaf);
-      node->keys->at(pos) = leaf->keys->at(0);
+      node->keys.get_rw()[pos] = leaf->keys.get_ro()[0];
     } else if (pos < node->numKeys && leaf->nextLeaf->numKeys > middle) {
       // we have a sibling at the right for rebalancing the keys
       balanceLeafNodes(leaf->nextLeaf, leaf);
-      node->keys->at(pos) = leaf->nextLeaf->keys->at(0);
+      node->keys.get_rw()[pos] = leaf->nextLeaf->keys.get_ro()[0];
     } else {
       // 2. if this fails we have to merge two leaf nodes
       // but only if both nodes have the same direct parent
@@ -391,10 +384,10 @@ class PBPTree {
         if (pos > 0) pos--;
         // just remove the child node from the current branch node
         for (auto i = pos; i < node->numKeys - 1; i++) {
-          node->keys->at(i) = node->keys->at(i + 1);
-          node->children->at(i + 1) = node->children->at(i + 2);
+          node->keys.get_rw()[i] = node->keys.get_ro()[i + 1];
+          node->children.get_rw()[i + 1] = node->children.get_ro()[i + 2];
         }
-        node->children->at(pos) = survivor;
+        node->children.get_rw()[pos] = survivor;
         node->numKeys--;
       } else {
         // This is a special case that happens only if
@@ -421,8 +414,8 @@ class PBPTree {
 
     // we move all keys/values from node2 to node1
     for (auto i = 0u; i < node2->numKeys; i++) {
-      node1->keys->at(node1->numKeys + i) = node2->keys->at(i);
-      node1->values->at(node1->numKeys + i) = node2->values->at(i);
+      node1->keys.get_rw()[node1->numKeys + i] = node2->keys.get_ro()[i];
+      node1->values.get_rw()[node1->numKeys + i] = node2->values.get_ro()[i];
     }
     node1->numKeys += node2->numKeys;
     node1->nextLeaf = node2->nextLeaf;
@@ -447,18 +440,18 @@ class PBPTree {
     unsigned int toMove = donor->numKeys - balancedNum;
     if (toMove == 0) return;
 
-    if (donor->keys->at(0) < receiver->keys->at(0)) {
+    if (donor->keys.get_rw()[0] < receiver->keys.get_ro()[0]) {
       // move from one node to a node with larger keys
       unsigned int i = 0, j = 0;
       for (i = receiver->numKeys; i > 0; i--) {
         // reserve space on receiver side
-        receiver->keys->at(i + toMove - 1) = receiver->keys->at(i - 1);
-        receiver->values->at(i + toMove - 1) = receiver->values->at(i - 1);
+        receiver->keys.get_rw()[i + toMove - 1] = receiver->keys.get_ro()[i - 1];
+        receiver->values.get_rw()[i + toMove - 1] = receiver->values.get_ro()[i - 1];
       }
       // move toMove keys/values from donor to receiver
       for (i = balancedNum; i < donor->numKeys; i++, j++) {
-        receiver->keys->at(j) = donor->keys->at(i);
-        receiver->values->at(j) = donor->values->at(i);
+        receiver->keys.get_rw()[j] = donor->keys.get_ro()[i];
+        receiver->values.get_rw()[j] = donor->values.get_ro()[i];
         receiver->numKeys++;
       }
     } else {
@@ -466,14 +459,14 @@ class PBPTree {
       unsigned int i = 0;
       // move toMove keys/values from donor to receiver
       for (i = 0; i < toMove; i++) {
-        receiver->keys->at(receiver->numKeys) = donor->keys->at(i);
-        receiver->values->at(receiver->numKeys) = donor->values->at(i);
+        receiver->keys.get_rw()[receiver->numKeys] = donor->keys.get_ro()[i];
+        receiver->values.get_rw()[receiver->numKeys] = donor->values.get_ro()[i];
         receiver->numKeys++;
       }
       // on donor node move all keys and values to the left
       for (i = 0; i < donor->numKeys - toMove; i++) {
-        donor->keys->at(i) = donor->keys->at(toMove + i);
-        donor->values->at(i) = donor->values->at(toMove + i);
+        donor->keys.get_rw()[i] = donor->keys.get_ro()[toMove + i];
+        donor->values.get_rw()[i] = donor->values.get_ro()[toMove + i];
       }
     }
     donor->numKeys -= toMove;
@@ -496,7 +489,7 @@ class PBPTree {
     bool deleted = false;
     // try to find the branch
     auto pos = lookupPositionInBranchNode(node, key);
-    auto n = node->children->at(pos);
+    auto n = node->children.get_ro()[pos];
     if (d == 1) {
       // the next level is the leaf level
       auto leaf = n.leaf;
@@ -537,16 +530,16 @@ class PBPTree {
    */
   void mergeBranchNodes(persistent_ptr<BranchNode> sibling, const KeyType &key,
                        persistent_ptr<BranchNode> node) {
-    assert(key <= node->keys->at(0));
+    assert(key <= node->keys.get_ro()[0]);
     assert(sibling != nullptr);
     assert(node != nullptr);
-    assert(sibling->keys->at(sibling->numKeys - 1) < key);
+    assert(sibling->keys.get_ro()[sibling->numKeys - 1] < key);
 
-    sibling->keys->at(sibling->numKeys) = key;
-    sibling->children->at(sibling->numKeys + 1) = node->children->at(0);
+    sibling->keys.get_rw()[sibling->numKeys] = key;
+    sibling->children.get_rw()[sibling->numKeys + 1] = node->children.get_ro()[0];
     for (auto i = 0u; i < node->numKeys; i++) {
-      sibling->keys->at(sibling->numKeys + i + 1) = node->keys->at(i);
-      sibling->children->at(sibling->numKeys + i + 2) = node->children->at(i + 1);
+      sibling->keys.get_rw()[sibling->numKeys + i + 1] = node->keys.get_ro()[i];
+      sibling->children.get_rw()[sibling->numKeys + i + 2] = node->children.get_ro()[i + 1];
     }
     sibling->numKeys += node->numKeys + 1;
   }
@@ -573,16 +566,16 @@ class PBPTree {
     unsigned int middle = (N + 1) / 2;
     // 1. we check whether we can rebalance with one of the siblings
     if (pos > 0 &&
-        (node->children->at(pos - 1)).branch->numKeys >
+        (node->children.get_ro()[pos - 1]).branch->numKeys >
             middle) {
       // we have a sibling at the left for rebalancing the keys
-      persistent_ptr<BranchNode> sibling = (node->children->at(pos - 1)).branch;
+      persistent_ptr<BranchNode> sibling = (node->children.get_ro()[pos - 1]).branch;
       balanceBranchNodes(sibling, child, node, pos - 1);
-      // node->keys->at(pos) = child->keys->at(0);
+      // node->keys.get_rw()[pos] = child->keys.get_ro()[0];
       return newChild;
-    } else if (pos < node->numKeys && (node->children->at(pos + 1)).branch->numKeys > middle) {
+    } else if (pos < node->numKeys && (node->children.get_ro()[pos + 1]).branch->numKeys > middle) {
       // we have a sibling at the right for rebalancing the keys
-      auto sibling = (node->children->at(pos + 1)).branch;
+      auto sibling = (node->children.get_ro()[pos + 1]).branch;
       balanceBranchNodes(sibling, child, node, pos);
       return newChild;
     } else {
@@ -591,37 +584,37 @@ class PBPTree {
       unsigned int prevKeys = 0, nextKeys = 0;
 
       if (pos > 0) {
-        lSibling = (node->children->at(pos - 1)).branch;
+        lSibling = (node->children.get_ro()[pos - 1]).branch;
         prevKeys = lSibling->numKeys;
       }
       if (pos < node->numKeys) {
-        rSibling = (node->children->at(pos + 1)).branch;
+        rSibling = (node->children.get_ro()[pos + 1]).branch;
         nextKeys = rSibling->numKeys;
       }
 
       persistent_ptr<BranchNode> witnessNode = nullptr;
       auto ppos = pos;
       if (prevKeys > 0) {
-        mergeBranchNodes(lSibling, node->keys->at(pos - 1), child);
+        mergeBranchNodes(lSibling, node->keys.get_ro()[pos - 1], child);
         ppos = pos - 1;
         witnessNode = child;
         newChild = lSibling;
         // pos -= 1;
       } else if (nextKeys > 0) {
-        mergeBranchNodes(child, node->keys->at(pos), rSibling);
+        mergeBranchNodes(child, node->keys.get_ro()[pos], rSibling);
         witnessNode = rSibling;
       } else
         // shouldn't happen
         assert(false);
 
-      // remove node->keys->at(pos) from node
+      // remove node->keys.get_ro()[pos] from node
       for (auto i = ppos; i < node->numKeys - 1; i++) {
-        node->keys->at(i) = node->keys->at(i + 1);
+        node->keys.get_rw()[i] = node->keys.get_ro()[i + 1];
       }
       if (pos == 0) pos++;
       for (auto i = pos; i < node->numKeys; i++) {
         if (i + 1 <= node->numKeys)
-          node->children->at(i) = node->children->at(i + 1);
+          node->children.get_rw()[i] = node->children.get_ro()[i + 1];
       }
       node->numKeys--;
 
@@ -650,29 +643,29 @@ class PBPTree {
     unsigned int toMove = donor->numKeys - balancedNum;
     if (toMove == 0) return;
 
-    if (donor->keys->at(0) < receiver->keys->at(0)) {
+    if (donor->keys.get_ro()[0] < receiver->keys.get_ro()[0]) {
       // move from one node to a node with larger keys
       unsigned int i = 0;
 
       // 1. make room
-      receiver->children->at(receiver->numKeys + toMove) =
-          receiver->children->at(receiver->numKeys);
+      receiver->children.get_rw()[receiver->numKeys + toMove] =
+          receiver->children.get_ro()[receiver->numKeys];
       for (i = receiver->numKeys; i > 0; i--) {
         // reserve space on receiver side
-        receiver->keys->at(i + toMove - 1) = receiver->keys->at(i - 1);
-        receiver->children->at(i + toMove - 1) = receiver->children->at(i - 1);
+        receiver->keys.get_rw()[i + toMove - 1] = receiver->keys.get_ro()[i - 1];
+        receiver->children.get_rw()[i + toMove - 1] = receiver->children.get_ro()[i - 1];
       }
       // 2. move toMove keys/children from donor to receiver
       for (i = 0; i < toMove; i++) {
-        receiver->children->at(i) =
-            donor->children->at(donor->numKeys - toMove + 1 + i);
+        receiver->children.get_rw()[i] =
+            donor->children.get_ro()[donor->numKeys - toMove + 1 + i];
       }
       for (i = 0; i < toMove - 1; i++) {
-        receiver->keys->at(i) = donor->keys->at(donor->numKeys - toMove + 1 + i);
+        receiver->keys.get_rw()[i] = donor->keys.get_ro()[donor->numKeys - toMove + 1 + i];
       }
-      receiver->keys->at(toMove - 1) = parent->keys->at(pos);
+      receiver->keys.get_rw()[toMove - 1] = parent->keys.get_ro()[pos];
       assert(parent->numKeys > pos);
-      parent->keys->at(pos) = donor->keys->at(donor->numKeys - toMove);
+      parent->keys.get_rw()[pos] = donor->keys.get_ro()[donor->numKeys - toMove];
       receiver->numKeys += toMove;
     } else {
       // mode from one node to a node with smaller keys
@@ -680,25 +673,25 @@ class PBPTree {
 
       // 1. move toMove keys/children from donor to receiver
       for (i = 0; i < toMove; i++) {
-        receiver->children->at(n + 1 + i) = donor->children->at(i);
-        receiver->keys->at(n + 1 + i) = donor->keys->at(i);
+        receiver->children.get_rw()[n + 1 + i] = donor->children.get_ro()[i];
+        receiver->keys.get_rw()[n + 1 + i] = donor->keys.get_ro()[i];
       }
       // 2. we have to move via the parent node: take the key from
-      // parent->keys->at(pos)
-      receiver->keys->at(n) = parent->keys->at(pos);
+      // parent->keys.get_ro()[pos]
+      receiver->keys.get_rw()[n] = parent->keys.get_ro()[pos];
       receiver->numKeys += toMove;
-      KeyType key = donor->keys->at(toMove - 1);
+      KeyType key = donor->keys.get_ro()[toMove - 1];
 
       // 3. on donor node move all keys and values to the left
       for (i = 0; i < donor->numKeys - toMove; i++) {
-        donor->keys->at(i) = donor->keys->at(toMove + i);
-        donor->children->at(i) = donor->children->at(toMove + i);
+        donor->keys.get_rw()[i] = donor->keys.get_ro()[toMove + i];
+        donor->children.get_rw()[i] = donor->children.get_ro()[toMove + i];
       }
-      donor->children->at(donor->numKeys - toMove) =
-          donor->children->at(donor->numKeys);
-      // and replace this key by donor->keys->at(0)
+      donor->children.get_rw()[donor->numKeys - toMove] =
+          donor->children.get_rw()[donor->numKeys];
+      // and replace this key by donor->keys.get_ro()[0]
       assert(parent->numKeys > pos);
-      parent->keys->at(pos) = key;
+      parent->keys.get_rw()[pos] = key;
     }
     donor->numKeys -= toMove;
   }
@@ -719,15 +712,15 @@ class PBPTree {
     std::cout << d << " { ";
     for (auto k = 0u; k < node->numKeys; k++) {
       if (k > 0) std::cout << ", ";
-      std::cout << node->keys->at(k);
+      std::cout << node->keys.get_ro()[k];
     }
     std::cout << " }" << std::endl;
     for (auto k = 0u; k <= node->numKeys; k++) {
       if (d + 1 < depth) {
-        auto child = node->children->at(k).branch;
+        auto child = node->children.get_ro()[k].branch;
         if (child != nullptr) printBranchNode(d + 1, child);
       } else {
-        auto leaf = (node->children->at(k)).leaf;
+        auto leaf = (node->children.get_ro()[k]).leaf;
         printLeafNode(d + 1, leaf);
       }
     }
@@ -743,7 +736,7 @@ class PBPTree {
     std::cout << "{ ";
     for (auto k = 0u; k < node->numKeys; k++) {
       if (k > 0) std::cout << ", ";
-      std::cout << node->keys->at(k);
+      std::cout << node->keys.get_ro()[k];
     }
     std::cout << " }" << std::endl;
   }
@@ -759,7 +752,7 @@ class PBPTree {
     std::cout << "[" << std::hex << node << std::dec << " : ";
     for (auto i = 0u; i < node->numKeys; i++) {
       if (i > 0) std::cout << ", ";
-      std::cout << "{" << node->keys->at(i) << " -> " << node->values->at(i) << "}";
+      std::cout << "{" << node->keys.get_ro()[i] << " -> " << node->values.get_ro()[i] << "}";
     }
     std::cout << "]" << std::endl;
   }
@@ -782,9 +775,9 @@ class PBPTree {
                         const ValueType &val, SplitInfo *splitInfo) {
     bool split = false;
     auto pos = lookupPositionInLeafNode(node, key);
-    if (pos < node->numKeys && node->keys->at(pos) == key) {
+    if (pos < node->numKeys && node->keys.get_ro()[pos] == key) {
       // handle insert of duplicates
-      node->values->at(pos) = val;
+      node->values.get_rw()[pos] = val;
       return false;
     }
     if (node->numKeys == M) {
@@ -795,8 +788,8 @@ class PBPTree {
       persistent_ptr<LeafNode> sibling = newLeafNode();
       sibling->numKeys = node->numKeys - middle;
       for (auto i = 0u; i < sibling->numKeys; i++) {
-        sibling->keys->at(i) = node->keys->at(i + middle);
-        sibling->values->at(i) = node->values->at(i + middle);
+        sibling->keys.get_rw()[i] = node->keys.get_ro()[i + middle];
+        sibling->values.get_rw()[i] = node->values.get_ro()[i + middle];
       }
       node->numKeys = middle;
 
@@ -814,7 +807,7 @@ class PBPTree {
       split = true;
       splitInfo->leftChild = node;
       splitInfo->rightChild = sibling;
-      splitInfo->key = sibling->keys->at(0);
+      splitInfo->key = sibling->keys.get_ro()[0];
     } else {
       // otherwise, we can simply insert the new entry at the given position
       insertInLeafNodeAtPosition(node, pos, key, val);
@@ -841,12 +834,12 @@ class PBPTree {
     assert(node->numKeys < M);
     // we move all entries behind pos by one position
     for (unsigned int i = node->numKeys; i > pos; i--) {
-      node->keys->at(i) = node->keys->at(i - 1);
-      node->values->at(i) = node->values->at(i - 1);
+      node->keys.get_rw()[i] = node->keys.get_ro()[i - 1];
+      node->values.get_rw()[i] = node->values.get_ro()[i - 1];
     }
     // and then insert the new entry at the given position
-    node->keys->at(pos) = key;
-    node->values->at(pos) = val;
+    node->keys.get_rw()[pos] = key;
+    node->values.get_rw()[pos] = val;
     node->numKeys = node->numKeys + 1;
   }
 
@@ -864,18 +857,18 @@ class PBPTree {
     // determine the split position
     unsigned int middle = (N + 1) / 2;
     // adjust the middle based on the key we have to insert
-    if (splitKey > node->keys->at(middle)) middle++;
+    if (splitKey > node->keys.get_ro()[middle]) middle++;
     // move all entries behind this position to a new sibling node
     persistent_ptr<BranchNode> sibling = newBranchNode();
     sibling->numKeys = node->numKeys - middle;
     for (auto i = 0u; i < sibling->numKeys; i++) {
-      sibling->keys->at(i) = node->keys->at(middle + i);
-      sibling->children->at(i) = node->children->at(middle + i);
+      sibling->keys.get_rw()[i] = node->keys.get_ro()[middle + i];
+      sibling->children.get_rw()[i] = node->children.get_ro()[middle + i];
     }
-    sibling->children->at(sibling->numKeys) = node->children->at(node->numKeys);
+    sibling->children.get_rw()[sibling->numKeys] = node->children.get_ro()[node->numKeys];
     node->numKeys = middle - 1;
 
-    splitInfo->key = node->keys->at(middle - 1);
+    splitInfo->key = node->keys.get_ro()[middle - 1];
     splitInfo->leftChild = node;
     splitInfo->rightChild = sibling;
   }
@@ -900,11 +893,11 @@ class PBPTree {
     auto pos = lookupPositionInBranchNode(node, key);
     if (depth - 1 == 0) {
       // case #1: our children are leaf nodes
-      auto child = node->children->at(pos).leaf;
+      auto child = node->children.get_ro()[pos].leaf;
       hasSplit = insertInLeafNode(child, key, val, &childSplitInfo);
     } else {
       // case #2: our children are branch nodes
-      auto child = node->children->at(pos).branch;
+      auto child = node->children.get_ro()[pos].branch;
       hasSplit = insertInBranchNode(child, depth - 1, key, val, &childSplitInfo);
     }
     if (hasSplit) {
@@ -923,16 +916,16 @@ class PBPTree {
       if (pos < host->numKeys) {
         // if the child isn't inserted at the rightmost position
         // then we have to make space for it
-        host->children->at(host->numKeys + 1) = host->children->at(host->numKeys);
+        host->children.get_rw()[host->numKeys + 1] = host->children.get_ro()[host->numKeys];
         for (auto i = host->numKeys.get_ro(); i > pos; i--) {
-          host->children->at(i) = host->children->at(i - 1);
-          host->keys->at(i) = host->keys->at(i - 1);
+          host->children.get_rw()[i] = host->children.get_ro()[i - 1];
+          host->keys.get_rw()[i] = host->keys.get_ro()[i - 1];
         }
       }
       // finally, add the new entry at the given position
-      host->keys->at(pos) = childSplitInfo.key;
-      host->children->at(pos) = childSplitInfo.leftChild;
-      host->children->at(pos + 1) = childSplitInfo.rightChild;
+      host->keys.get_rw()[pos] = childSplitInfo.key;
+      host->children.get_rw()[pos] = childSplitInfo.leftChild;
+      host->children.get_rw()[pos + 1] = childSplitInfo.rightChild;
       host->numKeys = host->numKeys + 1;
     }
     return split;
@@ -957,7 +950,7 @@ class PBPTree {
       // as long as we aren't at the leaf level we follow the path down
       auto n = node.branch;
       auto pos = lookupPositionInBranchNode(n, key);
-      node = n->children->at(pos);
+      node = n->children.get_ro()[pos];
     }
     return node.leaf;
   }
@@ -980,7 +973,7 @@ class PBPTree {
     // search instead?
     unsigned int pos = 0;
     const unsigned int num = node->numKeys;
-    for (; pos < num && node->keys->at(pos) <= key; pos++)
+    for (; pos < num && node->keys.get_ro()[pos] <= key; pos++)
       ;
     return pos;
   }
@@ -1000,7 +993,7 @@ class PBPTree {
     // search instead?
     unsigned int pos = 0;
     const unsigned int num = node->numKeys.get_ro();
-    for (; pos < num && node->keys->at(pos) < key; pos++)
+    for (; pos < num && node->keys.get_ro()[pos] < key; pos++)
       ;
     return pos;
   }
@@ -1055,18 +1048,18 @@ class PBPTree {
      * Constructor for creating a new empty leaf node.
      */
     LeafNode() : numKeys(0), nextLeaf(nullptr), prevLeaf(nullptr) {
-      auto pop = nvml::obj::pool_by_vptr(this);
+      /*auto pop = nvml::obj::pool_by_vptr(this);
       transaction::exec_tx(pop, [&] {
         keys = make_persistent<std::array<KeyType, M>>();
         values = make_persistent<std::array<ValueType, M>>();
-      });
+      });*/
     }
    // ~LeafNode() { std::cout << "~LeafNode: " << std::hex << this <<
    //    std::endl; }
 
     p<unsigned int> numKeys;                         //< the number of currently stored keys
-    persistent_ptr<std::array<KeyType, M>> keys;     //< the actual keys
-    persistent_ptr<std::array<ValueType, M>> values; //< the actual values
+    p<std::array<KeyType, M>> keys;     //< the actual keys
+    p<std::array<ValueType, M>> values; //< the actual values
     persistent_ptr<LeafNode> nextLeaf;               //< pointer to the subsequent sibling
     persistent_ptr<LeafNode> prevLeaf;               //< pointer to the preceeding sibling
     p<unsigned char> pad_[LEAF_PADDING];            //<
@@ -1080,18 +1073,18 @@ class PBPTree {
      * Constructor for creating a new empty branch node.
      */
     BranchNode() : numKeys(0) {
-      auto pop = nvml::obj::pool_by_vptr(this);
+      /*auto pop = nvml::obj::pool_by_vptr(this);
       transaction::exec_tx(pop, [&] {
         keys = make_persistent<std::array<KeyType, N>>();
         children = make_persistent<std::array<LeafOrBranchNode, N+1>>();
-      });
+      });*/
     }
     // ~BranchNode() { std::cout << "~BranchNode: " << std::hex << this << std::dec <<
      //   std::endl; }
 
     p<unsigned int> numKeys;                     //< the number of currently stored keys
-    persistent_ptr<std::array<KeyType, N>> keys; //< the actual keys
-    persistent_ptr<std::array<LeafOrBranchNode, N + 1>>
+    p<std::array<KeyType, N>> keys; //< the actual keys
+    p<std::array<LeafOrBranchNode, N + 1>>
         children;                                //< pointers to child nodes (BranchNode or LeafNode)
     p<unsigned char> pad_[BRANCH_PADDING];            //<
   };

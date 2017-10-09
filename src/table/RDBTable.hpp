@@ -32,7 +32,7 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/signals2.hpp>
-#include <table/VTableInfo.hpp>
+#include <table/TableInfo.hpp>
 
 #include "fmt/format.h"
 
