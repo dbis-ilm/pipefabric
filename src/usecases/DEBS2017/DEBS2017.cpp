@@ -172,7 +172,6 @@ int main(int argc, char **argv){
     .partitionBy([&ThreadAmount](auto tp) { return get<0>(tp) % ThreadAmount; }, ThreadAmount)
     .statefulMap<TInMarkov, ClusterState>([&mtx](auto tp, bool outdated, std::shared_ptr<ClusterState> state){ //this operator clusters
       int FoundRowNew = 0, RowNumberNew = 0, HasEnoughValues = 0;
-      double testDouble = 0.0;
       std::vector<int> ClusterSequence(0, 0); //handover variable 
       std::string TempMetadataString = get<2>(tp); //check for outdated tuple or not (within the window or not)
       double TempMachineNumber, TempValueNumber;
