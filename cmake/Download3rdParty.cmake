@@ -117,3 +117,17 @@ add_custom_command(
 )
 endif()
 
+#--------------------------------------------------------------------------------
+if(BUILD_USE_CASES)
+# data for use cases
+download_project(PROJ               data
+	            GIT_REPOSITORY      https://github.com/dbis-ilm/data.git
+	            GIT_TAG             master
+	            UPDATE_DISCONNECTED 1
+	            QUIET
+)
+file(COPY ${PROJECT_BINARY_DIR}/data-src/DEBS2017
+     DESTINATION ${THIRD_PARTY_DIR}
+)
+endif()
+

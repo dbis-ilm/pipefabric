@@ -18,6 +18,9 @@ set(PIPEFABRIC_DIR "/usr/local/pfabric")
 
 #The following variables enable or disable additional functionalities, which can be switched off to reduce build time.
 
+#Build use cases
+option(BUILD_USE_CASES "" OFF)
+
 # Use the boost::spirit parser for converting strings to numbers
 option(USE_BOOST_SPIRIT_PARSER
     "use the boost::spirit::qi parsers for converting strings to tuple attributes"
@@ -312,6 +315,14 @@ add_subdirectory(test)
 # Micro-benchmarking using Google Benchmark
 #
 add_subdirectory(bench)
+
+#-----------------------------------------------------------------------------------------
+#
+# Build use cases
+#
+if(BUILD_USE_CASES)
+  add_subdirectory(usecases)
+endif()
 #-----------------------------------------------------------------------------------------
 #
 # Installation
