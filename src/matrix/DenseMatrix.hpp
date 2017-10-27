@@ -5,7 +5,7 @@
 
 #include "BaseMatrix.hpp"
 #include "ReaderValue.hpp"
-#include <Eigen/Dense>
+#include <eigen3/Eigen/Dense>
 
 #include <boost/uuid/uuid.hpp>
 

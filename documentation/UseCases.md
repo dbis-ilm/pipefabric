@@ -4,7 +4,7 @@ Here we want to describe and show some use cases for PipeFabric to give you an i
 and necessary efforts of utilization. Therefore we provide the following topics:
 
  + DEBS2017, a research challenge for detecting anomalies in RDF streaming data
- + Image Processing, realized by matrix operations (coming soon)
+ + Image and Graph Processing, realized by matrix operations
  + Processing of Movement Trajectories, tracking movement of different objects (coming soon)
 
 To run them on your own, we give the necessary simple installation steps below because the use cases are not
@@ -67,10 +67,9 @@ For data of real sensors with real manufacturing machines, this print could also
 whatever the reaction to an anomaly should be.
 
 
-### Image Processing ###
+### Image and Graph Processing ###
 
-(coming soon!)
-
+Requires OpenCV and Eigen library to be installed (tested with opencv 3.3.1 and eigen 3.3.1)
 
 ### Movement Trajectories ###
 

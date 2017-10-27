@@ -6,7 +6,7 @@
 #include "BaseMatrix.hpp"
 #include "core/StreamElementTraits.hpp"
 #include "ReaderValue.hpp"
-#include <Eigen/Sparse>
+#include <eigen3/Eigen/Sparse>
 
 #include <mutex>
 #include <boost/signals2.hpp>

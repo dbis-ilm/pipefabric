@@ -26,7 +26,7 @@ option(SUPPORT_MATRICES
 # Build use cases
 option(BUILD_USE_CASES
 	""
-  OFF)
+	OFF)
 
 # Use the boost::spirit parser for converting strings to numbers
 option(USE_BOOST_SPIRIT_PARSER
@@ -53,13 +53,13 @@ option(BUILD_ONLY_LIBS
 # If switched to off, no tests will be build
 option(BUILD_TEST_CASES
   "build tests for pipefabric functionality"
-  ON
+	ON
 )
 
 #Build google benchmark library
 option(BUILD_GOOGLE_BENCH
   "build google benchmark"
-  ON
+	ON
 )
 
 # Build benchmark test
@@ -74,7 +74,7 @@ option(BUILD_BENCHMARKS
 
 # Use cases require matrix support (image and graph processing)
 if(BUILD_USE_CASES)
-	set(SUPPORT_MATRICES)
+	set(SUPPORT_MATRICES ON)
 endif()
 
 # Benchmark test requires benchmark library

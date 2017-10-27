@@ -1,3 +1,2 @@
-if (BUILD_USE_CASES)
-  add_subdirectory(DEBS2017)
-endif()
+add_subdirectory(DEBS2017)
+add_subdirectory(MatrixProcessing)
