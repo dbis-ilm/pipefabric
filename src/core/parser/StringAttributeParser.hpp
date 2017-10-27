@@ -39,6 +39,11 @@
 namespace qi = boost::spirit::qi;
 #endif
 
+#ifdef SUPPORT_MATRICES
+#include "core/StreamElementTraits.hpp"
+#include "matrix/Matrix.hpp"
+#include "matrix/VectorParser.hpp"
+#endif
 
 namespace pfabric {
 
@@ -243,6 +248,58 @@ public:
 		);
 	}
 };
+
+#ifdef SUPPORT_MATRICES
+/**
+ * @brief Atribute parser for sparse vector
+ **/
+
+template<typename CellType>
+class StringAttributeParser<pfabric::SparseVector<CellType> > :
+	public AttributeParserBase<pfabric::SparseVector<CellType>, StringAttributeParser<pfabric::SparseVector<CellType> > > {
+public:
+  // the attribute should be initialized
+  typedef pfabric::SparseVector<CellType> Attribute;
+
+  /**
+   * @brief Parse reads vector of values from an attribute of tuple (e.g. TuplePtr< int, int, v1 v2 v3 ... >)
+   *
+   * @param[in] input
+   *	string of values (v1 v2 v3 ...)
+   * @param[out] matrix
+   *	the matrix which should be initialized by string of values from a tuple.
+   */
+  static inline
+  void parse(const std::string &input, Attribute &vector) {
+	VectorParser::parse(input, vector);
+  }
+};
+
+/**
+ * @brief Atribute parser for dense vector
+ */
+
+template<typename CellType, int Rows, int Cols>
+class StringAttributeParser<pfabric::DenseMatrix<CellType, Rows, Cols> > :
+	public AttributeParserBase<pfabric::DenseMatrix<CellType, Rows, Cols>, StringAttributeParser<pfabric::DenseMatrix<CellType, Rows, Cols>>> {
+public:
+  // the attribute should be initialized
+  typedef pfabric::DenseMatrix<CellType, Rows, Cols> Attribute;
+
+  /**
+	* @brief Parse reads vector of values from an attribute of tuple (e.g. TuplePtr< int, int, v1 v2 v3 ... >)
+	*
+	* @param[in] input
+	*	string of values (v1 v2 v3 ...)
+	* @param[out] matrix
+	*	the matrix which should be initialized by string of values from a tuple.
+	*/
+	static inline
+	void parse(const std::string &input, Attribute &vector) {
+	  VectorParser::parse(input, vector);
+	}
+};
+#endif
 
 } /* end namespace pquery */
 

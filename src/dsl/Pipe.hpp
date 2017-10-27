@@ -58,6 +58,11 @@
 #include "qop/Where.hpp"
 #include "qop/ZMQSink.hpp"
 #include "qop/ScaleJoin.hpp"
+#ifdef SUPPORT_MATRICES
+#include "qop/ToMatrix.hpp"
+#include "qop/MatrixSlice.hpp"
+#include "qop/MatrixMerge.hpp"
+#endif
 
 namespace pfabric {
 
@@ -1446,8 +1451,74 @@ class Pipe {
       throw TopologyException("No KeyExtractor defined for updateTable.");
     }
   }
-  /*------------------------------ partitioning
-   * -----------------------------*/
+
+#ifdef SUPPORT_MATRICES
+  /**
+   * @brief Create a new pipe to insert tuples into matrix
+   * @tparam MatrixType
+   *   the type of matrix (Sparse, Dense, etc.)
+   * @tparam T
+   *   record containing values, typically TuplePtr< int, int, double >.
+   * @param[in]
+   *   the matrix object to store values.
+   * @return
+   *   the new pipe with operator to collect values into stateful the matrix.
+   */
+  template<class MatrixType>
+  Pipe<T> toMatrix(std::shared_ptr<MatrixType> matrix) throw(TopologyException) {
+    try {
+      auto op = std::make_shared<ToMatrix<MatrixType>>(matrix);
+      auto iter = addPublisher<ToMatrix<MatrixType>, DataSource<T> >(op);
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+    } catch (...) {
+      throw TopologyException("toMatrix: unknown error has occured");
+    }
+  }
+
+  /**
+   * @brief matrix_slice
+   *   the operator decouples a matrix into several parts
+   *   sending them to the next operators separately
+   *
+   * @tparam PartitionFunc
+   *   the user defined function to slice matrix
+   * @param[in] pred
+   *   Predicate to decouple matrix
+   * @param[in] numParts
+   *   the number of partitions
+   * @return a new pipe
+   */
+  template<typename PartitionFunc>
+  Pipe<T> matrix_slice(PartitionFunc pred, std::size_t numParts) throw(TopologyException) {
+    try {
+      auto op = std::make_shared<MatrixSlice<T>>(pred, numParts);
+      auto iter = addPublisher<MatrixSlice<T>, DataSource<T> >(op);
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+    } catch (...) {
+      throw TopologyException("matrix_slice: unknown error has occured");
+    }
+  }
+
+  /**
+   * @brief matrix_merge
+   *   the operator receives pieces of the matrix to put back together again
+   * @param[in] numParts
+   *   the number of partitions
+   * @return a new pipe
+   */
+  Pipe<T> matrix_merge(std::size_t numParts) throw(TopologyException) {
+    try {
+      auto op = std::make_shared<MatrixMerge<T>>(numParts);
+      auto iter = addPublisher<MatrixMerge<T>, DataSource<T> >(op);
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+    } catch (...) {
+      throw TopologyException("matrix_merge: unknown error has occured");
+    }
+  }
+#endif
+
+        /*------------------------------ partitioning
+         * -----------------------------*/
   /**
    * @brief Create a PartitionBy operator.
    *
