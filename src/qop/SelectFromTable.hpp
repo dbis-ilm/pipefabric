@@ -71,6 +71,8 @@ namespace pfabric {
     unsigned long start() {
       unsigned long ntuples = 0;
 
+      assert(mTable.get() != nullptr);
+
       auto iter = mPredicate == nullptr ? mTable->select() : mTable->select(mPredicate);
       for (; iter.isValid(); iter++) {
         auto tup = *iter;

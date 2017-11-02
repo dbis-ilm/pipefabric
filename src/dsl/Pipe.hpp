@@ -651,7 +651,7 @@ class Pipe {
   /**
    * TODO
    */
-  Pipe<BatchPtr<T>> batch(std::size_t bsize) throw(TopologyException) {
+  Pipe<BatchPtr<T>> batch(std::size_t bsize = SIZE_MAX) throw(TopologyException) {
     auto op = std::make_shared<Batcher<T>>(bsize);
     auto iter = addPublisher<Batcher<T>, DataSource<T>>(op);
     return Pipe<BatchPtr<T>>(dataflow, iter, keyExtractor, timestampExtractor,
@@ -1330,20 +1330,31 @@ class Pipe {
   Pipe<T> updateTable(
       std::shared_ptr<Table<typename RecordType::element_type, KeyType>> tbl,
       std::function<bool(const T&, bool,
-                         const typename RecordType::element_type&)>
-          updateFunc) throw(TopologyException) {
+                         typename RecordType::element_type&)>
+          updateFunc,
+      std::function<typename RecordType::element_type(const T&)> insertFunc
+          ) throw(TopologyException) {
     typedef std::function<KeyType(const T&)> KeyExtractorFunc;
     assert(partitioningState == NoPartitioning);
 
     try {
       KeyExtractorFunc keyFunc =
           boost::any_cast<KeyExtractorFunc>(keyExtractor);
-      return map<T, T>([=](auto tp, bool outdated) {
+      return map<T>([=](auto tp, bool outdated) {
         KeyType key = keyFunc(tp);
-        tbl->updateOrDeleteByKey(
-            key, [=](const typename RecordType::element_type& old) -> bool {
+        if (!outdated) 
+          tbl->updateOrDeleteByKey(
+            key, [=](typename RecordType::element_type& old) -> bool {
               return updateFunc(tp, outdated, old);
-            });
+            }, 
+            [=]() -> typename RecordType::element_type {
+              return insertFunc(tp);
+              });
+        else
+          tbl->updateOrDeleteByKey(
+            key, [=](typename RecordType::element_type& old) -> bool {
+              return updateFunc(tp, outdated, old);
+            }); 
         return tp;
       });
     } catch (boost::bad_any_cast& e) {

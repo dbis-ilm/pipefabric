@@ -108,8 +108,9 @@ namespace pfabric {
       auto key = mKeyFunc(data);
       if (outdated)
         mTable->deleteByKey(key);
-      else
+      else {
         mTable->insert(key, *data);
+      }
       if (mAutoCommit) {
         // TODO: perform commit
       }

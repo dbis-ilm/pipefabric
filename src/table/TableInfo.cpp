@@ -35,6 +35,9 @@ std::string TableInfo::typeSignature() const {
       case ColumnInfo::String_Type:
         os << "S";
         break;
+      case ColumnInfo::UInt_Type:
+        os << "u";
+        break;
     }
   }
   os << "]";
@@ -63,6 +66,9 @@ std::ostream& operator<<(std::ostream& os, pfabric::ColumnInfo::ColumnType ct) {
       break;
     case ColumnInfo::String_Type:
       os << "std::string";
+      break;
+    case ColumnInfo::UInt_Type:
+      os << "unsigned int";
       break;
   }
   return os;

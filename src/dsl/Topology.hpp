@@ -26,6 +26,7 @@
 #include <vector>
 #include <future>
 #include <mutex>
+#include <chrono>
 
 #include "core/Tuple.hpp"
 
@@ -62,11 +63,11 @@ namespace pfabric {
    * auto s = t->newStreamFromFile("file.csv")
    *           .extract<T1>(',')
    *           .where<T1>([](auto tp, bool outdated) {
-   *                     return getAttribute<0>(*tp) % 2 == 0;
+   *                     return get<0>(tp) % 2 == 0;
    *            })
-   *           .map<T1,T2>([](auto tp) -> T2 {
-   *                     return makeTuplePtr(getAttribute<2>(*tp),
-   *                                         getAttribute<0>(*tp));
+   *           .map<T1,T2>([](auto tp, bool) -> T2 {
+   *                     return makeTuplePtr(get<2>(tp),
+   *                                         get<0>(tp));
    *            })
    *           .print<T2>(strm);
    * // now, let's start the processing
@@ -83,6 +84,7 @@ namespace pfabric {
     std::vector<StartupFunc> prepareList; //< the list of functions to be called for startup
     bool asyncStarted;                    //< true if we started asynchronously
     std::vector<std::future<unsigned long> > startupFutures; //< futures for the startup functions
+    std::vector<std::thread> wakeupTimers; //< threads for runEvery queries
     std::mutex mMutex;                    //< mutex for accessing startupFutures
 
     DataflowPtr dataflow;
@@ -134,6 +136,18 @@ namespace pfabric {
     void start(bool async = true);
 
     void prepare();
+
+    /**
+     * @brief Runs the topology periodically every @c secs seconds.
+     *
+     * Starts the processing of the topology every @c secs seconds. Note,
+     * that the topology should be a finite query not a continuous stream
+     * query.
+     *
+     * @param[in] secs
+     *  the period of time between two invocations
+     */ 
+    void runEvery(const std::chrono::seconds& secs);
 
     /**
      * @brief Waits until the execution of the topology stopped.

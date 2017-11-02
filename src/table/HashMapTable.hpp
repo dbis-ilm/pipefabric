@@ -64,7 +64,7 @@ public:
 
   HashMapIterator operator++(int) { auto tmp = *this; ++(*this); return tmp; }
   bool isValid() const { return i != end; }
-  SmartPtr<RecordType> operator*() { 
+  SmartPtr<RecordType> operator*() {
     return SmartPtr<RecordType> (new RecordType(i->second));
   }
   // typename Iter::value_type::second_type* operator->() { return &i->second; }
@@ -130,10 +130,12 @@ public:
   ~HashMapTable() {}
 
   /**
-   * @brief Insert a tuple.
+   * @brief Insert or update a tuple.
    *
-   * Insert the given tuple @rec with the given key into the table. After the insert
-   * all observers are notified.
+   * Insert or update the given tuple @rec with the given key into the table.
+   * If the key already exists then the tuple in the table is updated, otherwise
+   * the tuple is newly inserted.
+   * After the insert/update all observers are notified.
    *
    * @param key the key value of the tuple
    * @param rec the actual tuple
@@ -142,6 +144,11 @@ public:
     {
       // make sure we have exclusive access
       std::lock_guard<std::mutex> lock(mMtx);
+      auto iter = mDataTable.find(key);
+      if (iter != mDataTable.end()) 
+        // we erase the key/tuple pair first, because of the missing copy assignment
+        // operator in Tuple we cannot simply use the operator[]
+        mDataTable.erase(key);
       mDataTable.insert({key, rec});
     }
     // after the lock is released we can inform our observers
@@ -427,4 +434,3 @@ private:
 }
 
 #endif
-

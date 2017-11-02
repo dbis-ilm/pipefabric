@@ -79,6 +79,15 @@ void Topology::wait() {
       f.get();
 }
 
+void Topology::runEvery(const std::chrono::seconds& secs) {
+  wakeupTimers.push_back(std::thread([&](){
+        while(true) {
+          std::this_thread::sleep_for(secs);
+          startAsync();
+        }
+  }));
+}
+    
 Pipe<TStringPtr> Topology::newStreamFromFile(const std::string& fname, unsigned long limit) {
   // create a new TextFileSource
   auto op = std::make_shared<TextFileSource>(fname, limit);

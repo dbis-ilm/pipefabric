@@ -165,7 +165,7 @@ sql::SQLQueryPtr SQLParser::parse(const std::string& stmt) throw(QueryCompileExc
 
   bool r = phrase_parse(iter, end, parser, space, *res);
    if (r && iter == end) {
-     std::cout << "parsing ok: " << *res << std::endl;
+     // success
    }
    else {
      std::cout << "parsing failed: " << std::string(iter, end) << std::endl;

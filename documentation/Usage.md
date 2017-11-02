@@ -39,7 +39,7 @@ Topology t;
 auto s = t.newStreamFromFile("file.csv")
   .extract<T1>(',')
   .where([](auto tp, bool outdated) { return get<0>(tp) % 2 == 0; } )
-  .map<T2>([](auto tp) -> T2 {
+  .map<T2>([](auto tp, bool) -> T2 {
     return makeTuplePtr(get<2>(tp), get<0>(tp));
   })
   .print(std::cout);

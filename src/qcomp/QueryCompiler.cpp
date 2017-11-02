@@ -364,6 +364,7 @@ std::string QueryCompiler::compileCppCode(
       << "-o " << lib_path.string() << "/lib" << fileName
       << ".dylib -install_name @rpath/lib" << fileName << ".dylib "
       << lib_path / fileName << ".cpp " << ldflags << " " << libs << std::endl;
+  // std::cout << cmd.str() << std::endl;
   std::system(cmd.str().c_str());
   return fileName;
 }

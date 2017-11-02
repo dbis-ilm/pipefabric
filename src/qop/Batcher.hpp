@@ -41,7 +41,8 @@ private:
 PFABRIC_UNARY_TRANSFORM_TYPEDEFS(InputStreamElement, OutputStreamElement)
 
 public:
-  Batcher(std::size_t batchSize) : mBatchSize(batchSize), mPos(0), mBuf(batchSize) {}
+  Batcher(std::size_t batchSize = SIZE_MAX) : mBatchSize(batchSize), mPos(0), 
+    mBuf(batchSize != SIZE_MAX ? batchSize : 0) {}
 
   /**
 	 * @brief Bind the callback for the data channel.
@@ -66,6 +67,8 @@ private:
 	 *    the incoming punctuation tuple
 	 */
 	void processPunctuation( const PunctuationPtr& punctuation ) {
+    if (mBatchSize == SIZE_MAX)
+      publishBatch();
 		this->getOutputPunctuationChannel().publish(punctuation);
 	}
 
@@ -80,14 +83,27 @@ private:
 	 *    flag indicating whether the tuple is new or invalidated now
 	 */
 	void processDataElement( const InputStreamElement& data, const bool outdated ) {
+    // ensure capacity
+    if (mBatchSize == SIZE_MAX)
+      mBuf.resize(mPos + 1);
 		mBuf[mPos++] = std::make_pair(data, outdated);
     if (mPos == mBatchSize) {
+      publishBatch();
+      /*
       auto tup = makeTuplePtr(std::move(mBuf));
       this->getOutputDataChannel().publish(tup, false);
       mPos = 0;
       mBuf.resize(mBatchSize);
+      */
     }
 	}
+
+  void publishBatch() {
+      auto tup = makeTuplePtr(std::move(mBuf));
+      this->getOutputDataChannel().publish(tup, false);
+      mPos = 0;
+      mBuf.resize(mBatchSize);
+  }
 
   std::size_t mBatchSize, mPos;
   std::vector<std::pair<InputStreamElement, bool>> mBuf;

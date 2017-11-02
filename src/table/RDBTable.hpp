@@ -154,6 +154,8 @@ class RDBTable : public BaseTable {
   //< setting the bool component of @c UpdateResult to false)
   typedef std::function<bool(RecordType&)> UpdelFunc;
 
+  typedef std::function<RecordType()> InsertFunc;
+
   //< typedef for a callback function which is invoked when the table was
   // updated
   typedef boost::signals2::signal<void(const RecordType&,
@@ -195,11 +197,12 @@ class RDBTable : public BaseTable {
   // Table(const TableInfo& tInfo) : BaseTable(tInfo) {}
 
   /**
-   * @brief Insert a tuple.
+   * @brief Insert or update a tuple.
    *
-   * Insert the given tuple @rec with the given key into the table. After the
-   * insert
-   * all observers are notified.
+   * Insert or update the given tuple @rec with the given key into the table.
+   * If the key already exists then the tuple in the table is updated, otherwise
+   * the tuple is newly inserted.
+   * After the insert/update all observers are notified.
    *
    * @param key the key value of the tuple
    * @param rec the actual tuple
@@ -213,6 +216,7 @@ class RDBTable : public BaseTable {
                   rocksdb::Slice(reinterpret_cast<const char*>(buf.data()),
                                  buf.size()));
       if (status.ok()) numRecords++;
+      // TODO: what happens in case of replacing a key???
     }
     // after the lock is released we can inform our observers
     notifyObservers(rec, TableParams::Insert, TableParams::Immediate);
@@ -289,7 +293,7 @@ class RDBTable : public BaseTable {
    *        or deleted (=false)
    * @return the number of modified tuples
    */
-  unsigned long updateOrDeleteByKey(KeyType key, UpdelFunc ufunc) {
+  unsigned long updateOrDeleteByKey(KeyType key, UpdelFunc ufunc, InsertFunc ifunc = nullptr) {
     auto keySlice = pfabric::detail::valToSlice(key);
     std::string resultData;
     auto status = db->Get(readOptions, keySlice, &resultData);
@@ -304,7 +308,7 @@ class RDBTable : public BaseTable {
       auto res = ufunc(rec);
 
       // check whether we have to perform an update ...
-      if (!res) {
+      if (res) {
 
         StreamType buf;
         rec.serializeToStream(buf);
@@ -321,6 +325,13 @@ class RDBTable : public BaseTable {
       // notify the observers
       notifyObservers(rec, mode, TableParams::Immediate);
       return num;
+    }
+    else {
+      // key doesn't exist
+      if (ifunc != nullptr) {
+        insert(key, ifunc());
+        return 1;
+      }
     }
     return 0;
   }

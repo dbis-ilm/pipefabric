@@ -366,11 +366,13 @@ private:
 	 *    a reference to the lock protecting the aggregation state
 	 */
 	void produceAggregates(const Timestamp& timestamp, const bool outdated, const Lock& lock) {
+    /*
 		for (const auto groupEntry : mAggregateTable) {
 			const AggregateStatePtr& aggrState = groupEntry.second;
 
-      //produceAggregate(aggrState, timestamp, outdated, lock);
+      produceAggregate(aggrState, timestamp, outdated, lock);
 		}
+    */
 	}
 
 	/**

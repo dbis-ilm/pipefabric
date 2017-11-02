@@ -9,7 +9,7 @@
 namespace pfabric {
 
 struct ColumnInfo {
-  enum ColumnType { Void_Type, Int_Type, Double_Type, String_Type };
+  enum ColumnType { Void_Type, Int_Type, Double_Type, String_Type, UInt_Type };
 
   ColumnInfo(const std::string& n, ColumnType ct) : mColName(n), mColType(ct) {}
 
