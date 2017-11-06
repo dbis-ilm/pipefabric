@@ -109,6 +109,61 @@ private:
   std::vector<std::pair<InputStreamElement, bool>> mBuf;
 };
 
+template <typename InputStreamElement>
+class UnBatcher : public UnaryTransform< BatchPtr<InputStreamElement>, InputStreamElement> // use default unary transform
+{
+private:
+typedef BatchPtr<InputStreamElement> InputStreamBatch;
+
+PFABRIC_UNARY_TRANSFORM_TYPEDEFS(InputStreamBatch, InputStreamElement)
+
+public:
+  /**
+	 * @brief Bind the callback for the data channel.
+	 */
+	BIND_INPUT_CHANNEL_DEFAULT( InputDataChannel, UnBatcher, processDataElement );
+
+	/**
+	 * @brief Bind the callback for the punctuation channel.
+	 */
+	BIND_INPUT_CHANNEL_DEFAULT( InputPunctuationChannel, UnBatcher, processPunctuation );
+
+	const std::string opName() const override { return std::string("UnBatcher"); }
+
+private:
+
+  /**
+	 * @brief This method is invoked when a punctuation arrives.
+	 *
+	 * It simply forwards the punctuation to the subscribers.
+	 *
+	 * @param[in] punctuation
+	 *    the incoming punctuation tuple
+	 */
+	void processPunctuation( const PunctuationPtr& punctuation ) {
+		this->getOutputPunctuationChannel().publish(punctuation);
+	}
+
+	/**
+	 * This method is invoked when a data stream element arrives.
+	 *
+	 * It ... and forwards the resulting element to its subscribers.
+	 *
+	 * @param[in] data
+	 *    the incoming stream element
+	 * @param[in] outdated
+	 *    flag indicating whether the tuple is new or invalidated now
+	 */
+	void processDataElement( const InputStreamBatch& data, const bool outdated ) {
+    // data = TuplePtr<std::vector<std::pair<InputStreamElement, bool>>>
+    auto& vec = get<0>(data);
+    for (auto& elem : vec) {
+      this->getOutputDataChannel().publish(elem.first, outdated);
+    }
+	}
+
+};
+
 }
 
 #endif

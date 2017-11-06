@@ -8,20 +8,30 @@ set (PipeFabric_VERSION_MINOR 2)
 
 include(CTest)
 
-#############################
-# customization section
-#############################
-#
+################################################################################
+# customization section                                                        #
+################################################################################
 
 # Installation path
 set(PIPEFABRIC_DIR "/usr/local/pfabric")
 
-#The following variables enable or disable additional functionalities, which can be switched off to reduce build time.
+# The following variables enable or disable additional functionalities, 
+# which can be switched off to reduce build time.
+
+# Support Matrix Operations (needs Eigen library to be installed) 
+option(SUPPORT_MATRICES 
+	"support matrix operations as tuple and state type" 
+	OFF)
+
+# Build use cases
+option(BUILD_USE_CASES
+	""
+  ON)
 
 # Use the boost::spirit parser for converting strings to numbers
 option(USE_BOOST_SPIRIT_PARSER
-    "use the boost::spirit::qi parsers for converting strings to tuple attributes"
-    ON
+  "use the boost::spirit::qi parsers for converting strings to tuple attributes"
+  ON
 )
 
 # Use RocksDB key-value store for implementing tables
@@ -43,13 +53,13 @@ option(BUILD_ONLY_LIBS
 # If switched to off, no tests will be build
 option(BUILD_TEST_CASES
   "build tests for pipefabric functionality"
-  ON
+	ON
 )
 
 #Build google benchmark library
 option(BUILD_GOOGLE_BENCH
   "build google benchmark"
-  ON
+	ON
 )
 
 # Build benchmark test
@@ -57,6 +67,15 @@ option(BUILD_BENCHMARKS
   "build benchmarks for pipefabric"
   ON
 )
+
+################################
+# End of customization section #
+################################
+
+# Use cases require matrix support (image and graph processing)
+if(BUILD_USE_CASES)
+	set(SUPPORT_MATRICES ON)
+endif()
 
 # Benchmark test requires benchmark library
 if (BUILD_BENCHMARKS)
@@ -80,14 +99,10 @@ endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused -Wno-uninitialized")
 
-# End of customization section
-#---------------------------------------------------------------------------
-
 # Add our CMake directory to CMake's module path
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/")
 
-# We download some 3rdparty modules from github.com before building
-# the project.
+# We download some 3rdparty modules from github.com before building the project.
 include(Download3rdParty)
 
 if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
@@ -98,9 +113,9 @@ else()
 set(DYLIB_LIBRARY "")
 endif()
 
-#############################
-# memory allocator libraries
-#############################
+##############################
+# memory allocator libraries #
+##############################
 #
 find_package(JeMalloc)
 find_package(Tcmalloc)
@@ -210,6 +225,27 @@ if (ZEROMQ_FOUND)
     link_directories(${ZEROMQ_LIBRARY_DIR})
 endif(ZEROMQ_FOUND)
 
+
+#-----------------------------------------------------------------------------------------
+#
+# Matrix Support
+#
+
+if(SUPPORT_MATRICES)
+	####################################
+	# Eigen library for linear algebra #
+	####################################
+	find_package(Eigen3)
+ 	if(EIGEN3_FOUND)
+	  message(STATUS "using Eigen3 library for linear algebra")    
+		include_directories(${EIGEN3_INCLUDE_DIR})
+	else()
+		message(STATUS "Eigen3 not found")
+	endif()
+	add_definitions(-DSUPPORT_MATRICES)
+endif()
+
+
 #-----------------------------------------------------------------------------------------
 #
 # Building PipeFabric core library
@@ -312,6 +348,24 @@ add_subdirectory(test)
 # Micro-benchmarking using Google Benchmark
 #
 add_subdirectory(bench)
+
+#-----------------------------------------------------------------------------------------
+#
+# Build use cases
+#
+if(BUILD_USE_CASES)
+	#######################################
+	# OpenCV library for image processing #
+	#######################################
+	find_package(OpenCV REQUIRED)
+	if(OpenCV_FOUND)
+	 message(STATUS "using OpenCV library for image processing")  
+	 include_directories(${OpenCV_INCLUDE_DIR}) 
+	else()
+		message(STATUS "OpenCV not found")  
+	endif()
+endif()
+  add_subdirectory(usecases)
 #-----------------------------------------------------------------------------------------
 #
 # Installation

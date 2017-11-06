@@ -258,10 +258,6 @@ private:
 	 */
 	void processPunctuation( const PunctuationPtr& punctuation ) {
 			Lock lock( mAggrMtx );
-
-    	const Timestamp timestamp = punctuation->getTimestamp();
-    	const bool outdated = false;
-			produceAggregates( timestamp, outdated, lock );
 			this->getOutputPunctuationChannel().publish(punctuation);
 	}
 
@@ -350,6 +346,7 @@ private:
       }
   }
 
+#if 0
 	/**
 	 * @brief Produce aggregate elements for all groups in the aggregation table.
 	 *
@@ -374,6 +371,7 @@ private:
 		}
     */
 	}
+#endif
 
 	/**
 	 * @brief Produce a final aggregate for a specific state and publish it to all subscribers.
@@ -405,11 +403,7 @@ protected:
 	 * TODO
 	 */
   void notificationCallback() {
-    const bool outdated = false;
-    const Timestamp timestamp = 0; // = ????;
-
     Lock lock(mAggrMtx);
-    this->produceAggregates(timestamp, outdated, lock);
     PunctuationPtr punctuation = std::make_shared< Punctuation >( Punctuation::SlideExpired );
     this->getOutputPunctuationChannel().publish(punctuation);
   }

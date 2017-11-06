@@ -41,7 +41,9 @@
 #include "qop/FromTable.hpp"
 #include "qop/SelectFromTable.hpp"
 #include "qop/StreamGenerator.hpp"
-
+#ifdef SUPPORT_MATRICES
+#include "qop/FromMatrix.hpp"
+#endif
 #include "dsl/Pipe.hpp"
 #include "dsl/Dataflow.hpp"
 
@@ -246,7 +248,26 @@ namespace pfabric {
       return Pipe<T>(dataflow, dataflow->addPublisher(op));
     }
 
+#ifdef SUPPORT_MATRICES
     /**
+     * @brief Create a pipe for stream from matrix
+     * @tparam Matrix
+     *   matrix type
+     * @tparam Matrix::StreamElement
+     *   record type of the matrix like @c TuplePtr< int, int, double >
+     * @param[in] matrix
+     *   the matrix is source of stream.
+     * @return
+     *   a new pipe with new stream.
+     */
+    template<typename Matrix>
+    Pipe<typename Matrix::StreamElement> newStreamFromMatrix(std::shared_ptr<Matrix> matrix) {
+      auto op = std::make_shared<FromMatrix< Matrix > >(matrix);
+      return Pipe<typename Matrix::StreamElement>(dataflow, dataflow->addPublisher(op));
+    }
+#endif
+
+      /**
      * @brief Create a new pipe where a named stream is used as input.
      *
      * @tparam T the type of the stream element

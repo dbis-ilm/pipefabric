@@ -49,6 +49,12 @@ add_custom_command(
                 ${Format_SOURCE_DIR}/fmt/format.h
                 ${THIRD_PARTY_DIR}/fmt
         COMMAND ${CMAKE_COMMAND} -E copy
+                ${Format_SOURCE_DIR}/fmt/ostream.h
+                ${THIRD_PARTY_DIR}/fmt
+        COMMAND ${CMAKE_COMMAND} -E copy
+                ${Format_SOURCE_DIR}/fmt/ostream.cc
+                ${THIRD_PARTY_DIR}/fmt
+        COMMAND ${CMAKE_COMMAND} -E copy
                 ${Format_SOURCE_DIR}/fmt/format.cc
                 ${THIRD_PARTY_DIR}/fmt)
 
@@ -114,6 +120,20 @@ add_custom_command(
 	    COMMAND ${CMAKE_COMMAND} -E copy
 	            ${rocksdb_SOURCE_DIR}/librocksdb.a
 	            ${THIRD_PARTY_DIR}/rocksdb/lib
+)
+endif()
+
+#--------------------------------------------------------------------------------
+if(BUILD_USE_CASES)
+# data for use cases
+download_project(PROJ               data
+	            GIT_REPOSITORY      https://github.com/dbis-ilm/data.git
+	            GIT_TAG             master
+	            UPDATE_DISCONNECTED 1
+	            QUIET
+)
+file(COPY ${PROJECT_BINARY_DIR}/data-src/DEBS2017
+     DESTINATION ${THIRD_PARTY_DIR}
 )
 endif()
 
