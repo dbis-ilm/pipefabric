@@ -45,6 +45,9 @@
 #endif
 #include "dsl/Pipe.hpp"
 #include "dsl/Dataflow.hpp"
+#ifdef NETWORK_SOURCES
+#include "net/RabbitMQSource.hpp"
+#endif
 
 namespace pfabric {
 
@@ -183,6 +186,23 @@ namespace pfabric {
                             const std::string& path,
                             RESTSource::RESTMethod method,
                             unsigned short numThreads = 1);
+
+#ifdef NETWORK_SOURCES
+    /**
+     * @brief Creates a pipe from a RabbitMQ source as input.
+     *
+     * Creates a new pipe for receiving tuples via AMQP server (RabbitMQ).
+     * It reads messages from the AMQP queue and forwards them as tuples
+     * to the subscribers, as long as there are messages on the server
+     *
+     * @param[in] info
+     *    a string containing password, user, address and port of the server
+     *    format: "password:user@address:port", e.g. "guest:guest@localhost:5672"
+     * @return
+     *    a new pipe where RabbitMQSource acts as a producer.
+     */
+    Pipe<TStringPtr> newStreamFromRabbitMQ(const std::string& info);
+#endif
 
     /**
      * @brief Creates a pipe from a ZMQ source as input.

@@ -19,14 +19,22 @@ set(PIPEFABRIC_DIR "/usr/local/pfabric")
 # which can be switched off to reduce build time.
 
 # Support Matrix Operations (needs Eigen library to be installed) 
-option(SUPPORT_MATRICES 
-	"support matrix operations as tuple and state type" 
-	OFF)
+option(SUPPORT_MATRICES
+  "support matrix operations as tuple and state type"
+  OFF
+)
 
 # Build use cases
 option(BUILD_USE_CASES
-	""
-	OFF)
+  "build use cases to show functionality examples"
+  OFF
+)
+
+# Use additional network sources, like RabbitMQ
+option(NETWORK_SOURCES
+  "use additional network sources, like RabbitMQ"
+  OFF
+)
 
 # Use the boost::spirit parser for converting strings to numbers
 option(USE_BOOST_SPIRIT_PARSER
@@ -53,13 +61,13 @@ option(BUILD_ONLY_LIBS
 # If switched to off, no tests will be build
 option(BUILD_TEST_CASES
   "build tests for pipefabric functionality"
-	ON
+  ON
 )
 
 #Build google benchmark library
 option(BUILD_GOOGLE_BENCH
   "build google benchmark"
-	ON
+  ON
 )
 
 # Build benchmark test
@@ -298,13 +306,30 @@ if(BUILD_GOOGLE_BENCH)
   )
 endif()
 
+set(core_libs
+  ${BOOST_LIBRARIES}
+  ${ZEROMQ_LIBRARIES}
+)
+
+if(NETWORK_SOURCES)
+  add_definitions(-DNETWORK_SOURCES)
+  set(core_libs
+    ${core_libs}
+    amqpcpp
+    rabbitmq
+  )
+  set(core_sources
+    ${core_sources}
+    net/RabbitMQSource.cpp
+  )
+endif()
+
 add_library(pfabric_core SHARED
   ${core_sources}
 )
 
 target_link_libraries(pfabric_core
-		${BOOST_LIBRARIES}
-		${ZEROMQ_LIBRARIES}
+  ${core_libs}
 )
 
 #-----------------------------------------------------------------------------------------
