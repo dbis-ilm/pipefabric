@@ -21,8 +21,8 @@ that CMake can find them), you have to enable the network source by switching th
 or by passing `-DNETWORK_SOURCES=ON` to cmake, like `cmake -DNETWORK_SOURCES=ON ../src`.
 
 In addition, you have to start the RabbitMQ server before running the test case. This can be done 
-on console by the command `$service rabbitmq-server start` (without the $). Else the test case 
-will throw an error.
+on console by the command `service rabbitmq-server start`. Else the test case will throw an error, 
+namely `AMQP cannot create socket`.
 
 
 #### newStreamFromRabbitMQ ####
