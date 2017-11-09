@@ -23,11 +23,10 @@
 
 #include "catch.hpp"
 
-#include "AMQPcpp.h"
+#include <cppkafka/producer.h>
+#include "cppkafka/configuration.h"
 #include <string>
 #include <iostream>
-
-#include "core/Tuple.hpp"
 
 #include "dsl/Topology.hpp"
 #include "dsl/Pipe.hpp"
@@ -35,19 +34,32 @@
 
 using namespace pfabric;
 
-TEST_CASE("Producing and receiving tuples via AMQP and RabbitMQ", "[RabbitMQ]") {
+TEST_CASE("Producing and receiving tuples via Apache Kafka protocol", "[Kafka]") {
 
+  //prepare the consuming - necessary to subscribe to the topic before we start
+  //producing tuples (to set the "pointer" on the current topic data correctly)
+  typedef TuplePtr<int, double> InTuplePtr;
+  int resCntr = 0;
+  std::string grp = "TestGroup"+std::to_string(rand()%100000);
+
+  PFabricContext ctx;
+  auto t = ctx.createTopology();
+
+  auto s = t->newStreamFromKafka("127.0.0.1:9092", "PipeFabric", grp)
+    .extract<InTuplePtr>(',')
+    .print()
+    .notify([&resCntr](auto tp, bool outdated) { resCntr++; })
+    ;
+
+  //start the producing
   std::cout<<"Producing 100 tuples..."<<std::endl;
 
-  //produce
-  AMQP amqp("guest:guest@localhost:5672"); //standard
+  cppkafka::Configuration config = {
+    { "metadata.broker.list", "127.0.0.1:9092" }
+  };
 
-  AMQPExchange* ex = amqp.createExchange("tupleProducer");
-  ex->Declare("tupleProducer", "fanout");
-
-  AMQPQueue *qu = amqp.createQueue("queue");
-  qu->Declare();
-  qu->Bind("tupleProducer","");
+  cppkafka::Producer producer(config);
+  cppkafka::MessageBuilder builder("PipeFabric");
 
   std::string msg;
 
@@ -55,23 +67,11 @@ TEST_CASE("Producing and receiving tuples via AMQP and RabbitMQ", "[RabbitMQ]") 
     msg = "";
     msg.append(std::to_string(i));
     msg.append(",1.5");
-    ex->Publish(msg,"");
+    builder.payload(msg);
+    producer.produce(builder);
   }
 
-  std::cout<<"Receiving..."<<std::endl;
-
-  //consume
-  typedef TuplePtr<int, double> InTuplePtr;
-  int resCntr = 0;
-
-  PFabricContext ctx;
-  auto t = ctx.createTopology();
-
-  auto s = t->newStreamFromRabbitMQ("guest:guest@localhost:5672", "queue")
-    .extract<InTuplePtr>(',')
-    .notify([&resCntr](auto tp, bool outdated) { resCntr++; })
-    ;
-
+  //start the consuming
   t->start(false);
 
   REQUIRE(resCntr == 100);

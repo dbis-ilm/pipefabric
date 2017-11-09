@@ -24,8 +24,9 @@
 
 using namespace pfabric;
   
-RabbitMQSource::RabbitMQSource(const std::string& info) {
+RabbitMQSource::RabbitMQSource(const std::string& info, const std::string& queueName) {
   mInfo = info;
+  mQueueName = queueName;
 }
 
 RabbitMQSource::~RabbitMQSource() {
@@ -33,15 +34,18 @@ RabbitMQSource::~RabbitMQSource() {
 
 unsigned long RabbitMQSource::start() {
   AMQP amqp(mInfo);
-  AMQPQueue* que = amqp.createQueue("q");
+  AMQPQueue* que = amqp.createQueue(mQueueName);
   que->Declare();
   uint32_t len = 0;
+  char* data;
 
   //get first tuple
   que->Get(AMQP_NOACK);
   AMQPMessage* m = que->getMessage();
-  char* data = m->getMessage(&len);
-  produceTuple(StringRef(data, len));
+  if(m->getMessageCount() > 0) {
+    data = m->getMessage(&len);
+    produceTuple(StringRef(data, len));
+  }
 
   //and all the others
   while(m->getMessageCount() > 0) {

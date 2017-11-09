@@ -30,9 +30,14 @@ option(BUILD_USE_CASES
   OFF
 )
 
-# Use additional network sources, like RabbitMQ
-option(NETWORK_SOURCES
-  "use additional network sources, like RabbitMQ"
+# Use RabbitMQ as network source
+option(USE_RABBITMQ
+  "use RabbitMQ as network source"
+  OFF
+)
+# Use Apache Kafka as network source
+option(USE_KAFKA
+  "use Apache Kafka as network source"
   OFF
 )
 
@@ -311,8 +316,15 @@ set(core_libs
   ${ZEROMQ_LIBRARIES}
 )
 
-if(NETWORK_SOURCES)
-  add_definitions(-DNETWORK_SOURCES)
+#-----------------------------------------------------------------------------------------
+#
+##########
+# RabbitMQ
+##########
+#
+#
+if(USE_RABBITMQ)
+  add_definitions(-DUSE_RABBITMQ)
   set(core_libs
     ${core_libs}
     amqpcpp
@@ -323,6 +335,26 @@ if(NETWORK_SOURCES)
     net/RabbitMQSource.cpp
   )
 endif()
+#-----------------------------------------------------------------------------------------
+#
+##############
+# Apache Kafka
+##############
+#
+#
+if(USE_KAFKA)
+  add_definitions(-DUSE_KAFKA)
+  set(core_libs
+    ${core_libs}
+    cppkafka
+    rdkafka
+  )
+  set(core_sources
+    ${core_sources}
+    net/KafkaSource.cpp
+  )
+endif()
+#-----------------------------------------------------------------------------------------
 
 add_library(pfabric_core SHARED
   ${core_sources}

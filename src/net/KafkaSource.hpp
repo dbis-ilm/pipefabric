@@ -19,8 +19,8 @@
  * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
  */
 
-#ifndef RabbitMQSource_hpp_
-#define RabbitMQSource_hpp_
+#ifndef KafkaSource_hpp_
+#define KafkaSource_hpp_
 
 #include "core/Punctuation.hpp"
 #include "core/Tuple.hpp"
@@ -29,41 +29,43 @@
 #include "qop/BaseOp.hpp"
 #include "qop/OperatorMacros.hpp"
 #include "qop/TextFileSource.hpp"
-#include "AMQPcpp.h"
+#include "cppkafka/consumer.h"
+#include "cppkafka/configuration.h"
 
 namespace pfabric {
 
   /**
-   * @brief RabbitMQSource is a source operator for receiving tuples via AMQP interface.
+   * @brief KafkaSource is a source operator for receiving tuples via Apache Kafka protocol.
    *
-   * A RabbitMQSource is an operator producing a stream of tuples which are received
-   * via AMQP interface. The operator produces a stream of @c TStringPtr elements,
-   * where each element corresponds to a single AMQP message.
+   * A KafkaSource is an operator producing a stream of tuples which are received via Apache
+   * Kafka protocol. The operator produces a stream of @c TStringPtr elements.
    */
-  class RabbitMQSource : public DataSource<TStringPtr> {
+  class KafkaSource : public DataSource<TStringPtr> {
     public:
       PFABRIC_SOURCE_TYPEDEFS(TStringPtr);
 
       /**
-       * @brief Create a new instance of the RabbitMQSource operator.
+       * @brief Create a new instance of the KafkaSource operator.
        *
-       * Create a new RabbitMQSource operator for receiving stream tuples via AMQP.
+       * Create a new KafkaSource operator for receiving stream tuples via Apache Kafka
+       * protocol.
        *
-       * @param[in] info
-       *    a string containing password, user, address and port of the server
-       *    format: "password:user@address:port", e.g. "guest:guest@localhost:5672"
-       * @param[in] queueName
-       *    a string containing the name of the queue for exchanging tuples, e.g. "queue"
+       * @param[in] broker
+       *    the node(s) where the Kafka server runs on
+       * @param[in] topic
+       *    the topic where the data is stored
+       * @param[in] groupID
+       *    the ID of the group the consumer belongs to
        */
-      RabbitMQSource(const std::string& info, const std::string& queueName);
+      KafkaSource(const std::string& broker, const std::string& topic, const std::string& groupID);
 
       /**
        * Deallocates all resources.
        */
-      ~RabbitMQSource();
+      ~KafkaSource();
 
       /**
-       * Start the operator by listing at the given port and address.
+       * Start the operator by polling the Kafka server.
        *
        * @return always 0
        */
@@ -75,8 +77,8 @@ namespace pfabric {
       void stop();
 
     protected:
-      std::string mInfo;
-      std::string mQueueName;
+      cppkafka::Consumer *consumer;
+      cppkafka::Message msg;
 
       void produceTuple(const StringRef& data);
       void producePunctuation(PunctuationPtr pp);

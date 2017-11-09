@@ -57,7 +57,11 @@ if (BUILD_TEST_CASES)
     do_test(MatrixTest)
   endif()
 
-  if(NETWORK_SOURCES)
+  if(USE_RABBITMQ)
     do_test(RabbitMQSourceTest)
+  endif()
+
+  if(USE_KAFKA)
+    do_test(KafkaSourceTest)
   endif()
 endif()

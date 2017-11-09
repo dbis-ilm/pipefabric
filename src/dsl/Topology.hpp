@@ -41,12 +41,15 @@
 #include "qop/SelectFromTable.hpp"
 #include "qop/StreamGenerator.hpp"
 #ifdef SUPPORT_MATRICES
-#include "qop/FromMatrix.hpp"
+  #include "qop/FromMatrix.hpp"
 #endif
 #include "dsl/Pipe.hpp"
 #include "dsl/Dataflow.hpp"
-#ifdef NETWORK_SOURCES
-#include "net/RabbitMQSource.hpp"
+#ifdef USE_RABBITMQ
+  #include "net/RabbitMQSource.hpp"
+#endif
+#ifdef USE_KAFKA
+  #include "net/KafkaSource.hpp"
 #endif
 
 namespace pfabric {
@@ -187,21 +190,43 @@ namespace pfabric {
                             RESTSource::RESTMethod method,
                             unsigned short numThreads = 1);
 
-#ifdef NETWORK_SOURCES
+#ifdef USE_RABBITMQ
     /**
      * @brief Creates a pipe from a RabbitMQ source as input.
      *
      * Creates a new pipe for receiving tuples via AMQP server (RabbitMQ).
      * It reads messages from the AMQP queue and forwards them as tuples
-     * to the subscribers, as long as there are messages on the server
+     * to the subscribers, as long as there are messages on the server.
      *
      * @param[in] info
      *    a string containing password, user, address and port of the server
      *    format: "password:user@address:port", e.g. "guest:guest@localhost:5672"
+     * @param[in] queueName
+     *    a string containing the name of the queue for exchanging tuples, e.g. "queue"
      * @return
      *    a new pipe where RabbitMQSource acts as a producer.
      */
-    Pipe<TStringPtr> newStreamFromRabbitMQ(const std::string& info);
+    Pipe<TStringPtr> newStreamFromRabbitMQ(const std::string& info, const std::string& queueName);
+#endif
+
+#ifdef USE_KAFKA
+    /**
+     * @brief Creates a pipe from an Apache Kafka source as input.
+     *
+     * Creates a new pipe for receiving tuples via Apache Kafka protocol.
+     *
+     * @param[in] broker
+     *    the node(s) where the Kafka server runs on,
+     *    e.g. "127.0.0.1:9092" for localhost
+     * @param[in] topic
+     *    the topic where the data is stored (Kafka property)
+     * @param[in] groupID
+     *    the ID of the group the consumer belongs to
+     * @return
+     *    a new pipe where KafkaSource acts as a producer.
+     */
+    Pipe<TStringPtr> newStreamFromKafka(const std::string& broker, const std::string& topic,
+                                        const std::string& groupID);
 #endif
 
     /**
