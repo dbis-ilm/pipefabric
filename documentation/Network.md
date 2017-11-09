@@ -3,7 +3,7 @@
 There already exist ZeroMQ and REST as network sources, providing tuples via network connection.
 In addition, the AMQP (Advanced Message Queuing Protocol) used by RabbitMQ as well as the Apache
 Kafka protocol can be used as source. However, there are additional libraries/installs necessary to
-run the protocol which are not delivered in PipeFabric per default.
+run the protocols which are not delivered in PipeFabric per default.
 
 ## RabbitMQ ##
 
@@ -44,6 +44,9 @@ The operator currently checks once if there are messages (tuples) available on t
 If yes, all the messages are gathered and sent downstreams to the subscribers (that means, the
 following operator(s)). Then it finishes. However, it can be easily adapted to stay waiting,
 repeatedly asking the server if new messages have arrived.
+
+There is an example (test case) provided how to use it properly which can be found in
+`/test/RabbitMQSourceTest.cpp` of the source folder.
 
 ## Apache Kafka ##
 
@@ -102,4 +105,7 @@ The operator currently checks once if there are messages (tuples) available on t
 If yes, all the messages are consecutively gathered and sent downstreams to the subscribers (that
 means, the following operator(s)). Then it finishes. However, it can be easily adapted to stay
 waiting, repeatedly asking the server if new messages have arrived.
+
+There is an example (test case) provided how to use it properly which can be found in
+`/test/KafkaSourceTest.cpp` of the source folder.
 

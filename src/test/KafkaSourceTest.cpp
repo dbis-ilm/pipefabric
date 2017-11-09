@@ -47,7 +47,6 @@ TEST_CASE("Producing and receiving tuples via Apache Kafka protocol", "[Kafka]")
 
   auto s = t->newStreamFromKafka("127.0.0.1:9092", "PipeFabric", grp)
     .extract<InTuplePtr>(',')
-    .print()
     .notify([&resCntr](auto tp, bool outdated) { resCntr++; })
     ;
 
