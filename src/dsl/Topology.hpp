@@ -51,6 +51,9 @@
 #ifdef USE_KAFKA
   #include "net/KafkaSource.hpp"
 #endif
+#ifdef USE_MQTT
+  #include "net/MQTTSource.hpp"
+#endif
 
 namespace pfabric {
 
@@ -227,6 +230,22 @@ namespace pfabric {
      */
     Pipe<TStringPtr> newStreamFromKafka(const std::string& broker, const std::string& topic,
                                         const std::string& groupID);
+#endif
+
+#ifdef USE_MQTT
+    /**
+     * @brief Creates a pipe from a MQTT source as input.
+     *
+     * Creates a new pipe for receiving tuples via MQTT.
+     *
+     * @param[in] conn
+     *    server connection info, e.g. "tcp://localhost:1883"
+     * @param[in] channel
+     *    the name of the channel to listen on
+     * @return
+     *    a new pipe where MQTTSource acts as a producer.
+     */
+    Pipe<TStringPtr> newStreamFromMQTT(const std::string& conn, const std::string& channel);
 #endif
 
     /**

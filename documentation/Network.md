@@ -2,8 +2,9 @@
 
 There already exist ZeroMQ and REST as network sources, providing tuples via network connection.
 In addition, the AMQP (Advanced Message Queuing Protocol) used by RabbitMQ as well as the Apache
-Kafka protocol can be used as source. However, there are additional libraries/installs necessary to
-run the protocols which are not delivered in PipeFabric per default.
+Kafka and the MQTT (Message Queue Telemetry Transport) protocol can be used as source. However,
+there are additional libraries/installs necessary to run the protocols which are not delivered in
+PipeFabric per default.
 
 ## RabbitMQ ##
 
@@ -108,4 +109,47 @@ waiting, repeatedly asking the server if new messages have arrived.
 
 There is an example (test case) provided how to use it properly which can be found in
 `/test/KafkaSourceTest.cpp` of the source folder.
+
+## MQTT ##
+
+### Preliminaries and Installation ###
+
+For MQTT:
+ + [Eclipse Mosquitto](https://mosquitto.org/)
+ + [Eclipse Paho C](https://github.com/eclipse/paho.mqtt.c.git), available on Github
+ + [Eclipse Paho C++](https://github.com/eclipse/paho.mqtt.cpp.git), available on GitHub
+
+The Eclipse Mosquitto delivers the necessities for running an MQTT server. In Linux systems, it is
+possible to use the command `sudo apt-get install mosquitto mosquitto-clients` for the server and
+the client software. Eclipse Paho provides the libraries and headers for C++ support. Because of
+Eclipse Paho C++ references the Eclipse Paho C installation, both are necessary. Both have to be
+installed in a way that CMake can find them (libraries and headers).
+
+MQTT is then enabled in PipeFabric by switching the CMake variable `USE_MQTT` to `ON`. This can be
+done manually in the CMakeLists.txt file in the src folder or by passing `-DUSE_MQTT=ON` to cmake,
+like `cmake -DUSE_MQTT=ON ../src`.
+
+In addition, you have to start the MQTT server before running the test case. This can be done on
+console by the command `mosquitto`. Else the test case will throw an error, namely
+`MQTT error [-1]: TCP/TLS connect failure`.
+
+### Usage ###
+
+PipeFabric provides an interface to the MQTT server in which all currently available messages on
+the server are gathered, transformed to tuples and forwarded to the query. This is done by using
+the operator `newStreamFromMQTT`:
+
+`Pipe<TStringPtr> Topology::newStreamFromMQTT(const std::string& conn, const std::string& channel)`
+
+Each incoming message of the MQTT server produces a single tuple (consisting of a single string).
+The parameter `conn` describes the server address with port. The channel is just the name of the
+topic where the messages are exchanged.
+
+The operator currently checks once if there are messages (tuples) available on the MQTT server.
+If yes, all the messages are consecutively gathered and sent downstreams to the subscribers (that
+means, the following operator(s)). Then it finishes. However, it can be easily adapted to stay
+waiting, repeatedly asking the server if new messages have arrived.
+
+There is an example (test case) provided how to use it properly which can be found in
+`/test/MQTTSourceTest.cpp` of the source folder.
 

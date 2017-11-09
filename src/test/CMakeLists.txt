@@ -64,4 +64,8 @@ if (BUILD_TEST_CASES)
   if(USE_KAFKA)
     do_test(KafkaSourceTest)
   endif()
+
+  if(USE_MQTT)
+    do_test(MQTTSourceTest)
+  endif()
 endif()

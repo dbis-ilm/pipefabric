@@ -33,12 +33,17 @@ option(BUILD_USE_CASES
 # Use RabbitMQ as network source
 option(USE_RABBITMQ
   "use RabbitMQ as network source"
-  OFF
+  ON
 )
 # Use Apache Kafka as network source
 option(USE_KAFKA
   "use Apache Kafka as network source"
-  OFF
+  ON
+)
+# Use MQTT as network source
+option(USE_MQTT
+  "use MQTT as network source"
+  ON
 )
 
 # Use the boost::spirit parser for converting strings to numbers
@@ -352,6 +357,28 @@ if(USE_KAFKA)
   set(core_sources
     ${core_sources}
     net/KafkaSource.cpp
+  )
+endif()
+#-----------------------------------------------------------------------------------------
+#
+######
+# MQTT
+######
+#
+#
+if(USE_MQTT)
+  add_definitions(-DUSE_MQTT)
+  set(core_libs
+    ${core_libs}
+    paho-mqtt3c
+    paho-mqtt3cs
+    paho-mqtt3a
+    paho-mqtt3as
+    paho-mqttpp3
+  )
+  set(core_sources
+    ${core_sources}
+    net/MQTTSource.cpp
   )
 endif()
 #-----------------------------------------------------------------------------------------
