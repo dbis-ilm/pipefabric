@@ -33,17 +33,17 @@ option(BUILD_USE_CASES
 # Use RabbitMQ as network source
 option(USE_RABBITMQ
   "use RabbitMQ as network source"
-  ON
+  OFF
 )
 # Use Apache Kafka as network source
 option(USE_KAFKA
   "use Apache Kafka as network source"
-  ON
+  OFF
 )
 # Use MQTT as network source
 option(USE_MQTT
   "use MQTT as network source"
-  ON
+  OFF
 )
 
 # Use the boost::spirit parser for converting strings to numbers
