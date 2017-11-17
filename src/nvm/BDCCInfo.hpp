@@ -22,70 +22,88 @@
 #ifndef BDCCInfo_hpp_
 #define BDCCInfo_hpp_
 
-#include <nvm/PTableInfo.hpp>
 #include <map>
 #include <unordered_map>
 #include <algorithm>
+#include <iterator>
+
+#include "nvm/PTableInfo.hpp"
 
 #include "nvml/include/libpmemobj++/allocator.hpp"
-#include "nvml/include/libpmemobj++/detail/persistent_ptr_base.hpp"
-#include "nvml/include/libpmemobj++/make_persistent.hpp"
 #include "nvml/include/libpmemobj++/p.hpp"
-#include "nvml/include/libpmemobj++/persistent_ptr.hpp"
-#include "nvml/include/libpmemobj++/transaction.hpp"
-#include "nvml/include/libpmemobj++/utils.hpp"
 
 namespace pfabric {
-  namespace nvm {
+namespace nvm {
 
-    using nvml::obj::allocator;
-    using nvml::obj::delete_persistent;
-    using nvml::obj::make_persistent;
-    using nvml::obj::p;
-    using nvml::obj::persistent_ptr;
-    using nvml::obj::pool_by_vptr;
-    using nvml::obj::transaction;
+using nvml::obj::allocator;
+using nvml::obj::p;
 
 /**************************************************************************//**
  * \brief Info structure about the BDCC meta data.
  *
  * It is used in persistent tables to store the BDCC meta data and statistics.
  *****************************************************************************/
-    class BDCCInfo {
-      using pColumnBitsMap = const std::vector<std::pair<uint16_t, uint16_t>, nvml::obj::allocator<std::pair<uint16_t, uint16_t>>>;
-      public:
-      using ColumnBitsMap = const std::unordered_map<uint16_t, uint16_t>; //<mapping from column id to number of bits
-      explicit BDCCInfo(const ColumnBitsMap &_bitMap) :
-        bitMap(_bitMap.cbegin(), _bitMap.cend()),
-        numberOfBins(std::accumulate(_bitMap.begin(), _bitMap.end(), 0,
-                                [](const size_t sum, decltype(*_bitMap.begin()) p) { return sum + p.second; })) {}
+class BDCCInfo {
+  using DimensionUses = std::vector<std::tuple<uint16_t, uint16_t, std::bitset<32>>,
+                                    nvml::obj::allocator<std::tuple<uint16_t, uint16_t, std::bitset<32>>>>;
+  p<size_t> numberOfBins;
+  p<DimensionUses> dimensions;
 
-      const pColumnBitsMap::const_iterator find(uint16_t item) const {
-        for (auto it = bitMap.cbegin(); it != bitMap.cend(); it++) {
-          if (it->first == item) return it;
-        }
-        return bitMap.cend();
-      }
+ public:
+  using ColumnBitsMap = std::map<uint16_t, uint16_t>; //<mapping from column id to number of bits
 
-      const size_t numColumns() const {
-        return bitMap.size();
-      }
+  BDCCInfo() : numberOfBins(0), dimensions() {}
 
-      const size_t numBins() const {
-        return numberOfBins.get_ro();
-      }
+  explicit BDCCInfo(const ColumnBitsMap &_bitMap) :
+    numberOfBins(std::accumulate(_bitMap.begin(), _bitMap.end(), 0,
+                                 [](const size_t sum, decltype(*_bitMap.begin()) p) {
+                                   return sum + p.second;
+                                 })),
+    dimensions() { deriveMasks(_bitMap); }
 
-      const pColumnBitsMap::const_iterator cend() const {
-        return bitMap.cend();
-      }
-
-    //  private:
-      const pColumnBitsMap bitMap;
-      p<const size_t> numberOfBins;
-      //std::map<uint32_t, std::size_t> histogram;
-    };/* struct BDCCInfo */
-
+  const auto find(uint16_t item) const {
+    for (auto it = dimensions.get_ro().cbegin(); it != dimensions.get_ro().cend(); it++) {
+      if (std::get<0>(*it) == item) return it;
+    }
+    return dimensions.get_ro().cend();
   }
+
+  const auto numBins() const {
+    return numberOfBins.get_ro();
+  }
+
+  const auto begin() const {
+    return dimensions.get_ro().cbegin();
+  }
+
+  const auto end() const {
+    return dimensions.get_ro().cend();
+  }
+
+ private:
+  void deriveMasks(ColumnBitsMap colToBits) {
+    /* Initialize */
+    for (const auto &dim: colToBits) {
+      dimensions.get_rw()
+        .emplace_back(dim.first,
+                      dim.second,
+                      std::bitset<32>());
+    }
+
+    /* Round robin the bins for mapping */
+    auto bdccSize = numBins();
+    while (bdccSize > 0) {
+      auto i = 0ul;
+      for (auto &dim: colToBits) {
+        if (std::get<1>(dim)-- > 0) {
+          std::get<2>(dimensions.get_rw()[i++])[--bdccSize] = 1;
+        }
+      }
+    }
+  }
+};/* struct BDCCInfo */
+
+}
 } /* namespace pfabric::nvm */
 
 #endif /* PTuple_hpp_ */

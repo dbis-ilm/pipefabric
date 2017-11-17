@@ -51,7 +51,7 @@ namespace detail {
  * \tparam ID
  *   the index of the requested attribute
  *****************************************************************************/
-template<typename T, std::size_t ID>
+template<typename T, std::size_t ID, typename KeyType>
 struct get_helper;
 
 /**************************************************************************//**
@@ -62,12 +62,12 @@ struct get_helper;
  * \tparam ID
  *   the index of the requested attribute
  *****************************************************************************/
-template<typename T, std::size_t ID>
+template<typename T, std::size_t ID, typename KeyType>
 struct get_helper {
-  static T apply(persistent_ptr<BDCC_Block> block, const uint16_t *offsets) {
+  static T apply(persistent_ptr<DataNode<KeyType>> node, const uint16_t *offsets) {
     T val;
     uint8_t* ptr = reinterpret_cast<uint8_t*>(&val);
-    std::copy(block->begin() + offsets[ID], block->begin() + offsets[ID] + sizeof(T), ptr);
+    std::copy(node->block.get_ro().begin() + offsets[ID], node->block.get_ro().begin() + offsets[ID] + sizeof(T), ptr);
     return val;
   }
 };
@@ -80,10 +80,10 @@ struct get_helper {
  * \tparam ID
  *   the index of the requested attribute
  *****************************************************************************/
-template<std::size_t ID>
-struct get_helper<std::string, ID> {
-  static std::string apply(persistent_ptr<BDCC_Block> block, const uint16_t *offsets) {
-    return reinterpret_cast<char (&)[]>(block->at(offsets[ID]));
+template<std::size_t ID, typename KeyType>
+struct get_helper<std::string, ID, KeyType> {
+  static std::string apply(persistent_ptr<DataNode<KeyType>> node, const uint16_t *offsets) {
+    return reinterpret_cast<const char (&)[]>(node->block.get_ro()[offsets[ID]]);
   }
 };
 
@@ -95,10 +95,10 @@ struct get_helper<std::string, ID> {
  * \tparam ID
  *   the index of the requested attribute
  *****************************************************************************/
-template<std::size_t ID>
-struct get_helper<int, ID> {
-  static int apply(persistent_ptr<BDCC_Block> block, const uint16_t *offsets) {
-    return reinterpret_cast<int&>(block->at(offsets[ID]));
+template<std::size_t ID, typename KeyType>
+struct get_helper<int, ID, KeyType> {
+  static int apply(persistent_ptr<DataNode<KeyType>> node, const uint16_t *offsets) {
+    return reinterpret_cast<const int&>(node->block.get_ro()[offsets[ID]]);
   }
 };
 
@@ -110,10 +110,10 @@ struct get_helper<int, ID> {
  * \tparam ID
  *   the index of the requested attribute
  *****************************************************************************/
-template<std::size_t ID>
-struct get_helper<double, ID> {
-  static double apply(persistent_ptr<BDCC_Block> block, const uint16_t *offsets) {
-    return reinterpret_cast<double&>(block->at(offsets[ID]));
+template<std::size_t ID, typename KeyType>
+struct get_helper<double, ID, KeyType> {
+  static double apply(persistent_ptr<DataNode<KeyType>> node, const uint16_t *offsets) {
+    return reinterpret_cast<const double&>(node->block.get_ro()[offsets[ID]]);
   }
 };
 
@@ -126,7 +126,7 @@ struct get_helper<double, ID> {
  * \tparam CurrentIndex
  *   the index of the attribute to set next
  *****************************************************************************/
-template<class Tuple, std::size_t CurrentIndex>
+template<class Tuple, std::size_t CurrentIndex, typename KeyType>
 struct getAll_helper;
 
 /**************************************************************************//**
@@ -140,11 +140,11 @@ struct getAll_helper;
  * \tparam CurrentIndex
  *   the index of the attribute to add next
  *****************************************************************************/
-template<class Tuple, std::size_t CurrentIndex>
+template<class Tuple, std::size_t CurrentIndex, typename KeyType>
 struct getAll_helper {
-  static void apply(SmartPtr<Tuple> tptr, persistent_ptr<BDCC_Block> block, const uint16_t* const offsets) {
-    getAll_helper<Tuple, CurrentIndex - 1>::apply(tptr, block, offsets);
-    auto val = get_helper<typename Tuple::template getAttributeType<CurrentIndex-1>::type, CurrentIndex - 1>::apply(block, offsets);
+  static void apply(SmartPtr<Tuple> tptr, persistent_ptr<DataNode<KeyType>> node, const uint16_t* const offsets) {
+    getAll_helper<Tuple, CurrentIndex - 1, KeyType>::apply(tptr, node, offsets);
+    auto val = get_helper<typename Tuple::template getAttributeType<CurrentIndex-1>::type, CurrentIndex - 1, KeyType>::apply(node, offsets);
     tptr->template setAttribute<CurrentIndex-1>(val);
   }
 };
@@ -157,10 +157,10 @@ struct getAll_helper {
  * \tparam Tuple
  *    the underlying tuple type having one element
  *****************************************************************************/
-template<class Tuple>
-struct getAll_helper<Tuple, 1> {
-  static void apply(SmartPtr<Tuple> tptr, persistent_ptr<BDCC_Block> block, const uint16_t* const offsets) {
-    auto val = get_helper<typename Tuple::template getAttributeType<0>::type, 0>::apply(block, offsets);
+template<class Tuple, typename KeyType>
+struct getAll_helper<Tuple, 1, KeyType> {
+  static void apply(SmartPtr<Tuple> tptr, persistent_ptr<DataNode<KeyType>> node, const uint16_t* const offsets) {
+    auto val = get_helper<typename Tuple::template getAttributeType<0>::type, 0, KeyType>::apply(node, offsets);
     tptr->template setAttribute<0>(val);
   }
 };
@@ -178,7 +178,7 @@ struct getAll_helper<Tuple, 1> {
  * \tparam CurrentIndex
  *    the index of the attribute value to be printed
  *****************************************************************************/
-template<class Tuple, std::size_t CurrentIndex>
+template<class Tuple, std::size_t CurrentIndex, typename KeyType>
 struct PTuplePrinter;
 
 /**************************************************************************//**
@@ -192,11 +192,11 @@ struct PTuplePrinter;
  * \tparam CurrentIndex
  *    the index of the attribute value to be printed
  *****************************************************************************/
-template<class Tuple, std::size_t CurrentIndex>
+template<class Tuple, std::size_t CurrentIndex, typename KeyType>
 struct PTuplePrinter {
-  static void print(std::ostream& os, persistent_ptr<BDCC_Block> block, const uint16_t* offsets) {
-    PTuplePrinter<Tuple, CurrentIndex - 1>::print(os, block, offsets);
-    auto val = get_helper<typename Tuple::template getAttributeType<CurrentIndex-1>::type, CurrentIndex - 1>::apply(block, offsets);
+  static void print(std::ostream& os, persistent_ptr<DataNode<KeyType>> node, const uint16_t* offsets) {
+    PTuplePrinter<Tuple, CurrentIndex - 1, KeyType>::print(os, node, offsets);
+    auto val = get_helper<typename Tuple::template getAttributeType<CurrentIndex-1>::type, CurrentIndex - 1, KeyType>::apply(node, offsets);
     os << "," << val;
   }
 };
@@ -209,10 +209,10 @@ struct PTuplePrinter {
  * \tparam Tuple
  *    the underlying tuple type having one element
  *****************************************************************************/
-template<class Tuple>
-struct PTuplePrinter<Tuple, 1> {
-  static void print(std::ostream& os, persistent_ptr<BDCC_Block> block, const uint16_t* offsets) {
-    os << get_helper<typename Tuple::template getAttributeType<0>::type, 0>::apply(block, offsets);
+template<class Tuple, typename KeyType>
+struct PTuplePrinter<Tuple, 1, KeyType> {
+  static void print(std::ostream& os, persistent_ptr<DataNode<KeyType>> node, const uint16_t* offsets) {
+    os << get_helper<typename Tuple::template getAttributeType<0>::type, 0, KeyType>::apply(node, offsets);
   }
 };
 
@@ -224,9 +224,9 @@ struct PTuplePrinter<Tuple, 1> {
  * \tparam Tuple
  *    the underlying tuple type having no elements
  *****************************************************************************/
-template<class Tuple>
-struct PTuplePrinter<Tuple, 0> {
-  static void print(std::ostream& os, persistent_ptr<BDCC_Block> block, const uint16_t* offsets) {
+template<class Tuple, typename KeyType>
+struct PTuplePrinter<Tuple, 0, KeyType> {
+  static void print(std::ostream& os, persistent_ptr<DataNode<KeyType>> node, const uint16_t* offsets) {
   }
 };
 
@@ -235,17 +235,17 @@ struct PTuplePrinter<Tuple, 0> {
 /**************************************************************************//**
  * \brief A persistent Tuple used for referencing tuples in a persistent table.
  *
- * A PTuple consist of a persistent pointer to the \c block where the
+ * A PTuple consist of a persistent pointer to the \c node where the
  * underlying tuple is stored. The \c offsets are used to locate the individual
- * attributes of the tuple within the \c block.
+ * attributes of the tuple within the \c node.
  *
  * \code
- * persistent_ptr<BDCC_Block> block;
+ * persistent_ptr<DataNode<KeyType>> node;
  * std::vector<uint16_t> tupleOffsets;
  *
- * // Insert into block and save the offsets ...
+ * // Insert into node and save the offsets ...
  *
- * PTuple<pfabric::Tuple<int, double, std::string>> ptp(block, tupleOffsets);
+ * PTuple<pfabric::Tuple<int, double, std::string>> ptp(node, tupleOffsets);
  * \endcode
  *
  * Get reference to single attribute:
@@ -259,7 +259,7 @@ struct PTuplePrinter<Tuple, 0> {
  * \note string attributes are returned as reference to a char array
  * \author Philipp Goetze <philipp.goetze@tu-ilmenau.de>
  *****************************************************************************/
-template<class Tuple>
+template<class Tuple, typename KeyType>
 class PTuple {
 public:
 
@@ -280,21 +280,21 @@ public:
   };
 
   /************************************************************************//**
-   * \brief Constructs a new persistent tuple using a persistent block and
+   * \brief Constructs a new persistent tuple using a persistent node and
    *        offsets for the tuple elements.
    *
    * \tparam Tuple
    *   the underlying tuple type used as base
-   * \param[in] _block
-   *   the persistent block containing the tuple data (bytes)
+   * \param[in] _node
+   *   the persistent node containing the tuple data (bytes)
    * \param[in] _offsets
    *   the offsets for each tuple element
    ***************************************************************************/
-  PTuple(persistent_ptr<BDCC_Block> _block, std::array<uint16_t, NUM_ATTRIBUTES> _offsets) :
-      block(_block), offsets(_offsets) {
+  PTuple(persistent_ptr<DataNode<KeyType>> _node, std::array<uint16_t, NUM_ATTRIBUTES> _offsets) :
+      node(_node), offsets(_offsets) {
   }
 
-  PTuple() : block(nullptr), offsets(std::array<uint16_t, Tuple::NUM_ATTRIBUTES>()) {}
+  PTuple() : node(nullptr), offsets(std::array<uint16_t, Tuple::NUM_ATTRIBUTES>()) {}
 
   /************************************************************************//**
    * \brief Get a specific attribute value from the persistent tuple.
@@ -307,7 +307,7 @@ public:
   template<std::size_t ID>
   typename getAttributeType< ID >::type& getAttribute() {
     auto val = new typename getAttributeType<ID>::type;
-    *val = detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets.get_ro().data());
+    *val = detail::get_helper<typename getAttributeType<ID>::type, ID, KeyType>::apply(node, offsets.get_ro().data());
     return *val;
   }
 
@@ -321,7 +321,7 @@ public:
    ***************************************************************************/
   template<std::size_t ID>
   inline auto get() {
-    return detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets.get_ro().data());
+    return detail::get_helper<typename getAttributeType<ID>::type, ID, KeyType>::apply(node, offsets.get_ro().data());
   }
 
   /************************************************************************//**
@@ -334,7 +334,7 @@ public:
    ***************************************************************************/
   template<std::size_t ID>
   const typename getAttributeType< ID >::type& getAttribute() const {
-    return detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets.get_ro().data());
+    return detail::get_helper<typename getAttributeType<ID>::type, ID, KeyType>::apply(node, offsets.get_ro().data());
   }
 
   /************************************************************************//**
@@ -347,7 +347,15 @@ public:
    ***************************************************************************/
   template<std::size_t ID>
   inline auto get() const {
-    return detail::get_helper<typename getAttributeType<ID>::type, ID>::apply(block, offsets.get_ro().data());
+    return detail::get_helper<typename getAttributeType<ID>::type, ID, KeyType>::apply(node, offsets.get_ro().data());
+  }
+
+  persistent_ptr<DataNode<KeyType>> getNode() const {
+    return node;
+  }
+
+  uint16_t getOffsetAt(std::size_t pos) const {
+    return offsets.get_ro()[pos];
   }
 
   /************************************************************************//**
@@ -356,8 +364,8 @@ public:
    * \param[in] os
    *   the output stream to print the tuple
    ***************************************************************************/
-  void print(std::ostream& os) {
-    detail::PTuplePrinter<Tuple, NUM_ATTRIBUTES>::print(os, block, offsets.get_ro().data());
+  void print(std::ostream& os) const {
+    detail::PTuplePrinter<Tuple, NUM_ATTRIBUTES, KeyType>::print(os, node, offsets.get_ro().data());
   }
 
   /************************************************************************//**
@@ -369,21 +377,21 @@ public:
   SmartPtr<Tuple> createTuple() const {
     typename Tuple::Base tp{};
     SmartPtr<Tuple> tptr(new Tuple(tp));
-    detail::getAll_helper<Tuple, NUM_ATTRIBUTES>::apply(tptr, block, offsets.get_ro().data());
+    detail::getAll_helper<Tuple, NUM_ATTRIBUTES, KeyType>::apply(tptr, node, offsets.get_ro().data());
     return tptr;
   }
 
 private:
 
-  persistent_ptr<BDCC_Block> block;
+  persistent_ptr<DataNode<KeyType>> node;
   p<std::array<uint16_t, NUM_ATTRIBUTES>> offsets;
 
 }; /* class PTuple */
 
 } /* end namespace nvm */
 
-template<class Tuple>
-using PTuplePtr = persistent_ptr<nvm::PTuple<Tuple>>;
+template<class Tuple, typename KeyType>
+using PTuplePtr = persistent_ptr<nvm::PTuple<Tuple, KeyType>>;
 
 /**************************************************************************//**
  * \brief Get a specific attribute reference from the PTuple.
@@ -400,8 +408,8 @@ using PTuplePtr = persistent_ptr<nvm::PTuple<Tuple>>;
  * \return
  *   a reference to the persistent tuple's attribute with the requested \c ID
  *****************************************************************************/
-template<std::size_t ID, class Tuple>
-auto get(const nvm::PTuple<Tuple>& ptp) -> decltype((ptp.template get<ID>())) {
+template<std::size_t ID, class Tuple, typename KeyType>
+auto get(const nvm::PTuple<Tuple, KeyType>& ptp) -> decltype((ptp.template get<ID>())) {
   return ptp.template get<ID>();
 }
 
@@ -411,8 +419,8 @@ auto get(const nvm::PTuple<Tuple>& ptp) -> decltype((ptp.template get<ID>())) {
    * \param[in] os
    *   the output stream to print the tuple
  *****************************************************************************/
-template<class Tuple>
-void print(std::ostream& os, const nvm::PTuple<Tuple>& ptp) {
+template<class Tuple, typename KeyType>
+void print(std::ostream& os, const nvm::PTuple<Tuple, KeyType>& ptp) {
   ptp.print(os);
 }
 
@@ -430,8 +438,8 @@ void print(std::ostream& os, const nvm::PTuple<Tuple>& ptp) {
  * \return
  *   the output stream
  *****************************************************************************/
-template<typename Tuple>
-std::ostream& operator<<(std::ostream& os, pfabric::nvm::PTuple<Tuple>& ptp) {
+template<class Tuple, typename KeyType>
+std::ostream& operator<<(std::ostream& os, const pfabric::nvm::PTuple<Tuple, KeyType>& ptp) {
   ptp.print(os);
   return os;
 }

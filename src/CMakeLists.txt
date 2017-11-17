@@ -16,6 +16,9 @@ include(CTest)
 # Installation path
 set(PIPEFABRIC_DIR "/usr/local/pfabric")
 
+# Set to 1 if you need log output
+add_definitions(-DDO_LOG=1)
+
 #The following variables enable or disable additional functionalities, which can be switched off to reduce build time.
 
 # Use the boost::spirit parser for converting strings to numbers
@@ -49,7 +52,7 @@ option(BUILD_ONLY_LIBS
 # If switched to off, no tests will be build
 option(BUILD_TEST_CASES
   "build tests for pipefabric functionality"
-  ON
+  OFF
 )
 
 #Build google benchmark library
@@ -303,7 +306,9 @@ if(USE_NVML_TABLE)
   set(core_sources
     ${core_sources}
     nvm/PTableInfo.cpp
-    ${THIRD_PARTY_DIR}/nvml)
+    ${THIRD_PARTY_DIR}/nvml
+#    ${THIRD_PARTY_DIR}/pmemkv
+  )
   add_library(pfabric_core SHARED
     ${core_sources}
   )
@@ -312,8 +317,10 @@ if(USE_NVML_TABLE)
     ${ZEROMQ_LIBRARIES}
     ${NVML_LIBRARIES})
 
-  add_executable(nvm_test nvm_test.cpp)
-  target_link_libraries(nvm_test pfabric_core)
+  add_executable(nvm_scan nvm_scan.cpp)
+  target_link_libraries(nvm_scan pfabric_core)
+  add_executable(nvm_insert nvm_insert.cpp)
+  target_link_libraries(nvm_insert pfabric_core)
 endif()
 
 #-----------------------------------------------------------------------------------------

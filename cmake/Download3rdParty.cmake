@@ -135,4 +135,24 @@ add_custom_command(
 				#				 ${nvml_SOURCE_DIR}/src/include
 				#        ${THIRD_PARTY_DIR}/nvml/include
 )
+
+# Key/Value Store for Non-Volatile Memory(pmem.io)
+if(FALSE)
+download_project(PROJ               pmemkv
+                GIT_REPOSITORY      https://github.com/pmem/pmemkv.git
+                GIT_TAG             master
+                UPDATE_DISCONNECTED 1
+                QUIET
+)
+add_custom_command(
+        OUTPUT ${THIRD_PARTY_DIR}/pmemkv
+        COMMAND ${CMAKE_COMMAND} -E chdir ${pmemkv_SOURCE_DIR} $(MAKE) configure
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/pmemkv/include
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/pmemkv/lib
+				COMMAND ${CMAKE_COMMAND} -E chdir ${pmemkv_SOURCE_DIR} $(MAKE) install prefix=${THIRD_PARTY_DIR}/pmemkv
+)
 endif()
+endif()
+
+
+

@@ -3,6 +3,8 @@
 
 #include <array>
 
+#include "DataNode.hpp"
+
 #include "nvml/include/libpmemobj++/make_persistent.hpp"
 #include "nvml/include/libpmemobj++/p.hpp"
 #include "nvml/include/libpmemobj++/persistent_ptr.hpp"
@@ -12,15 +14,14 @@
 #define BRANCH_PADDING  0
 #define LEAF_PADDING    0
 
-namespace pfabric { namespace nvm {
+namespace pfabric {
+namespace nvm {
 
 using nvml::obj::delete_persistent;
 using nvml::obj::make_persistent;
 using nvml::obj::p;
 using nvml::obj::persistent_ptr;
 using nvml::obj::transaction;
-
-//const std::string LAYOUT = "PBPTree";
 
 /**
  * A persistent memory implementation of a B+ tree.
@@ -36,6 +37,9 @@ class PBPTree {
   static_assert(N > 2, "number of branch keys has to be >2.");
   // we need at least one key on a leaf node
   static_assert(M > 0, "number of leaf keys should be >0.");
+  // there is a bug that for odd numbers the tree sometimes breaks (TODO)
+  static_assert(M % 2 == 0 && N % 2 == 0, "The number of keys should be even");
+
 #ifndef UNIT_TESTS
  private:
 #else
@@ -84,15 +88,15 @@ class PBPTree {
    * the caller.
    */
   struct SplitInfo {
-    KeyType key;                  //< the key at which the node was split
-    LeafOrBranchNode leftChild;   //< the resulting lhs child node
-    LeafOrBranchNode rightChild;  //< the resulting rhs child node
+    KeyType key;                 //< the key at which the node was split
+    LeafOrBranchNode leftChild;  //< the resulting lhs child node
+    LeafOrBranchNode rightChild; //< the resulting rhs child node
   };
 
-  p<unsigned int> depth;          //< the depth of the tree, i.e. the number of levels (0 => rootNode is LeafNode)
+  p<unsigned int> depth;         //< the depth of the tree, i.e. the number of levels (0 => rootNode is LeafNode)
 
-  LeafOrBranchNode rootNode;      //< pointer to the root node (an instance of @c LeafNode or
-                                  //< @c BranchNode). This pointer is never @c nullptr.
+  LeafOrBranchNode rootNode;     //< pointer to the root node (an instance of @c LeafNode or
+                                 //< @c BranchNode). This pointer is never @c nullptr.
 
  public:
   /**
@@ -154,15 +158,14 @@ class PBPTree {
    */
   PBPTree() : depth(0) {
     rootNode = newLeafNode();
-    std::cout << "sizeof(BranchNode) = " << sizeof(BranchNode)
-      << ", sizeof(LeafNode) = " << sizeof(LeafNode) << std::endl;
+    PLOG("created new tree with sizeof(BranchNode) = "
+          << sizeof(BranchNode) << ", sizeof(LeafNode) = " << sizeof(LeafNode));
   }
 
   /**
    * Destructor for the B+ tree. Should delete all allocated nodes.
    */
   ~PBPTree() {
-    //TODO: Necessary in Pmem case?
     // Nodes are deleted automatically by releasing leafPool and branchPool.
   }
 
@@ -327,7 +330,7 @@ class PBPTree {
   bool eraseFromLeafNode(persistent_ptr<LeafNode> node, const KeyType &key) {
     bool deleted = false;
     auto pos = lookupPositionInLeafNode(node, key);
-    if (node->keys.get_rw()[pos] == key) {
+    if (node->keys.get_ro()[pos] == key) {
       for (auto i = pos; i < node->numKeys - 1; i++) {
         node->keys.get_rw()[i] = node->keys.get_ro()[i + 1];
         node->values.get_rw()[i] = node->values.get_ro()[i + 1];
@@ -358,7 +361,7 @@ class PBPTree {
     if (pos > 0 && leaf->prevLeaf->numKeys > middle) {
       // we have a sibling at the left for rebalancing the keys
       balanceLeafNodes(leaf->prevLeaf, leaf);
-      node->keys.get_rw()[pos] = leaf->keys.get_ro()[0];
+      node->keys.get_rw()[pos-1] = leaf->keys.get_ro()[0];
     } else if (pos < node->numKeys && leaf->nextLeaf->numKeys > middle) {
       // we have a sibling at the right for rebalancing the keys
       balanceLeafNodes(leaf->nextLeaf, leaf);
@@ -489,10 +492,9 @@ class PBPTree {
     bool deleted = false;
     // try to find the branch
     auto pos = lookupPositionInBranchNode(node, key);
-    auto n = node->children.get_ro()[pos];
     if (d == 1) {
       // the next level is the leaf level
-      auto leaf = n.leaf;
+      auto leaf = node->children.get_ro()[pos].leaf;
       assert(leaf != nullptr);
       deleted = eraseFromLeafNode(leaf, key);
       unsigned int middle = (M + 1) / 2;
@@ -501,7 +503,7 @@ class PBPTree {
         underflowAtLeafLevel(node, pos, leaf);
       }
     } else {
-      auto child = n.branch;
+      auto child = node->children.get_ro()[pos].branch;
       deleted = eraseFromBranchNode(child, d - 1, key);
 
       pos = lookupPositionInBranchNode(node, key);
@@ -800,6 +802,10 @@ class PBPTree {
         insertInLeafNodeAtPosition(sibling, pos - middle, key, val);
 
       // setup the list of leaf nodes
+      if(node->nextLeaf != nullptr) {
+        sibling->nextLeaf = node->nextLeaf;
+        node->nextLeaf->prevLeaf = sibling;
+      }
       node->nextLeaf = sibling;
       sibling->prevLeaf = node;
 
@@ -1047,22 +1053,14 @@ class PBPTree {
     /**
      * Constructor for creating a new empty leaf node.
      */
-    LeafNode() : numKeys(0), nextLeaf(nullptr), prevLeaf(nullptr) {
-      /*auto pop = nvml::obj::pool_by_vptr(this);
-      transaction::exec_tx(pop, [&] {
-        keys = make_persistent<std::array<KeyType, M>>();
-        values = make_persistent<std::array<ValueType, M>>();
-      });*/
-    }
-   // ~LeafNode() { std::cout << "~LeafNode: " << std::hex << this <<
-   //    std::endl; }
+    LeafNode() : numKeys(0), nextLeaf(nullptr), prevLeaf(nullptr) {}
 
-    p<unsigned int> numKeys;                         //< the number of currently stored keys
-    p<std::array<KeyType, M>> keys;     //< the actual keys
-    p<std::array<ValueType, M>> values; //< the actual values
-    persistent_ptr<LeafNode> nextLeaf;               //< pointer to the subsequent sibling
-    persistent_ptr<LeafNode> prevLeaf;               //< pointer to the preceeding sibling
-    p<unsigned char> pad_[LEAF_PADDING];            //<
+    p<unsigned int> numKeys;             //< the number of currently stored keys
+    p<std::array<KeyType, M>> keys;      //< the actual keys
+    p<std::array<ValueType, M>> values;  //< the actual values
+    persistent_ptr<LeafNode> nextLeaf;   //< pointer to the subsequent sibling
+    persistent_ptr<LeafNode> prevLeaf;   //< pointer to the preceeding sibling
+    p<unsigned char> pad_[LEAF_PADDING]; //<
   };
 
   /**
@@ -1072,21 +1070,12 @@ class PBPTree {
     /**
      * Constructor for creating a new empty branch node.
      */
-    BranchNode() : numKeys(0) {
-      /*auto pop = nvml::obj::pool_by_vptr(this);
-      transaction::exec_tx(pop, [&] {
-        keys = make_persistent<std::array<KeyType, N>>();
-        children = make_persistent<std::array<LeafOrBranchNode, N+1>>();
-      });*/
-    }
-    // ~BranchNode() { std::cout << "~BranchNode: " << std::hex << this << std::dec <<
-     //   std::endl; }
+    BranchNode() : numKeys(0) {}
 
-    p<unsigned int> numKeys;                     //< the number of currently stored keys
-    p<std::array<KeyType, N>> keys; //< the actual keys
-    p<std::array<LeafOrBranchNode, N + 1>>
-        children;                                //< pointers to child nodes (BranchNode or LeafNode)
-    p<unsigned char> pad_[BRANCH_PADDING];            //<
+    p<unsigned int> numKeys;                         //< the number of currently stored keys
+    p<std::array<KeyType, N>> keys;                  //< the actual keys
+    p<std::array<LeafOrBranchNode, N + 1>> children; //< pointers to child nodes (BranchNode or LeafNode)
+    p<unsigned char> pad_[BRANCH_PADDING];           //<
   };
 
 }; /* end class PBPTree */
