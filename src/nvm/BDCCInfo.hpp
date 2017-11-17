@@ -26,8 +26,8 @@
 #include <unordered_map>
 #include <algorithm>
 #include <iterator>
-
 #include "nvm/PTableInfo.hpp"
+#include <numeric>
 
 #include "nvml/include/libpmemobj++/allocator.hpp"
 #include "nvml/include/libpmemobj++/p.hpp"
