@@ -142,11 +142,12 @@ public:
       // if found then we return it
       return std::static_pointer_cast<Table<RecordType, KeyType>>(it->second);
     }
-    else
+    else {
       // otherwise we just return an empty pointer
       // TODO: shouldn't we throw an exception here???
       std::cout << "table '" << tblName << "' not found" << std::endl;
       return std::shared_ptr<Table<RecordType, KeyType>>();
+    }
   }
 
   bool tableExists(const std::string& tblName) const;

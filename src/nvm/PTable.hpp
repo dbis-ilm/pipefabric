@@ -390,7 +390,7 @@ class PTable {
           transaction::exec_tx(pop, [&] { newNodes = splitBlock(targetNode); });
         else
           newNodes = splitBlock(targetNode);
-        insert(key, rec);
+        return insert(key, rec);
       } catch (std::exception &te) {
         std::cerr << te.what() << '\n'
                   << "Splitting table block failed. Tuple not inserted: "

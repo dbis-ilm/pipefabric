@@ -27,7 +27,7 @@
 #include "nvml/include/libpmemobj++/make_persistent.hpp"
 #include "nvml/include/libpmemobj++/persistent_ptr.hpp"
 
-#define PLOG(msg) if(false/*DO_LOG*/) std::cout << "[PTable] " << msg << '\n';
+#define PLOG(msg) if(DO_LOG) std::cout << "[PTable] " << msg << '\n';
 
 namespace pfabric {
 namespace nvm {

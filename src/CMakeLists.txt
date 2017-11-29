@@ -17,7 +17,7 @@ include(CTest)
 set(PIPEFABRIC_DIR "/usr/local/pfabric")
 
 # Set to 1 if you need log output
-add_definitions(-DDO_LOG=1)
+add_definitions(-DDO_LOG=0)
 
 #The following variables enable or disable additional functionalities, which can be switched off to reduce build time.
 
@@ -298,8 +298,6 @@ if(USE_ROCKSDB_TABLE)
     ${BOOST_LIBRARIES}
     ${ZEROMQ_LIBRARIES}
     ${ROCKSDB_LIB})
-  add_executable(rock_test rock_test.cpp)
-  target_link_libraries(rock_test pfabric_core ${ROCKSDB_LIB})
 endif()
 
 if(USE_NVML_TABLE)
@@ -317,10 +315,6 @@ if(USE_NVML_TABLE)
     ${ZEROMQ_LIBRARIES}
     ${NVML_LIBRARIES})
 
-  add_executable(nvm_scan nvm_scan.cpp)
-  target_link_libraries(nvm_scan pfabric_core)
-  add_executable(nvm_insert nvm_insert.cpp)
-  target_link_libraries(nvm_insert pfabric_core)
 endif()
 
 #-----------------------------------------------------------------------------------------
