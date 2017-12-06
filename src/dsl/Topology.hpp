@@ -242,7 +242,7 @@ namespace pfabric {
      *    a new pipe where the stream acts as the producer.
      */
     template <typename T>
-    Pipe<T> fromStream(Dataflow::BaseOpPtr stream) throw (TopologyException) {
+    Pipe<T> fromStream(Dataflow::BaseOpPtr stream) noexcept(false) {
       // check whether stream is a Queue<T> operator
       auto pOp = dynamic_cast<Queue<T>*>(stream.get());
       if (pOp == nullptr) {
