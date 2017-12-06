@@ -23,7 +23,7 @@ add_custom_command(
 # the JSON library
 download_project(PROJ               json
                 GIT_REPOSITORY      https://github.com/nlohmann/json.git
-                GIT_TAG             master
+                GIT_TAG             develop
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
