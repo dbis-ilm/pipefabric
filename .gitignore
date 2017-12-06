@@ -425,6 +425,12 @@ FakesAssemblies/
 # VSCode
 .vscode/
 
+###################################
+#
+# JetBrains IDEs
+#
+###################################
+**/.idea
 
 ###################################
 #
@@ -505,7 +511,8 @@ $RECYCLE.BIN/
 # Misc
 #
 ###################################
-
+# ignore catch.hpp header as it is downloaded automatically
+**/catch.hpp
 
 # ignore everything in the build directory
 # (explicitly included here because separate .gitignore inside that directory)
