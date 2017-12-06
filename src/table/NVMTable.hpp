@@ -31,30 +31,31 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <cstdio>
+#include <type_traits>
 
-#include <boost/array.hpp>
-#include <boost/fusion/algorithm/iteration/for_each.hpp>
-#include <boost/fusion/include/for_each.hpp>
 #include <boost/signals2.hpp>
 
+#include <libpmemobj++/make_persistent.hpp>
+#include <libpmemobj++/p.hpp>
+#include <libpmemobj++/persistent_ptr.hpp>
+#include <libpmemobj++/pool.hpp>
+#include <libpmemobj++/transaction.hpp>
+#include <libpmemobj++/utils.hpp>
+#include <libpmempool.h>
+
 #include "fmt/format.h"
+#include "PTable.hpp"
 
 #include "core/Tuple.hpp"
-#include "nvm/PTable.hpp"
-#include "nvm/PTableInfo.hpp"
-#include "nvm/PTuple.hpp"
 #include "table/TableException.hpp"
 #include "table/BaseTable.hpp"
 #include "table/TableInfo.hpp"
 
-#include "nvml/include/libpmemobj++/make_persistent.hpp"
-#include "nvml/include/libpmemobj++/p.hpp"
-#include "nvml/include/libpmemobj++/persistent_ptr.hpp"
-#include "nvml/include/libpmemobj++/pool.hpp"
-#include "nvml/include/libpmemobj++/transaction.hpp"
-#include "nvml/include/libpmempool.h"
 
 namespace pfabric {
+
+//TODO: Maybe the pmem device path prefix should be a CMake variable?
+const std::string pathPrefix = "/mnt/pmem/test/";
 
 namespace detail {
 
@@ -111,6 +112,14 @@ TableInfo constructSchema(const std::string &tableName) {
   tInfo.setColumns(cols);
   return tInfo;
 }
+
+template<typename T>
+struct is_tuple_impl : std::false_type {};
+template<typename... Ts>
+struct is_tuple_impl<pfabric::Tuple<Ts...>> : std::true_type {};
+template<typename T>
+struct is_tuple : is_tuple_impl<std::decay_t<T>> {};
+
 } /* namespace detail */
 
 using nvml::obj::delete_persistent;
@@ -119,13 +128,16 @@ using nvml::obj::p;
 using nvml::obj::persistent_ptr;
 using nvml::obj::pool;
 using nvml::obj::transaction;
-using pfabric::nvm::PTable;
+using ptable::PTable;
+using ptable::PTuple;
 
 template<typename RecordType, typename KeyType>
 class NVMIterator {
  public:
-  typedef std::function<bool(const nvm::PTuple<RecordType, KeyType> &)> Predicate;
-  typedef PTable<RecordType, KeyType> PTableType;
+  static_assert(detail::is_tuple<RecordType>::value, "Value type must be a pfabric::Tuple");
+  using TupleType = typename RecordType::Base;
+  using Predicate = std::function<bool(const PTuple<TupleType, KeyType> &)>;
+  using PTableType = PTable<TupleType, KeyType>;
 
   explicit NVMIterator() {
   }
@@ -155,7 +167,8 @@ class NVMIterator {
   }
 
   SmartPtr<RecordType> operator*() {
-    return (*iter).createTuple(); //TODO: Is this to expensive?
+    SmartPtr<RecordType> tptr(new RecordType(*(*iter).createTuple()));
+    return tptr; //TODO: Is this to expensive?
   }
 
  protected:
@@ -168,8 +181,8 @@ class NVMIterator {
 
 template<typename RecordType, typename KeyType>
 inline NVMIterator<RecordType, KeyType> makeNVMIterator(
-  typename PTable<RecordType, KeyType>::iterator &&iter,
-  typename PTable<RecordType, KeyType>::iterator &&end,
+  typename PTable<typename RecordType::Base, KeyType>::iterator &&iter,
+  typename PTable<typename RecordType::Base, KeyType>::iterator &&end,
   typename NVMIterator<RecordType, KeyType>::Predicate pred) {
   return NVMIterator<RecordType, KeyType>(std::move(iter), std::move(end), pred);
 }
@@ -190,28 +203,31 @@ inline NVMIterator<RecordType, KeyType> makeNVMIterator(
 template<typename RecordType, typename KeyType = DefaultKeyType>
 class NVMTable : public BaseTable {
  public:
-  typedef nvm::PTable<RecordType, KeyType> PTableType;
+  static_assert(detail::is_tuple<RecordType>::value, "Value type must be a pfabric::Tuple");
+  using TupleType = typename RecordType::Base;
+  using PTableType = PTable<TupleType, KeyType>;
 
   struct root {
     persistent_ptr<PTableType> pTable;
   };
 
-  //< typedef for a updater function which returns a modification of the parameter tuple
-  typedef std::function<void(RecordType &)> UpdaterFunc;
+  /** typedef for a updater function which returns a modification of the parameter tuple */
+  using UpdaterFunc = std::function<void(RecordType &)>;
 
-  //< typedefs for a function performing updates + deletes. Similar to UpdaterFunc
-  //< it allows to update the tuple, but also to delete it (indictated by the
-  //< setting the bool component of \c UpdateResult to false)
-  typedef std::function<bool(RecordType &)> UpdelFunc;
+  /** typedefs for a function performing updates + deletes. Similar to UpdaterFunc
+   *  it allows to update the tuple, but also to delete it (indictated by the
+   *  setting the bool component of \c UpdateResult to false)
+   **/
+  using UpdelFunc = std::function<bool(RecordType &)>;
 
-  //< typedef for a callback function which is invoked when the table was updated
-  typedef boost::signals2::signal<void(const RecordType &, TableParams::ModificationMode)> ObserverCallback;
+  /** typedef for a callback function which is invoked when the table was updated */
+  using ObserverCallback = boost::signals2::signal<void(const RecordType &, TableParams::ModificationMode)>;
 
-  //< typedef for an iterator to scan the table
-  typedef NVMIterator<RecordType, KeyType> TableIterator;
+  /** typedef for an iterator to scan the table */
+  using TableIterator = NVMIterator<RecordType, KeyType>;
 
-  //< typedef for a predicate evaluated using a scan: see \TableIterator for details
-  typedef typename TableIterator::Predicate Predicate;
+  /** typedef for a predicate evaluated using a scan: see \TableIterator for details */
+  using Predicate = typename TableIterator::Predicate;
 
   /************************************************************************//**
    * \brief Constructor for creating an empty table with only a given name.
@@ -244,9 +260,9 @@ class NVMTable : public BaseTable {
    * \param key the key value of the tuple
    * \param rec the actual tuple
    *****************************************************************************/
-  void insert(KeyType key, const RecordType &rec) throw(TableException) {
-    pop.get_root()->pTable->insert(key, rec);
-    notifyObservers(rec, TableParams::Insert, TableParams::Immediate);
+  void insert(KeyType key, const RecordType &rec) noexcept(false) {
+      pTable->insert(key, rec.data());
+      notifyObservers(rec, TableParams::Insert, TableParams::Immediate);
   }
 
   /************************************************************************//**
@@ -259,11 +275,7 @@ class NVMTable : public BaseTable {
    * \return the number of deleted tuples
    *****************************************************************************/
   unsigned long deleteByKey(KeyType key) {
-    unsigned long nres = 0;
-    {
-      //TODO:
-    }
-    return nres;
+    return pTable->deleteByKey(key);
   }
 
   /************************************************************************//**
@@ -340,8 +352,11 @@ class NVMTable : public BaseTable {
    * \param key the key value
    * \return the tuple associated with the given key
    *****************************************************************************/
-  const SmartPtr<RecordType> getByKey(KeyType key) throw(TableException) {
-    return pTable->getByKey(key).createTuple();
+  const SmartPtr<RecordType> getByKey(KeyType key) noexcept(false) {
+    //TODO: ugly, can we do better?
+    SmartPtr<RecordType> tptr(new RecordType(*pTable->getByKey(key).createTuple()));
+    return tptr;
+
   }
 
   /************************************************************************//**
@@ -380,7 +395,7 @@ class NVMTable : public BaseTable {
    * \return a pair of iterators
    *****************************************************************************/
   TableIterator select() {
-    auto alwaysTrue = [](const nvm::PTuple<RecordType, KeyType> &) { return true; };
+    auto alwaysTrue = [](const PTuple<TupleType, KeyType> &) { return true; };
     return makeNVMIterator<RecordType, KeyType>(std::move(pTable->begin()), std::move(pTable->end()), alwaysTrue);
 
   }
@@ -413,6 +428,7 @@ class NVMTable : public BaseTable {
   }
 
   void drop() {
+    auto pop = pool_by_pptr(q);
     transaction::exec_tx(pop, [&] {
       delete_persistent<PTableType>(pTable);
       pTable = nullptr;
@@ -420,7 +436,7 @@ class NVMTable : public BaseTable {
       q = nullptr;
     });
     pop.close();
-    pmempool_rm((BaseTable::mTableInfo->tableName() + ".db").c_str(), 1);
+    pmempool_rm((pathPrefix + BaseTable::mTableInfo->tableName() + ".db").c_str(), 1);
     //std::remove((BaseTable::mTableInfo->tableName()+".db").c_str());
   }
 
@@ -431,15 +447,30 @@ class NVMTable : public BaseTable {
  private:
   void openOrCreateTable(const TableInfo &tableInfo) /*throw(TableException)*/
   {
-    std::string path = tableInfo.tableName() + ".db";
+    std::string path = pathPrefix + tableInfo.tableName() + ".db";
+    pool<root> pop;
+
     if (access(path.c_str(), F_OK) != 0) {
-      pop = pool<root>::create(path, nvm::LAYOUT, 16 * 1024 * 1024);    //, (size_t)blockSize, 0666);
+      pop = pool<root>::create(path, ptable::LAYOUT, 64 * 1024 * 1024);    //, (size_t)blockSize, 0666);
       transaction::exec_tx(pop, [&] {
-        auto tbl = make_persistent<PTableType>(tableInfo);
+        ptable::ColumnVector cVector;
+        for (auto &c : tableInfo) {
+          switch (c.getType()) {
+            case ColumnInfo::Void_Type:cVector.push_back(ptable::Column(c.getName(), ptable::Void_Type));
+              break;
+            case ColumnInfo::Int_Type:cVector.push_back(ptable::Column(c.getName(), ptable::Int_Type));
+              break;
+            case ColumnInfo::Double_Type:cVector.push_back(ptable::Column(c.getName(), ptable::Double_Type));
+              break;
+            case ColumnInfo::String_Type:cVector.push_back(ptable::Column(c.getName(), ptable::String_Type));
+          };
+        }
+        ptable::VTableInfo vTableInfo(tableInfo.tableName(), cVector);
+        auto tbl = make_persistent<PTableType>(vTableInfo);
         pop.get_root()->pTable = tbl;
       });
     } else {
-      pop = pool<root>::open(path, nvm::LAYOUT);
+      pop = pool<root>::open(path, ptable::LAYOUT);
     }
     q = pop.get_root();
     pTable = q->pTable;
@@ -464,7 +495,6 @@ class NVMTable : public BaseTable {
     }
   }
 
-  pool<root> pop;
   persistent_ptr<struct root> q;
   persistent_ptr<PTableType> pTable;
   ObserverCallback mImmediateObservers, mDeferredObservers;

@@ -122,34 +122,26 @@ if(USE_NVML_TABLE)
 # Non-Volatile Memory Library (pmem.io)
 download_project(PROJ               nvml
                 GIT_REPOSITORY      https://github.com/pmem/nvml.git
-                GIT_TAG             master
+                GIT_TAG             1.3.1-rc2
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
 add_custom_command(
         OUTPUT ${THIRD_PARTY_DIR}/nvml
         COMMAND ${CMAKE_COMMAND} -E chdir ${nvml_SOURCE_DIR} $(MAKE)
-				COMMAND ${CMAKE_COMMAND} -E chdir ${nvml_SOURCE_DIR} $(MAKE) install prefix=${THIRD_PARTY_DIR}/nvml
-				#COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/nvml/include
-				#COMMAND ${CMAKE_COMMAND} -E copy_directory
-				#				 ${nvml_SOURCE_DIR}/src/include
-				#        ${THIRD_PARTY_DIR}/nvml/include
+		COMMAND ${CMAKE_COMMAND} -E chdir ${nvml_SOURCE_DIR} $(MAKE) install prefix=${THIRD_PARTY_DIR}/nvml
 )
 
-# Key/Value Store for Non-Volatile Memory(pmem.io)
-if(FALSE)
-download_project(PROJ               pmemkv
-                GIT_REPOSITORY      https://github.com/pmem/pmemkv.git
+# PTable (internal gitlab project) for NVM
+download_project(PROJ               ptable
+                GIT_REPOSITORY      https://dbgit.prakinf.tu-ilmenau.de/code/PTable.git
                 GIT_TAG             master
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
 add_custom_command(
-        OUTPUT ${THIRD_PARTY_DIR}/pmemkv
-        COMMAND ${CMAKE_COMMAND} -E chdir ${pmemkv_SOURCE_DIR} $(MAKE) configure
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/pmemkv/include
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/pmemkv/lib
-				COMMAND ${CMAKE_COMMAND} -E chdir ${pmemkv_SOURCE_DIR} $(MAKE) install prefix=${THIRD_PARTY_DIR}/pmemkv
+        OUTPUT ${THIRD_PARTY_DIR}/ptable
+        COMMAND ${CMAKE_COMMAND} -E chdir ${ptable_SOURCE_DIR} cmake -DPTABLE_DIR=${THIRD_PARTY_DIR}/ptable src
+		COMMAND ${CMAKE_COMMAND} -E chdir ${ptable_SOURCE_DIR} $(MAKE) install
 )
-endif()
 endif()

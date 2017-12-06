@@ -52,7 +52,7 @@ option(BUILD_ONLY_LIBS
 # If switched to off, no tests will be build
 option(BUILD_TEST_CASES
   "build tests for pipefabric functionality"
-  OFF
+  ON
 )
 
 #Build google benchmark library
@@ -64,7 +64,7 @@ option(BUILD_GOOGLE_BENCH
 # Build benchmark test
 option(BUILD_BENCHMARKS
   "build benchmarks for pipefabric"
-  ON
+  OFF
 )
 
 # Benchmark test requires benchmark library
@@ -78,7 +78,7 @@ endif()
 #CMAKE_FORCE_CXX_COMPILER(icpc "Intel C++ Compiler")
 
 # C++ compiler flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated -g -O2 -Wsign-compare")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated -g -O3 -Wsign-compare")
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedefs -Wno-#pragma-messages")
 elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
@@ -168,17 +168,19 @@ if (USE_NVML_TABLE)
 	message(STATUS "using NVML based persistent table")
 	add_definitions(-DUSE_NVML_TABLE)
 	set (NVML_LIBRARIES
-				"${THIRD_PARTY_DIR}/nvml/lib/libpmemblk.a"
-				"${THIRD_PARTY_DIR}/nvml/lib/libpmemlog.a"
-				"${THIRD_PARTY_DIR}/nvml/lib/libpmemobj.a"
-  			"${THIRD_PARTY_DIR}/nvml/lib/libpmempool.a"
-				"${THIRD_PARTY_DIR}/nvml/lib/libpmem.a"
-#				"${THIRD_PARTY_DIR}/nvml/lib/libvmem.a"
-#				"${THIRD_PARTY_DIR}/nvml/lib/libvmmalloc.a"
-        ${DYLIB_LIBRARY}
-	)
-  include_directories("${THIRD_PARTY_DIR}/nvml/include")
-else()
+            "${THIRD_PARTY_DIR}/nvml/lib/libpmemblk.a"
+            "${THIRD_PARTY_DIR}/nvml/lib/libpmemlog.a"
+            "${THIRD_PARTY_DIR}/nvml/lib/libpmemobj.a"
+            "${THIRD_PARTY_DIR}/nvml/lib/libpmempool.a"
+            "${THIRD_PARTY_DIR}/nvml/lib/libpmem.a"
+            ${DYLIB_LIBRARY}
+            "${THIRD_PARTY_DIR}/ptable/lib/libptable.so"
+            )
+    include_directories(
+            "${THIRD_PARTY_DIR}/nvml/include"
+            "${THIRD_PARTY_DIR}/ptable/include"
+            )
+else ()
 	message(STATUS "don't use NVML based persistent table")
 	set (NVML_LIBRARIES "")
 endif()
@@ -303,9 +305,8 @@ endif()
 if(USE_NVML_TABLE)
   set(core_sources
     ${core_sources}
-    nvm/PTableInfo.cpp
     ${THIRD_PARTY_DIR}/nvml
-#    ${THIRD_PARTY_DIR}/pmemkv
+    ${THIRD_PARTY_DIR}/ptable
   )
   add_library(pfabric_core SHARED
     ${core_sources}
