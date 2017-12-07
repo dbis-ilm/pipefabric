@@ -57,6 +57,12 @@
 #include "qop/Tuplifier.hpp"
 #include "qop/Where.hpp"
 #include "qop/ZMQSink.hpp"
+#include "qop/ScaleJoin.hpp"
+#ifdef SUPPORT_MATRICES
+#include "qop/ToMatrix.hpp"
+#include "qop/MatrixSlice.hpp"
+#include "qop/MatrixMerge.hpp"
+#endif
 
 namespace pfabric {
 
@@ -1253,6 +1259,101 @@ class Pipe {
     }
   }
 
+    /**
+   * @brief Creates an operator for joining two streams represented by pipes.
+   * Origin idea & paper: "ScaleJoin: a Deterministic, Disjoint-Parallel and
+   * Skew-Resilient Stream Join" (2016)
+   *
+   * Creates an operator implementing a ScaleJoin to join two streams.
+   * In addition a join predicate can be specified. Note, that the output
+   * tuple type is derived from the two input types.
+   *
+   * @tparam T
+   *      the input tuple type (usually a TuplePtr) of the left stream.
+   * @tparam T2
+   *      the input tuple type (usually a TuplePtr) of the right stream.
+   * @tparam KeyType
+   *      the data type for representing keys (join values)
+   * @param[in] otherPipe
+   *      the pipe representing the right stream
+   * @param[in] pred
+   *      the join predicate
+   * @param[in] threadnum
+   *      the number of threads for parallel joining
+   * @return a new pipe
+   */
+  template <typename KeyType = DefaultKeyType, typename T2>
+  Pipe<typename ScaleJoin<T, T2, KeyType>::ResultElement> scaleJoin(
+    Pipe<T2>& otherPipe, typename ScaleJoin<T, T2, KeyType>::JoinPredicateFunc pred, const int threadnum)
+    throw(TopologyException) {
+
+    typedef typename ScaleJoin<T, T2, KeyType>::ResultElement Tout;
+
+    try {
+      typedef std::function<KeyType(const T&)> LKeyExtractorFunc;
+      typedef std::function<KeyType(const T2&)> RKeyExtractorFunc;
+
+      //specify the keys of tuples
+      LKeyExtractorFunc fn1 = boost::any_cast<LKeyExtractorFunc>(keyExtractor);
+      RKeyExtractorFunc fn2 = boost::any_cast<RKeyExtractorFunc>(otherPipe.keyExtractor);
+
+      //get the sources of tuples of last operator before scaleJoin-operator (left and right stream)
+      auto pOp = castOperator<DataSource<T> >(getPublisher());
+      auto otherOp = castOperator<DataSource<T2> >(otherPipe.getPublisher());
+
+      //partitioning not necessary, already multithreaded join
+      assert(partitioningState == NoPartitioning);
+      assert(otherPipe.partitioningState == NoPartitioning);
+      assert(threadnum > 0);
+
+      //vector for join operators as well as queues (multithreading encoupling)
+      std::vector<std::shared_ptr<ScaleJoin<T, T2, KeyType> > > scJoinVec;
+      std::vector<std::shared_ptr<Queue<T> > > scQueueVec;
+
+      //queue for collecting join results, forwarding as a single stream
+      auto combine = std::make_shared<Queue<Tout>>();
+
+      //start thread instances, specified by threadnum
+      for (auto i=0; i<threadnum; i++) {
+
+        //create queue and scaleJoin instances
+        auto qu = std::make_shared<Queue<T>>();
+        auto scJoin = std::make_shared<ScaleJoin<T, T2, KeyType> >(fn1, fn2, pred, i, threadnum);
+
+        //connect output of predecessing operator of left stream with input of the current queue instance
+        CREATE_LINK(pOp, qu);
+
+        //connect output of queue instance with input of scaleJoin instance
+        connectChannels(qu->getOutputDataChannel(), scJoin->getLeftInputDataChannel());
+        connectChannels(qu->getOutputPunctuationChannel(), scJoin->getInputPunctuationChannel());
+
+        //connect output of predecessing operator of right stream with input of scaleJoin instance
+        connectChannels(otherOp->getOutputDataChannel(), scJoin->getRightInputDataChannel());
+        connectChannels(otherOp->getOutputPunctuationChannel(), scJoin->getInputPunctuationChannel());
+
+        //connect output of current scaleJoin instance with the combining queue operator
+        CREATE_LINK(scJoin, combine);
+
+        //add queue and scaleJoin instance to the vectors
+        scQueueVec.push_back(qu);
+        scJoinVec.push_back(scJoin);
+      }
+
+      //add all queues, scaleJoins and the combining queue to the dataflow
+      Dataflow::BaseOpList scQueueList(scQueueVec.begin(), scQueueVec.end());
+      dataflow->addPublisherList(scQueueList);
+      Dataflow::BaseOpList scJoinList(scJoinVec.begin(), scJoinVec.end());
+      dataflow->addPublisherList(scJoinList);
+      auto iter = dataflow->addPublisher(combine);
+
+      //return the pipe
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+
+    } catch (boost::bad_any_cast& e) {
+      throw TopologyException("No KeyExtractor defined for join.");
+    }
+  }
+
   /*--------------------------- table operators  -------------------------*/
 
   /**
@@ -1346,8 +1447,74 @@ class Pipe {
       throw TopologyException("No KeyExtractor defined for updateTable.");
     }
   }
-  /*------------------------------ partitioning
-   * -----------------------------*/
+
+#ifdef SUPPORT_MATRICES
+  /**
+   * @brief Create a new pipe to insert tuples into matrix
+   * @tparam MatrixType
+   *   the type of matrix (Sparse, Dense, etc.)
+   * @tparam T
+   *   record containing values, typically TuplePtr< int, int, double >.
+   * @param[in]
+   *   the matrix object to store values.
+   * @return
+   *   the new pipe with operator to collect values into stateful the matrix.
+   */
+  template<class MatrixType>
+  Pipe<T> toMatrix(std::shared_ptr<MatrixType> matrix) throw(TopologyException) {
+    try {
+      auto op = std::make_shared<ToMatrix<MatrixType>>(matrix);
+      auto iter = addPublisher<ToMatrix<MatrixType>, DataSource<T> >(op);
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+    } catch (...) {
+      throw TopologyException("toMatrix: unknown error has occured");
+    }
+  }
+
+  /**
+   * @brief matrix_slice
+   *   the operator decouples a matrix into several parts
+   *   sending them to the next operators separately
+   *
+   * @tparam PartitionFunc
+   *   the user defined function to slice matrix
+   * @param[in] pred
+   *   Predicate to decouple matrix
+   * @param[in] numParts
+   *   the number of partitions
+   * @return a new pipe
+   */
+  template<typename PartitionFunc>
+  Pipe<T> matrix_slice(PartitionFunc pred, std::size_t numParts) throw(TopologyException) {
+    try {
+      auto op = std::make_shared<MatrixSlice<T>>(pred, numParts);
+      auto iter = addPublisher<MatrixSlice<T>, DataSource<T> >(op);
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+    } catch (...) {
+      throw TopologyException("matrix_slice: unknown error has occured");
+    }
+  }
+
+  /**
+   * @brief matrix_merge
+   *   the operator receives pieces of the matrix to put back together again
+   * @param[in] numParts
+   *   the number of partitions
+   * @return a new pipe
+   */
+  Pipe<T> matrix_merge(std::size_t numParts) throw(TopologyException) {
+    try {
+      auto op = std::make_shared<MatrixMerge<T>>(numParts);
+      auto iter = addPublisher<MatrixMerge<T>, DataSource<T> >(op);
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+    } catch (...) {
+      throw TopologyException("matrix_merge: unknown error has occured");
+    }
+  }
+#endif
+
+        /*------------------------------ partitioning
+         * -----------------------------*/
   /**
    * @brief Create a PartitionBy operator.
    *

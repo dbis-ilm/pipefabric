@@ -30,12 +30,11 @@
 #include "dsl/Dataflow.hpp"
 #include "qop/Queue.hpp"
 #include "table/Table.hpp"
-#include "table/TableException.hpp"
-#include "table/TableInfo.hpp"
-
-namespace pfabric {
-class Topology;
-} /* namespace pfabric */
+#include "qop/Queue.hpp"
+#include "dsl/Topology.hpp"
+#ifdef SUPPORT_MATRICES
+#include "matrix/Matrix.hpp"
+#endif
 
 namespace pfabric {
 
@@ -154,6 +153,28 @@ public:
 
   TableInfoPtr getTableInfo(const std::string& tblName);
 
+#ifdef SUPPORT_MATRICES
+  template<typename T>
+  std::shared_ptr<T> createMatrix(const std::string &matrixName) {
+    auto it = matrixMap.find(matrixName);
+    if(it != matrixMap.end()) {
+      throw std::logic_error("matrix already exists");
+    }
+    auto m = std::make_shared<T>();
+    matrixMap[matrixName] = m;
+    return m;
+  }
+
+  template<typename T>
+  std::shared_ptr<T> getMatrix(const std::string &matrixName) {
+    auto it = matrixMap.find(matrixName);
+    if (it != matrixMap.end()) {
+      return std::static_pointer_cast<T>(it->second);
+    }
+    throw std::logic_error("matrix not found");
+  }
+#endif
+
   /**
    * @brief Creates a new stream with the given name and schema.
    *
@@ -183,7 +204,11 @@ private:
 
   std::map<std::string, BaseTablePtr> mTableSet;         //< a dictionary collecting all existing tables
   std::map<std::string, Dataflow::BaseOpPtr> mStreamSet; //< a dictionary collecting all named streams
-};
+#ifdef SUPPORT_MATRICES
+  using BaseMatrixPtr = typename std::shared_ptr<BaseMatrix>;
+  std::map<std::string, BaseMatrixPtr> matrixMap;        //< a dictionary collecting all existing matrix
+#endif
+    };
 
 }
 

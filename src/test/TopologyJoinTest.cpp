@@ -19,6 +19,33 @@
 using namespace pfabric;
 using namespace ns_types;
 
+TEST_CASE("Building and running a topology with ScaleJoin (3 instances)", "[ScaleJoin]") {
+  typedef TuplePtr<int, std::string, double> tPtr;
+
+  unsigned short num = 100;
+  TestDataGenerator tgen1("file.csv");
+  tgen1.writeData(num);
+
+  unsigned int results = 0;
+
+  Topology t;
+  auto s1 = t.newStreamFromMemory<tPtr>("file.csv")
+    .keyBy<0>();
+
+  auto s2 = t.newStreamFromMemory<tPtr>("file.csv")
+    .keyBy<0>()
+    .scaleJoin(s1, [](auto tp1, auto tp2) { return get<0>(tp1) == get<0>(tp2); }, 3)
+    .notify([&](auto tp, bool outdated) { results++; });
+
+  t.prepare();
+  t.start(false);
+
+  while(results!=num) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  }
+  REQUIRE(results == num);
+}
+
 TEST_CASE("Building and running a topology with joins", "[Unpartitioned Join]") {
   typedef TuplePtr<int, std::string, double> T1;
 

@@ -21,3 +21,5 @@ operators and utility classes. It consists of the following main components:
  + [Tutorial: Embedding PipeFabric](/documentation/Embedding.md)
  + [Tutorial: Stream partitioning](/documentation/Partitioning.md)
  + [Tutorial: How to build and use a Docker image](/documentation/Docker.md)
+ + [PipeFabric Use Cases](/documentation/UseCases.md)
+ + [Additional network sources](/documentation/Network.md)

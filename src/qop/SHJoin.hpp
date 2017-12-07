@@ -24,12 +24,11 @@
 #include <boost/core/ignore_unused.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
-#include <boost/unordered/unordered_map.hpp>
+#include <unordered_map>
 
 #include "qop/BinaryTransform.hpp"
 #include "ElementJoinTraits.hpp"
 #include "DefaultElementJoin.hpp"
-
 
 namespace pfabric {
 
@@ -76,8 +75,8 @@ namespace pfabric {
        * The type definition for our hash tables: we use the native Boost implementation.
        * Because, we allow that stream elements have the same key, we need a multimap here.
        */
-      typedef boost::unordered_multimap< KeyType, LeftInputStreamElement > LHashTable;
-      typedef boost::unordered_multimap< KeyType, RightInputStreamElement > RHashTable;
+      typedef std::unordered_multimap< KeyType, LeftInputStreamElement > LHashTable;
+      typedef std::unordered_multimap< KeyType, RightInputStreamElement > RHashTable;
 
       /// the join algorithm to be used for concatenating the input elements
       typedef ElementJoinTraits< ElementJoinImpl > ElementJoin;
@@ -87,7 +86,6 @@ namespace pfabric {
 
       /// a scoped lock for the mutex
       typedef boost::lock_guard< JoinMutex > Lock;
-
 
     public:
 
@@ -262,13 +260,12 @@ namespace pfabric {
         }
       }
 
-
       LHashTable mLTable;               //< hash table for the lhs stream
       RHashTable mRTable;               //< hash table for the rhs stream
       JoinPredicateFunc mJoinPredicate; //< a pointer to the function implementing the join predicate
       LKeyExtractorFunc mLKeyExtractor;         //< hash function for the lhs stream
       RKeyExtractorFunc mRKeyExtractor;         //< hash function for the rhs stream
-      mutable JoinMutex mMtx;           //< mutex for synchronizing access to the hash tables
+      mutable JoinMutex mMtx;
     };
 
 } /* end namespace pfabric */
