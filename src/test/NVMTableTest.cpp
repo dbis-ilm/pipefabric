@@ -32,3 +32,70 @@ TEST_CASE("Creating a table with a given schema and inserting data",
   }
   testTable->drop();
 }
+
+
+TEST_CASE("Creating a table with a given schema and deleting data",
+          "[NVMTable]") {
+  auto testTable = std::make_shared<TableType>("MyTestTable2");
+  for (int i = 0; i < 10000; i++) {
+    auto tp = MyTuple((unsigned long)i, i + 100, fmt::format("String#{}", i),
+                      i / 100.0);
+    testTable->insert(i, tp);
+  }
+
+  REQUIRE(testTable->size() == 10000);
+  for (int i = 0; i < 10000; i += 100) testTable->deleteByKey(i);
+
+  //TODO: REQUIRE(testTable->size() == 9900);
+  // check if the records were really deleted
+  for (int i = 0; i < 10000; i += 100) {
+    try {
+      auto tp = testTable->getByKey(i);
+      REQUIRE(false);
+    } catch (TableException& exc) {
+      // if the key wasn't found then an exception is raised
+      // which we can ignore here
+    }
+  }
+  testTable->drop();
+}
+
+TEST_CASE("scanning the whole table", "[NVMTable]") {
+  auto testTable = std::make_shared<TableType>("MyTestTable7");
+  for (int i = 0; i < 10000; i++) {
+    auto tp = MyTuple((unsigned long)i, i + 100, fmt::format("String#{}", i),
+                      i / 100.0);
+    testTable->insert(i, tp);
+  }
+
+  REQUIRE(testTable->size() == 10000);
+
+  unsigned int num = 0;
+  for (auto iter = testTable->select(); iter.isValid(); ++iter) num++;
+
+  REQUIRE(num == testTable->size());
+  testTable->drop();
+}
+
+TEST_CASE("scanning the table with a predicate", "[NVMTable]") {
+  auto testTable = std::make_shared<TableType>("MyTestTable8");
+  for (int i = 0; i < 10000; i++) {
+    auto tp = MyTuple((unsigned long)i, i + 100, fmt::format("String#{}", i),
+                      i / 100.0);
+    testTable->insert(i, tp);
+  }
+
+  REQUIRE(testTable->size() == 10000);
+
+  unsigned int num = 0;
+  {
+    auto iter = testTable->select(
+      [](const MyTuple& tp) { return get<0>(tp) % 2 == 0; });
+    for (; iter.isValid(); iter++) {
+      REQUIRE(get<0>(*iter) % 2 == 0);
+      num++;
+    }
+    REQUIRE(num == testTable->size() / 2);
+  }
+  testTable->drop();
+}

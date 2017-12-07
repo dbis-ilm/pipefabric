@@ -51,7 +51,6 @@
 #include "table/BaseTable.hpp"
 #include "table/TableInfo.hpp"
 
-
 namespace pfabric {
 
 //TODO: Maybe the pmem device path prefix should be a CMake variable?
@@ -136,7 +135,8 @@ class NVMIterator {
  public:
   static_assert(detail::is_tuple<RecordType>::value, "Value type must be a pfabric::Tuple");
   using TupleType = typename RecordType::Base;
-  using Predicate = std::function<bool(const PTuple<TupleType, KeyType> &)>;
+//  using Predicate = std::function<bool(const PTuple<TupleType, KeyType> &)>;
+  using Predicate = std::function<bool(const RecordType &)>;
   using PTableType = PTable<TupleType, KeyType>;
 
   explicit NVMIterator() {
@@ -145,13 +145,13 @@ class NVMIterator {
   explicit NVMIterator(typename PTableType::iterator &&_iter, typename PTableType::iterator &&_end, Predicate _pred) :
     iter(std::move(_iter)), end(std::move(_end)), pred(_pred) {
 
-    while (isValid() && !pred(*iter))
+    while (isValid() && !pred(*(*iter).createTuple()))
       iter++;
   }
 
   NVMIterator &operator++() {
     iter++;
-    while (isValid() && !pred(*iter))
+    while (isValid() && !pred(*(*iter).createTuple()))
       iter++;
     return *this;
   }
@@ -261,8 +261,8 @@ class NVMTable : public BaseTable {
    * \param rec the actual tuple
    *****************************************************************************/
   void insert(KeyType key, const RecordType &rec) noexcept(false) {
-      pTable->insert(key, rec.data());
-      notifyObservers(rec, TableParams::Insert, TableParams::Immediate);
+    pTable->insert(key, rec.data());
+    notifyObservers(rec, TableParams::Insert, TableParams::Immediate);
   }
 
   /************************************************************************//**
@@ -354,9 +354,12 @@ class NVMTable : public BaseTable {
    *****************************************************************************/
   const SmartPtr<RecordType> getByKey(KeyType key) noexcept(false) {
     //TODO: ugly, can we do better?
-    SmartPtr<RecordType> tptr(new RecordType(*pTable->getByKey(key).createTuple()));
-    return tptr;
-
+    try {
+      SmartPtr<RecordType> tptr(new RecordType(*pTable->getByKey(key).createTuple()));
+      return tptr;
+    } catch (ptable::PTableException &pex) {
+      throw TableException(pex.what());
+    }
   }
 
   /************************************************************************//**
@@ -395,7 +398,8 @@ class NVMTable : public BaseTable {
    * \return a pair of iterators
    *****************************************************************************/
   TableIterator select() {
-    auto alwaysTrue = [](const PTuple<TupleType, KeyType> &) { return true; };
+    auto alwaysTrue = [](const RecordType &) { return true; };
+//    auto alwaysTrue = [](const PTuple<TupleType, KeyType> &) { return true; };
     return makeNVMIterator<RecordType, KeyType>(std::move(pTable->begin()), std::move(pTable->end()), alwaysTrue);
 
   }
@@ -445,8 +449,7 @@ class NVMTable : public BaseTable {
   }
 
  private:
-  void openOrCreateTable(const TableInfo &tableInfo) /*throw(TableException)*/
-  {
+  void openOrCreateTable(const TableInfo &tableInfo) noexcept(false) {
     std::string path = pathPrefix + tableInfo.tableName() + ".db";
     pool<root> pop;
 
