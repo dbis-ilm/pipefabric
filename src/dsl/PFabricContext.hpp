@@ -21,13 +21,20 @@
 #ifndef PFabricContext_hpp_
 #define PFabricContext_hpp_
 
-#include <string>
+#include <iostream>
 #include <map>
+#include <memory>
+#include <string>
 
 #include "core/PFabricTypes.hpp"
+#include "dsl/Dataflow.hpp"
+#include "qop/Queue.hpp"
 #include "table/Table.hpp"
 #include "qop/Queue.hpp"
 #include "dsl/Topology.hpp"
+#ifdef SUPPORT_MATRICES
+#include "matrix/Matrix.hpp"
+#endif
 
 namespace pfabric {
 
@@ -85,7 +92,7 @@ public:
          a pointer to the newly created table
    */
   template <typename RecordType, typename KeyType = DefaultKeyType>
-  std::shared_ptr<Table<RecordType, KeyType>> createTable(const std::string& tblName) throw (TableException) {
+  std::shared_ptr<Table<RecordType, KeyType>> createTable(const std::string& tblName) noexcept(false) {
     // first we check whether the table exists already
     auto it = mTableSet.find(tblName);
     if (it != mTableSet.end())
@@ -98,7 +105,7 @@ public:
   }
 
   template <typename RecordType, typename KeyType = DefaultKeyType>
-  std::shared_ptr<Table<RecordType, KeyType>> createTable(const TableInfo& tblInfo) throw (TableException) {
+  std::shared_ptr<Table<RecordType, KeyType>> createTable(const TableInfo& tblInfo) noexcept(false) {
     // first we check whether the table exists already
     auto it = mTableSet.find(tblInfo.tableName());
     if (it != mTableSet.end())
@@ -134,16 +141,39 @@ public:
       // if found then we return it
       return std::static_pointer_cast<Table<RecordType, KeyType>>(it->second);
     }
-    else
+    else {
       // otherwise we just return an empty pointer
       // TODO: shouldn't we throw an exception here???
       std::cout << "table '" << tblName << "' not found" << std::endl;
       return std::shared_ptr<Table<RecordType, KeyType>>();
+    }
   }
 
   bool tableExists(const std::string& tblName) const;
 
   TableInfoPtr getTableInfo(const std::string& tblName);
+
+#ifdef SUPPORT_MATRICES
+  template<typename T>
+  std::shared_ptr<T> createMatrix(const std::string &matrixName) {
+    auto it = matrixMap.find(matrixName);
+    if(it != matrixMap.end()) {
+      throw std::logic_error("matrix already exists");
+    }
+    auto m = std::make_shared<T>();
+    matrixMap[matrixName] = m;
+    return m;
+  }
+
+  template<typename T>
+  std::shared_ptr<T> getMatrix(const std::string &matrixName) {
+    auto it = matrixMap.find(matrixName);
+    if (it != matrixMap.end()) {
+      return std::static_pointer_cast<T>(it->second);
+    }
+    throw std::logic_error("matrix not found");
+  }
+#endif
 
   /**
    * @brief Creates a new stream with the given name and schema.
@@ -170,11 +200,15 @@ public:
   }
 
 private:
-  typedef std::shared_ptr<BaseTable> BaseTablePtr;
+  using BaseTablePtr = typename std::shared_ptr<BaseTable>;
 
   std::map<std::string, BaseTablePtr> mTableSet;         //< a dictionary collecting all existing tables
   std::map<std::string, Dataflow::BaseOpPtr> mStreamSet; //< a dictionary collecting all named streams
-};
+#ifdef SUPPORT_MATRICES
+  using BaseMatrixPtr = typename std::shared_ptr<BaseMatrix>;
+  std::map<std::string, BaseMatrixPtr> matrixMap;        //< a dictionary collecting all existing matrix
+#endif
+    };
 
 }
 

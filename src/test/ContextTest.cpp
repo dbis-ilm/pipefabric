@@ -9,9 +9,11 @@
 #include <thread>
 
 #include "TestDataGenerator.hpp"
+#include "core/StreamElementTraits.hpp"
 #include "core/Tuple.hpp"
 #include "table/Table.hpp"
 #include "dsl/PFabricContext.hpp"
+#include "dsl/Topology.hpp"
 
 using namespace pfabric;
 

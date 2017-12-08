@@ -51,8 +51,8 @@ void RESTSource::createHttpServer(unsigned int port, unsigned short numThreads) 
   std::call_once( RESTSource::onlyOne,
                  [] (int p, unsigned short nt) {
                    RESTSource::server.reset(new HttpServer());
-	               RESTSource::server->config.port = p;
-	               RESTSource::server->config.thread_pool_size = nt;
+                   RESTSource::server->config.port = p;
+                   RESTSource::server->config.thread_pool_size = nt;
                    std::cout << "RESTSource: HTTPServer created for port " << p << std::endl;
                  }, port, numThreads);
 }

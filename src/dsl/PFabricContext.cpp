@@ -18,8 +18,11 @@
  * along with this program; see the file LICENSE.
  * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
  */
-#include <string>
-#include "PFabricContext.hpp"
+
+#include <sstream>
+
+#include "dsl/PFabricContext.hpp"
+#include "dsl/Topology.hpp"
 
 using namespace pfabric;
 
@@ -46,8 +49,10 @@ TableInfoPtr PFabricContext::getTableInfo(const std::string& tblName) {
       return it->second->tableInfo();
     }
     else {
-      // TODO: shouldn't we throw an exception here???
-      std::cout << "table not found: '" << tblName << "' : " << mTableSet.size() << std::endl;
-      return std::shared_ptr<TableInfo>();
+      // std::cout << "table not found: '" << tblName << "' : " << mTableSet.size() << std::endl;
+      //return std::shared_ptr<TableInfo>();
+      std::stringstream errMsg;
+      errMsg << "table not found: '" << tblName << "' : " << mTableSet.size() << '\n';
+      throw TableException(errMsg.str().c_str());
     }
   }

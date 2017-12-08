@@ -40,9 +40,20 @@
 #include "qop/FromTable.hpp"
 #include "qop/SelectFromTable.hpp"
 #include "qop/StreamGenerator.hpp"
-
+#ifdef SUPPORT_MATRICES
+  #include "qop/FromMatrix.hpp"
+#endif
 #include "dsl/Pipe.hpp"
 #include "dsl/Dataflow.hpp"
+#ifdef USE_RABBITMQ
+  #include "net/RabbitMQSource.hpp"
+#endif
+#ifdef USE_KAFKA
+  #include "net/KafkaSource.hpp"
+#endif
+#ifdef USE_MQTT
+  #include "net/MQTTSource.hpp"
+#endif
 
 namespace pfabric {
 
@@ -182,6 +193,61 @@ namespace pfabric {
                             RESTSource::RESTMethod method,
                             unsigned short numThreads = 1);
 
+#ifdef USE_RABBITMQ
+    /**
+     * @brief Creates a pipe from a RabbitMQ source as input.
+     *
+     * Creates a new pipe for receiving tuples via AMQP server (RabbitMQ).
+     * It reads messages from the AMQP queue and forwards them as tuples
+     * to the subscribers, as long as there are messages on the server.
+     *
+     * @param[in] info
+     *    a string containing password, user, address and port of the server
+     *    format: "password:user@address:port", e.g. "guest:guest@localhost:5672"
+     * @param[in] queueName
+     *    a string containing the name of the queue for exchanging tuples, e.g. "queue"
+     * @return
+     *    a new pipe where RabbitMQSource acts as a producer.
+     */
+    Pipe<TStringPtr> newStreamFromRabbitMQ(const std::string& info, const std::string& queueName);
+#endif
+
+#ifdef USE_KAFKA
+    /**
+     * @brief Creates a pipe from an Apache Kafka source as input.
+     *
+     * Creates a new pipe for receiving tuples via Apache Kafka protocol.
+     *
+     * @param[in] broker
+     *    the node(s) where the Kafka server runs on,
+     *    e.g. "127.0.0.1:9092" for localhost
+     * @param[in] topic
+     *    the topic where the data is stored (Kafka property)
+     * @param[in] groupID
+     *    the ID of the group the consumer belongs to
+     * @return
+     *    a new pipe where KafkaSource acts as a producer.
+     */
+    Pipe<TStringPtr> newStreamFromKafka(const std::string& broker, const std::string& topic,
+                                        const std::string& groupID);
+#endif
+
+#ifdef USE_MQTT
+    /**
+     * @brief Creates a pipe from a MQTT source as input.
+     *
+     * Creates a new pipe for receiving tuples via MQTT.
+     *
+     * @param[in] conn
+     *    server connection info, e.g. "tcp://localhost:1883"
+     * @param[in] channel
+     *    the name of the channel to listen on
+     * @return
+     *    a new pipe where MQTTSource acts as a producer.
+     */
+    Pipe<TStringPtr> newStreamFromMQTT(const std::string& conn, const std::string& channel);
+#endif
+
     /**
      * @brief Creates a pipe from a ZMQ source as input.
      *
@@ -232,7 +298,26 @@ namespace pfabric {
       return Pipe<T>(dataflow, dataflow->addPublisher(op));
     }
 
+#ifdef SUPPORT_MATRICES
     /**
+     * @brief Create a pipe for stream from matrix
+     * @tparam Matrix
+     *   matrix type
+     * @tparam Matrix::StreamElement
+     *   record type of the matrix like @c TuplePtr< int, int, double >
+     * @param[in] matrix
+     *   the matrix is source of stream.
+     * @return
+     *   a new pipe with new stream.
+     */
+    template<typename Matrix>
+    Pipe<typename Matrix::StreamElement> newStreamFromMatrix(std::shared_ptr<Matrix> matrix) {
+      auto op = std::make_shared<FromMatrix< Matrix > >(matrix);
+      return Pipe<typename Matrix::StreamElement>(dataflow, dataflow->addPublisher(op));
+    }
+#endif
+
+      /**
      * @brief Create a new pipe where a named stream is used as input.
      *
      * @tparam T the type of the stream element
@@ -242,7 +327,7 @@ namespace pfabric {
      *    a new pipe where the stream acts as the producer.
      */
     template <typename T>
-    Pipe<T> fromStream(Dataflow::BaseOpPtr stream) throw (TopologyException) {
+    Pipe<T> fromStream(Dataflow::BaseOpPtr stream) noexcept(false) {
       // check whether stream is a Queue<T> operator
       auto pOp = dynamic_cast<Queue<T>*>(stream.get());
       if (pOp == nullptr) {

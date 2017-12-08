@@ -8,11 +8,17 @@
 
 namespace pfabric {
 
-struct ColumnInfo {
+class ColumnInfo {
+public:
   enum ColumnType { Void_Type, Int_Type, Double_Type, String_Type };
 
   ColumnInfo(const std::string& n, ColumnType ct) : mColName(n), mColType(ct) {}
 
+  const std::string& getName() const { return mColName; }
+
+  const ColumnType& getType() const { return mColType; }
+
+private:
   std::string mColName;
   ColumnType mColType;
 };
@@ -26,6 +32,8 @@ class TableInfo {
   TableInfo(const std::string& name, std::initializer_list<ColumnInfo> columns,
             ColumnInfo::ColumnType keyType = ColumnInfo::Void_Type)
       : mName(name), mColumns(columns), mKeyType(keyType) {}
+
+  TableInfo(const std::string& name) : mName(name), mColumns(), mKeyType(ColumnInfo::Void_Type) {}
 
   const std::string& tableName() const { return mName; }
 

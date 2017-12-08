@@ -57,6 +57,12 @@
 #include "qop/Tuplifier.hpp"
 #include "qop/Where.hpp"
 #include "qop/ZMQSink.hpp"
+#include "qop/ScaleJoin.hpp"
+#ifdef SUPPORT_MATRICES
+#include "qop/ToMatrix.hpp"
+#include "qop/MatrixSlice.hpp"
+#include "qop/MatrixMerge.hpp"
+#endif
 
 namespace pfabric {
 
@@ -147,7 +153,7 @@ class Pipe {
   Dataflow::BaseOpIterator getPublishers() { return tailIter; }
 
   template <typename SourceType>
-  SourceType* castOperator(Dataflow::BaseOpPtr opPtr) throw(TopologyException) {
+  SourceType* castOperator(Dataflow::BaseOpPtr opPtr) noexcept(false) {
     auto pOp = dynamic_cast<SourceType*>(opPtr.get());
     if (pOp == nullptr) {
       throw TopologyException("Incompatible tuple types in Pipe.");
@@ -156,7 +162,7 @@ class Pipe {
   }
 
   template <typename SourceType>
-  SourceType* castOperator(BaseOp* opPtr) throw(TopologyException) {
+  SourceType* castOperator(BaseOp* opPtr) noexcept(false) {
     auto pOp = dynamic_cast<SourceType*>(opPtr);
     if (pOp == nullptr) {
       throw TopologyException("Incompatible tuple types in Pipe.");
@@ -165,8 +171,7 @@ class Pipe {
   }
 
   template <typename Publisher, typename SourceType>
-  OpIterator addPublisher(std::shared_ptr<Publisher> op) throw(
-      TopologyException) {
+  OpIterator addPublisher(std::shared_ptr<Publisher> op) noexcept(false) {
     auto pOp = castOperator<SourceType>(getPublisher());
     CREATE_LINK(pOp, op);
     return dataflow->addPublisher(op);
@@ -175,7 +180,7 @@ class Pipe {
   template <typename T2, typename KeyType>
   OpIterator addPartitionedJoin(
       std::vector<std::shared_ptr<SHJoin<T, T2, KeyType>>>& opList, DataSource<T2>* otherOp,
-      PartitioningState otherPartitioningState) throw(TopologyException) {
+      PartitioningState otherPartitioningState) noexcept(false) {
     typedef typename std::shared_ptr<SHJoin<T, T2, KeyType>> JoinOpPtr;
     if (partitioningState == NoPartitioning)
       throw TopologyException("Missing partitionBy operator in topology.");
@@ -240,7 +245,7 @@ class Pipe {
 
   template <typename Publisher, typename StreamElement>
   OpIterator addPartitionedPublisher(std::vector<std::shared_ptr<Publisher>>&
-                                         opList) throw(TopologyException) {
+                                         opList) noexcept(false) {
     if (partitioningState == NoPartitioning)
       throw TopologyException("Missing partitionBy operator in topology.");
 
@@ -382,7 +387,7 @@ class Pipe {
    */
   Pipe<T> slidingWindow(const WindowParams::WinType& wt, const unsigned int sz,
                         typename Window<T>::WindowOpFunc windowFunc = nullptr,
-                        const unsigned int ei = 0) throw(TableException) {
+                        const unsigned int ei = 0) noexcept(false) {
     typedef typename Window<T>::TimestampExtractorFunc ExtractorFunc;
     ExtractorFunc fn;
 
@@ -443,7 +448,7 @@ class Pipe {
    */
   Pipe<T> tumblingWindow(const WindowParams::WinType& wt,
                          const unsigned int sz,
-                         typename Window<T>::WindowOpFunc windowFunc = nullptr) throw(TableException) {
+                         typename Window<T>::WindowOpFunc windowFunc = nullptr) noexcept(false) {
     typedef typename Window<T>::TimestampExtractorFunc ExtractorFunc;
     ExtractorFunc fn;
 
@@ -503,7 +508,7 @@ class Pipe {
   Pipe<T> print(
       std::ostream& os = std::cout,
       typename ConsoleWriter<T>::FormatterFunc ffun =
-          ConsoleWriter<T>::defaultFormatter) throw(TopologyException) {
+          ConsoleWriter<T>::defaultFormatter) noexcept(false) {
     assert(partitioningState == NoPartitioning);
     auto op = std::make_shared<ConsoleWriter<T>>(os, ffun);
     auto pOp = castOperator<DataSource<T>>(getPublisher());
@@ -532,7 +537,7 @@ class Pipe {
   Pipe<T> saveToFile(
       const std::string& fname,
       typename FileWriter<T>::FormatterFunc ffun =
-          ConsoleWriter<T>::defaultFormatter) throw(TopologyException) {
+          ConsoleWriter<T>::defaultFormatter) noexcept(false) {
     assert(partitioningState == NoPartitioning);
     auto op = std::make_shared<FileWriter<T>>(fname, ffun);
     auto pOp = castOperator<DataSource<T>>(getPublisher());
@@ -563,7 +568,7 @@ class Pipe {
   Pipe<T> sendZMQ(const std::string& path,
                   ZMQParams::SinkType stype = ZMQParams::PublisherSink,
                   ZMQParams::EncodingMode mode =
-                      ZMQParams::BinaryMode) throw(TopologyException) {
+                      ZMQParams::BinaryMode) noexcept(false) {
     if (partitioningState == NoPartitioning) {
       auto op = std::make_shared<ZMQSink<T>>(path, stype, mode);
       auto pOp = castOperator<DataSource<T>>(getPublisher());
@@ -598,7 +603,7 @@ class Pipe {
    * @return a new pipe
    */
   template <class Tout>
-  Pipe<Tout> extract(char sep) throw(TopologyException) {
+  Pipe<Tout> extract(char sep) noexcept(false) {
     if (partitioningState == NoPartitioning) {
       auto op = std::make_shared<TupleExtractor<Tout>>(sep);
       auto iter =
@@ -629,8 +634,7 @@ class Pipe {
    * @return a new pipe
    */
   template <class Tout>
-  Pipe<Tout> extractJson(const std::initializer_list<std::string>& keys) throw(
-      TopologyException) {
+  Pipe<Tout> extractJson(const std::initializer_list<std::string>& keys) noexcept(false) {
     std::vector<std::string> keyList(keys);
     if (partitioningState == NoPartitioning) {
       auto op = std::make_shared<JsonExtractor<Tout>>(keyList);
@@ -651,7 +655,7 @@ class Pipe {
   /**
    * TODO
    */
-  Pipe<BatchPtr<T>> batch(std::size_t bsize) throw(TopologyException) {
+  Pipe<BatchPtr<T>> batch(std::size_t bsize) noexcept(false) {
     auto op = std::make_shared<Batcher<T>>(bsize);
     auto iter = addPublisher<Batcher<T>, DataSource<T>>(op);
     return Pipe<BatchPtr<T>>(dataflow, iter, keyExtractor, timestampExtractor,
@@ -665,7 +669,7 @@ class Pipe {
    * @return a new pipe
    */
   template <class Tout>
-  Pipe<Tout> deserialize() throw(TopologyException) {
+  Pipe<Tout> deserialize() noexcept(false) {
     if (partitioningState == NoPartitioning) {
       auto op = std::make_shared<TupleDeserializer<Tout>>();
       auto iter =
@@ -700,8 +704,7 @@ class Pipe {
     *      value for the input tuple
     * @return a new pipe
     */
-  Pipe<T> where(typename Where<T>::PredicateFunc func) throw(
-      TopologyException) {
+  Pipe<T> where(typename Where<T>::PredicateFunc func) noexcept(false) {
     if (partitioningState == NoPartitioning) {
       auto op = std::make_shared<Where<T>>(func);
       auto iter = addPublisher<Where<T>, DataSource<T>>(op);
@@ -739,7 +742,7 @@ class Pipe {
     */
   Pipe<T> notify(typename Notify<T>::CallbackFunc func,
                  typename Notify<T>::PunctuationCallbackFunc pfunc =
-                     nullptr) throw(TopologyException) {
+                     nullptr) noexcept(false) {
     assert(partitioningState == NoPartitioning);
 
     auto op = std::make_shared<Notify<T>>(func, pfunc);
@@ -760,7 +763,7 @@ class Pipe {
    *      the input tuple type (usually a TuplePtr) for the operator.
    * @return a new pipe
    */
-  Pipe<T> queue() throw(TopologyException) {
+  Pipe<T> queue() noexcept(false) {
     if (partitioningState == NoPartitioning) {
       auto op = std::make_shared<Queue<T>>();
       auto iter = addPublisher<Queue<T>, DataSource<T>>(op);
@@ -790,7 +793,7 @@ class Pipe {
    *      the named stream object to which the tuples are sent
    * @return a new pipe
    */
-  Pipe<T> toStream(Dataflow::BaseOpPtr stream) throw(TopologyException) {
+  Pipe<T> toStream(Dataflow::BaseOpPtr stream) noexcept(false) {
     assert(partitioningState == NoPartitioning);
     auto queueOp = castOperator<Queue<T>>(stream);
     auto pOp = castOperator<DataSource<T>>(getPublisher());
@@ -818,7 +821,7 @@ class Pipe {
    * @return new pipe
    */
   template <typename Tout>
-  Pipe<Tout> map(typename Map<T, Tout>::MapFunc func) throw(TopologyException) {
+  Pipe<Tout> map(typename Map<T, Tout>::MapFunc func) noexcept(false) {
     if (partitioningState == NoPartitioning) {
       auto op = std::make_shared<Map<T, Tout>>(func);
       auto iter = addPublisher<Map<T, Tout>, DataSource<T>>(op);
@@ -838,7 +841,7 @@ class Pipe {
 
   template <typename Tout>
   Pipe<Tout> tuplify(const std::initializer_list<std::string>& predList, TuplifierParams::TuplifyMode m, 
-      unsigned int ws = 0) throw(TopologyException) {
+      unsigned int ws = 0) noexcept(false) {
     if (partitioningState == NoPartitioning) {
       auto op = std::make_shared<Tuplifier<T, Tout>>(predList, m, ws);
       auto iter = addPublisher<Tuplifier<T, Tout>, DataSource<T>>(op);
@@ -878,7 +881,7 @@ class Pipe {
    */
   template <typename Tout, typename State>
   Pipe<Tout> statefulMap(typename StatefulMap<T, Tout, State>::MapFunc
-                             func) throw(TopologyException) {
+                             func) noexcept(false) {
     if (partitioningState == NoPartitioning) {
       auto op = std::make_shared<StatefulMap<T, Tout, State>>(func);
       auto iter = addPublisher<StatefulMap<T, Tout, State>, DataSource<T>>(op);
@@ -931,7 +934,7 @@ class Pipe {
   template <typename AggrState>
   Pipe<typename AggrState::ResultTypePtr> aggregate(
       AggregationTriggerType tType = TriggerAll,
-      const unsigned int tInterval = 0) throw(TopologyException) {
+      const unsigned int tInterval = 0) noexcept(false) {
     static_assert(typename AggrStateTraits<AggrState>::type(), "aggregate requires an AggrState class");
     return aggregate<typename AggrState::ResultTypePtr, AggrState>(AggrState::finalize, AggrState::iterate,
                                       tType, tInterval);
@@ -985,7 +988,7 @@ class Pipe {
       typename Aggregation<T, Tout, AggrState>::FinalFunc finalFun,
       typename Aggregation<T, Tout, AggrState>::IterateFunc iterFun,
       AggregationTriggerType tType = TriggerAll,
-      const unsigned int tInterval = 0) throw(TopologyException) {
+      const unsigned int tInterval = 0) noexcept(false) {
     if (partitioningState == NoPartitioning) {
       auto op = std::make_shared<Aggregation<T, Tout, AggrState>>(
           finalFun, iterFun, tType, tInterval);
@@ -1033,7 +1036,7 @@ class Pipe {
             typename KeyType = DefaultKeyType>
   Pipe<typename AggrState::ResultTypePtr> groupBy(
       AggregationTriggerType tType = TriggerAll,
-      const unsigned int tInterval = 0) throw(TopologyException) {
+      const unsigned int tInterval = 0) noexcept(false) {
     static_assert(typename AggrStateTraits<AggrState>::type(), "groupBy requires an AggrState class");
     return groupBy<typename AggrState::ResultTypePtr, AggrState, KeyType>(
         AggrState::finalize, AggrState::iterate, tType, tInterval);
@@ -1080,7 +1083,7 @@ class Pipe {
       typename GroupedAggregation<T, Tout, AggrState, KeyType>::IterateFunc
           iterFun,
       AggregationTriggerType tType = TriggerAll,
-      const unsigned int tInterval = 0) throw(TopologyException) {
+      const unsigned int tInterval = 0) noexcept(false) {
     try {
       typedef std::function<KeyType(const T&)> KeyExtractorFunc;
       KeyExtractorFunc keyFunc =
@@ -1139,7 +1142,7 @@ class Pipe {
   template <typename Tout, typename RelatedValueType>
   Pipe<Tout> matchByNFA(
       typename NFAController<T, Tout, RelatedValueType>::NFAControllerPtr
-          nfa) throw(TopologyException) {
+          nfa) noexcept(false) {
     auto op = std::make_shared<Matcher<T, Tout, RelatedValueType>>(
         Matcher<T, Tout, RelatedValueType>::FirstMatch);
     op->setNFAController(nfa);
@@ -1170,8 +1173,7 @@ class Pipe {
    * @return a reference to the pipe
    */
   template <typename Tout, typename RelatedValueType>
-  Pipe<Tout> matcher(CEPState<T, RelatedValueType>& expr) throw(
-      TopologyException) {
+  Pipe<Tout> matcher(CEPState<T, RelatedValueType>& expr) noexcept(false) {
     assert(partitioningState == NoPartitioning);
     auto op = std::make_shared<Matcher<T, Tout, RelatedValueType>>(
         Matcher<T, Tout, RelatedValueType>::FirstMatch);
@@ -1210,7 +1212,7 @@ class Pipe {
   template <typename KeyType = DefaultKeyType, typename T2>
   Pipe<typename SHJoin<T, T2, KeyType>::ResultElement> join(
       Pipe<T2>& otherPipe, typename SHJoin<T, T2, KeyType>::JoinPredicateFunc
-                               pred) throw(TopologyException) {
+                               pred) noexcept(false) {
     typedef typename SHJoin<T, T2, KeyType>::ResultElement Tout;
     try {
       typedef std::function<KeyType(const T&)> LKeyExtractorFunc;
@@ -1257,6 +1259,101 @@ class Pipe {
     }
   }
 
+    /**
+   * @brief Creates an operator for joining two streams represented by pipes.
+   * Origin idea & paper: "ScaleJoin: a Deterministic, Disjoint-Parallel and
+   * Skew-Resilient Stream Join" (2016)
+   *
+   * Creates an operator implementing a ScaleJoin to join two streams.
+   * In addition a join predicate can be specified. Note, that the output
+   * tuple type is derived from the two input types.
+   *
+   * @tparam T
+   *      the input tuple type (usually a TuplePtr) of the left stream.
+   * @tparam T2
+   *      the input tuple type (usually a TuplePtr) of the right stream.
+   * @tparam KeyType
+   *      the data type for representing keys (join values)
+   * @param[in] otherPipe
+   *      the pipe representing the right stream
+   * @param[in] pred
+   *      the join predicate
+   * @param[in] threadnum
+   *      the number of threads for parallel joining
+   * @return a new pipe
+   */
+  template <typename KeyType = DefaultKeyType, typename T2>
+  Pipe<typename ScaleJoin<T, T2, KeyType>::ResultElement> scaleJoin(
+    Pipe<T2>& otherPipe, typename ScaleJoin<T, T2, KeyType>::JoinPredicateFunc pred, const int threadnum)
+    throw(TopologyException) {
+
+    typedef typename ScaleJoin<T, T2, KeyType>::ResultElement Tout;
+
+    try {
+      typedef std::function<KeyType(const T&)> LKeyExtractorFunc;
+      typedef std::function<KeyType(const T2&)> RKeyExtractorFunc;
+
+      //specify the keys of tuples
+      LKeyExtractorFunc fn1 = boost::any_cast<LKeyExtractorFunc>(keyExtractor);
+      RKeyExtractorFunc fn2 = boost::any_cast<RKeyExtractorFunc>(otherPipe.keyExtractor);
+
+      //get the sources of tuples of last operator before scaleJoin-operator (left and right stream)
+      auto pOp = castOperator<DataSource<T> >(getPublisher());
+      auto otherOp = castOperator<DataSource<T2> >(otherPipe.getPublisher());
+
+      //partitioning not necessary, already multithreaded join
+      assert(partitioningState == NoPartitioning);
+      assert(otherPipe.partitioningState == NoPartitioning);
+      assert(threadnum > 0);
+
+      //vector for join operators as well as queues (multithreading encoupling)
+      std::vector<std::shared_ptr<ScaleJoin<T, T2, KeyType> > > scJoinVec;
+      std::vector<std::shared_ptr<Queue<T> > > scQueueVec;
+
+      //queue for collecting join results, forwarding as a single stream
+      auto combine = std::make_shared<Queue<Tout>>();
+
+      //start thread instances, specified by threadnum
+      for (auto i=0; i<threadnum; i++) {
+
+        //create queue and scaleJoin instances
+        auto qu = std::make_shared<Queue<T>>();
+        auto scJoin = std::make_shared<ScaleJoin<T, T2, KeyType> >(fn1, fn2, pred, i, threadnum);
+
+        //connect output of predecessing operator of left stream with input of the current queue instance
+        CREATE_LINK(pOp, qu);
+
+        //connect output of queue instance with input of scaleJoin instance
+        connectChannels(qu->getOutputDataChannel(), scJoin->getLeftInputDataChannel());
+        connectChannels(qu->getOutputPunctuationChannel(), scJoin->getInputPunctuationChannel());
+
+        //connect output of predecessing operator of right stream with input of scaleJoin instance
+        connectChannels(otherOp->getOutputDataChannel(), scJoin->getRightInputDataChannel());
+        connectChannels(otherOp->getOutputPunctuationChannel(), scJoin->getInputPunctuationChannel());
+
+        //connect output of current scaleJoin instance with the combining queue operator
+        CREATE_LINK(scJoin, combine);
+
+        //add queue and scaleJoin instance to the vectors
+        scQueueVec.push_back(qu);
+        scJoinVec.push_back(scJoin);
+      }
+
+      //add all queues, scaleJoins and the combining queue to the dataflow
+      Dataflow::BaseOpList scQueueList(scQueueVec.begin(), scQueueVec.end());
+      dataflow->addPublisherList(scQueueList);
+      Dataflow::BaseOpList scJoinList(scJoinVec.begin(), scJoinVec.end());
+      dataflow->addPublisherList(scJoinList);
+      auto iter = dataflow->addPublisher(combine);
+
+      //return the pipe
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+
+    } catch (boost::bad_any_cast& e) {
+      throw TopologyException("No KeyExtractor defined for join.");
+    }
+  }
+
   /*--------------------------- table operators  -------------------------*/
 
   /**
@@ -1281,7 +1378,7 @@ class Pipe {
    */
   template <typename KeyType = DefaultKeyType>
   Pipe<T> toTable(std::shared_ptr<Table<typename T::element_type, KeyType>> tbl,
-                  bool autoCommit = true) throw(TopologyException) {
+                  bool autoCommit = true) noexcept(false) {
     typedef std::function<KeyType(const T&)> KeyExtractorFunc;
     assert(partitioningState == NoPartitioning);
 
@@ -1331,7 +1428,7 @@ class Pipe {
       std::shared_ptr<Table<typename RecordType::element_type, KeyType>> tbl,
       std::function<bool(const T&, bool,
                          const typename RecordType::element_type&)>
-          updateFunc) throw(TopologyException) {
+          updateFunc) noexcept(false) {
     typedef std::function<KeyType(const T&)> KeyExtractorFunc;
     assert(partitioningState == NoPartitioning);
 
@@ -1350,8 +1447,74 @@ class Pipe {
       throw TopologyException("No KeyExtractor defined for updateTable.");
     }
   }
-  /*------------------------------ partitioning
-   * -----------------------------*/
+
+#ifdef SUPPORT_MATRICES
+  /**
+   * @brief Create a new pipe to insert tuples into matrix
+   * @tparam MatrixType
+   *   the type of matrix (Sparse, Dense, etc.)
+   * @tparam T
+   *   record containing values, typically TuplePtr< int, int, double >.
+   * @param[in]
+   *   the matrix object to store values.
+   * @return
+   *   the new pipe with operator to collect values into stateful the matrix.
+   */
+  template<class MatrixType>
+  Pipe<T> toMatrix(std::shared_ptr<MatrixType> matrix) throw(TopologyException) {
+    try {
+      auto op = std::make_shared<ToMatrix<MatrixType>>(matrix);
+      auto iter = addPublisher<ToMatrix<MatrixType>, DataSource<T> >(op);
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+    } catch (...) {
+      throw TopologyException("toMatrix: unknown error has occured");
+    }
+  }
+
+  /**
+   * @brief matrix_slice
+   *   the operator decouples a matrix into several parts
+   *   sending them to the next operators separately
+   *
+   * @tparam PartitionFunc
+   *   the user defined function to slice matrix
+   * @param[in] pred
+   *   Predicate to decouple matrix
+   * @param[in] numParts
+   *   the number of partitions
+   * @return a new pipe
+   */
+  template<typename PartitionFunc>
+  Pipe<T> matrix_slice(PartitionFunc pred, std::size_t numParts) throw(TopologyException) {
+    try {
+      auto op = std::make_shared<MatrixSlice<T>>(pred, numParts);
+      auto iter = addPublisher<MatrixSlice<T>, DataSource<T> >(op);
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+    } catch (...) {
+      throw TopologyException("matrix_slice: unknown error has occured");
+    }
+  }
+
+  /**
+   * @brief matrix_merge
+   *   the operator receives pieces of the matrix to put back together again
+   * @param[in] numParts
+   *   the number of partitions
+   * @return a new pipe
+   */
+  Pipe<T> matrix_merge(std::size_t numParts) throw(TopologyException) {
+    try {
+      auto op = std::make_shared<MatrixMerge<T>>(numParts);
+      auto iter = addPublisher<MatrixMerge<T>, DataSource<T> >(op);
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+    } catch (...) {
+      throw TopologyException("matrix_merge: unknown error has occured");
+    }
+  }
+#endif
+
+        /*------------------------------ partitioning
+         * -----------------------------*/
   /**
    * @brief Create a PartitionBy operator.
    *
@@ -1373,7 +1536,7 @@ class Pipe {
    * @return a new pipe
    */
   Pipe<T> partitionBy(typename PartitionBy<T>::PartitionFunc pFun,
-                      unsigned int nPartitions) throw(TopologyException) {
+                      unsigned int nPartitions) noexcept(false) {
     if (partitioningState != NoPartitioning)
       throw TopologyException(
           "Cannot partition an already partitioned stream.");
@@ -1394,7 +1557,7 @@ class Pipe {
    *   the data stream element type consumed by PartitionBy
    * @return a new pipe
    */
-  Pipe<T> merge() throw(TopologyException) {
+  Pipe<T> merge() noexcept(false) {
     if (partitioningState != NextInPartitioning)
       throw TopologyException("Nothing to merge in topology.");
 
@@ -1433,7 +1596,7 @@ class Pipe {
    */
   Pipe<T> barrier(
       std::condition_variable& cVar, std::mutex& mtx,
-      typename Barrier<T>::PredicateFunc f) throw(TopologyException) {
+      typename Barrier<T>::PredicateFunc f) noexcept(false) {
     if (partitioningState == NoPartitioning) {
       auto op = std::make_shared<Barrier<T>>(cVar, mtx, f);
       auto iter = addPublisher<Barrier<T>, DataSource<T>>(op);

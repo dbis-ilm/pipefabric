@@ -23,7 +23,7 @@ add_custom_command(
 # the JSON library
 download_project(PROJ               json
                 GIT_REPOSITORY      https://github.com/nlohmann/json.git
-                GIT_TAG             master
+                GIT_TAG             develop
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
@@ -117,3 +117,45 @@ add_custom_command(
 )
 endif()
 
+#--------------------------------------------------------------------------------
+if(BUILD_USE_CASES)
+# data for use cases
+download_project(PROJ               data
+	            GIT_REPOSITORY      https://github.com/dbis-ilm/data.git
+	            GIT_TAG             master
+	            UPDATE_DISCONNECTED 1
+	            QUIET
+)
+file(COPY ${PROJECT_BINARY_DIR}/data-src/DEBS2017
+     DESTINATION ${THIRD_PARTY_DIR}
+)
+endif()
+
+#--------------------------------------------------------------------------------
+if(USE_NVML_TABLE)
+# Non-Volatile Memory Library (pmem.io)
+download_project(PROJ               nvml
+                GIT_REPOSITORY      https://github.com/pmem/nvml.git
+                GIT_TAG             1.3.1-rc2
+                UPDATE_DISCONNECTED 1
+                QUIET
+)
+add_custom_command(
+        OUTPUT ${THIRD_PARTY_DIR}/nvml
+        COMMAND ${CMAKE_COMMAND} -E chdir ${nvml_SOURCE_DIR} $(MAKE)
+	COMMAND ${CMAKE_COMMAND} -E chdir ${nvml_SOURCE_DIR} $(MAKE) install prefix=${THIRD_PARTY_DIR}/nvml
+)
+
+# PTable (internal gitlab project) for NVM
+download_project(PROJ               ptable
+                GIT_REPOSITORY      https://dbgit.prakinf.tu-ilmenau.de/code/PTable.git
+                GIT_TAG             master
+                UPDATE_DISCONNECTED 1
+                QUIET
+)
+add_custom_command(
+        OUTPUT ${THIRD_PARTY_DIR}/ptable
+        COMMAND ${CMAKE_COMMAND} -E chdir ${ptable_SOURCE_DIR} cmake -DPTABLE_DIR=${THIRD_PARTY_DIR}/ptable src
+	COMMAND ${CMAKE_COMMAND} -E chdir ${ptable_SOURCE_DIR} $(MAKE) install
+)
+endif()

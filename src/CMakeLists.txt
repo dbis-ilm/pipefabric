@@ -8,27 +8,61 @@ set (PipeFabric_VERSION_MINOR 2)
 
 include(CTest)
 
-#############################
-# customization section
-#############################
-#
+################################################################################
+# customization section                                                        #
+################################################################################
 
 # Installation path
 set(PIPEFABRIC_DIR "/usr/local/pfabric")
 
-#The following variables enable or disable additional functionalities, which can be switched off to reduce build time.
+# The following variables enable or disable additional functionalities,
+# which can be switched off to reduce build time.
+
+# Support Matrix Operations (needs Eigen library to be installed)
+option(SUPPORT_MATRICES
+  "support matrix operations as tuple and state type"
+  OFF
+)
+
+# Build use cases
+option(BUILD_USE_CASES
+  "build use cases to show functionality examples"
+  OFF
+)
+
+# Use RabbitMQ as network source
+option(USE_RABBITMQ
+  "use RabbitMQ as network source"
+  OFF
+)
+# Use Apache Kafka as network source
+option(USE_KAFKA
+  "use Apache Kafka as network source"
+  OFF
+)
+# Use MQTT as network source
+option(USE_MQTT
+  "use MQTT as network source"
+  OFF
+)
 
 # Use the boost::spirit parser for converting strings to numbers
 option(USE_BOOST_SPIRIT_PARSER
-    "use the boost::spirit::qi parsers for converting strings to tuple attributes"
-    ON
+  "use the boost::spirit::qi parsers for converting strings to tuple attributes"
+  ON
 )
 
 # Use RocksDB key-value store for implementing tables
 # If switched to off, it will not be downloaded, saving initial building time.
 option(USE_ROCKSDB_TABLE
   "use RocksDB for implementing persistent tables"
-  ON
+  OFF
+)
+
+# Use Non-Volatile Memory Library for implementing tables
+option(USE_NVML_TABLE
+	"use nvml for implementing persistent memory tables"
+  OFF
 )
 
 # Build only pipefabric libraries (cep and core)
@@ -58,6 +92,15 @@ option(BUILD_BENCHMARKS
   ON
 )
 
+################################
+# End of customization section #
+################################
+
+# Use cases require matrix support (image and graph processing)
+if(BUILD_USE_CASES)
+	set(SUPPORT_MATRICES ON)
+endif()
+
 # Benchmark test requires benchmark library
 if (BUILD_BENCHMARKS)
   set(BUILD_GOOGLE_BENCH ON)
@@ -80,14 +123,10 @@ endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused -Wno-uninitialized")
 
-# End of customization section
-#---------------------------------------------------------------------------
-
 # Add our CMake directory to CMake's module path
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/")
 
-# We download some 3rdparty modules from github.com before building
-# the project.
+# We download some 3rdparty modules from github.com before building the project.
 include(Download3rdParty)
 
 if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
@@ -98,9 +137,9 @@ else()
 set(DYLIB_LIBRARY "")
 endif()
 
-#############################
-# memory allocator libraries
-#############################
+##############################
+# memory allocator libraries #
+##############################
 #
 find_package(JeMalloc)
 find_package(Tcmalloc)
@@ -149,6 +188,31 @@ if (USE_ROCKSDB_TABLE)
 else()
   message(STATUS "don't use RocksDB key-value store")
   set (ROCKSDB_LIB "")
+endif()
+
+########################
+# Non-Volatile Memory Library
+########################
+#
+if (USE_NVML_TABLE)
+	message(STATUS "using NVML based persistent table")
+	add_definitions(-DUSE_NVML_TABLE)
+	set (NVML_LIBRARIES
+            "${THIRD_PARTY_DIR}/nvml/lib/libpmemblk.a"
+            "${THIRD_PARTY_DIR}/nvml/lib/libpmemlog.a"
+            "${THIRD_PARTY_DIR}/nvml/lib/libpmemobj.a"
+            "${THIRD_PARTY_DIR}/nvml/lib/libpmempool.a"
+            "${THIRD_PARTY_DIR}/nvml/lib/libpmem.a"
+            ${DYLIB_LIBRARY}
+            "${THIRD_PARTY_DIR}/ptable/lib/libptable.so"
+            )
+    include_directories(
+            "${THIRD_PARTY_DIR}/nvml/include"
+            "${THIRD_PARTY_DIR}/ptable/include"
+            )
+else ()
+	message(STATUS "don't use NVML based persistent table")
+	set (NVML_LIBRARIES "")
 endif()
 
 ######################
@@ -210,6 +274,27 @@ if (ZEROMQ_FOUND)
     link_directories(${ZEROMQ_LIBRARY_DIR})
 endif(ZEROMQ_FOUND)
 
+
+#-----------------------------------------------------------------------------------------
+#
+# Matrix Support
+#
+
+if(SUPPORT_MATRICES)
+	####################################
+	# Eigen library for linear algebra #
+	####################################
+	find_package(Eigen3)
+ 	if(EIGEN3_FOUND)
+	  message(STATUS "using Eigen3 library for linear algebra")    
+		include_directories(${EIGEN3_INCLUDE_DIR})
+	else()
+		message(STATUS "Eigen3 not found")
+	endif()
+	add_definitions(-DSUPPORT_MATRICES)
+endif()
+
+
 #-----------------------------------------------------------------------------------------
 #
 # Building PipeFabric core library
@@ -262,13 +347,93 @@ if(BUILD_GOOGLE_BENCH)
   )
 endif()
 
+set(core_libs
+  ${BOOST_LIBRARIES}
+  ${ZEROMQ_LIBRARIES}
+)
+
+#-----------------------------------------------------------------------------------------
+#
+##########
+# RabbitMQ
+##########
+#
+#
+if(USE_RABBITMQ)
+  add_definitions(-DUSE_RABBITMQ)
+  set(core_libs
+    ${core_libs}
+    amqpcpp
+    rabbitmq
+  )
+  set(core_sources
+    ${core_sources}
+    net/RabbitMQSource.cpp
+  )
+endif()
+#-----------------------------------------------------------------------------------------
+#
+##############
+# Apache Kafka
+##############
+#
+#
+if(USE_KAFKA)
+  add_definitions(-DUSE_KAFKA)
+  set(core_libs
+    ${core_libs}
+    cppkafka
+    rdkafka
+  )
+  set(core_sources
+    ${core_sources}
+    net/KafkaSource.cpp
+  )
+endif()
+
+#-----------------------------------------------------------------------------------------
+#
+######
+# MQTT
+######
+#
+#
+if(USE_MQTT)
+  add_definitions(-DUSE_MQTT)
+  set(core_libs
+    ${core_libs}
+    paho-mqtt3c
+    paho-mqtt3cs
+    paho-mqtt3a
+    paho-mqtt3as
+    paho-mqttpp3
+  )
+  set(core_sources
+    ${core_sources}
+    net/MQTTSource.cpp
+  )
+endif()
+
+if(USE_NVML_TABLE)
+  add_definitions(-DDO_LOG=0)
+  set(core_sources
+    ${core_sources}
+    ${THIRD_PARTY_DIR}/nvml
+    ${THIRD_PARTY_DIR}/ptable
+  )
+  set(core_libs
+    ${core_libs}
+    ${NVML_LIBRARIES}
+  )
+endif()
+#-----------------------------------------------------------------------------------------
+
 add_library(pfabric_core SHARED
   ${core_sources}
 )
 
 target_link_libraries(pfabric_core
-		${BOOST_LIBRARIES}
-		${ZEROMQ_LIBRARIES}
+  ${core_libs}
 )
 
 #-----------------------------------------------------------------------------------------
@@ -289,7 +454,9 @@ target_link_libraries(pfabric_cep
 #
 # Experimental SQL query compiler
 #
-add_subdirectory(qcomp)
+if(!USE_NVML_TABLE)
+  add_subdirectory(qcomp)
+endif()
 
 #-----------------------------------------------------------------------------------------
 #
@@ -312,6 +479,24 @@ add_subdirectory(test)
 # Micro-benchmarking using Google Benchmark
 #
 add_subdirectory(bench)
+
+#-----------------------------------------------------------------------------------------
+#
+# Build use cases
+#
+if(BUILD_USE_CASES)
+	#######################################
+	# OpenCV library for image processing #
+	#######################################
+	find_package(OpenCV REQUIRED)
+	if(OpenCV_FOUND)
+	 message(STATUS "using OpenCV library for image processing")  
+	 include_directories(${OpenCV_INCLUDE_DIR}) 
+	else()
+		message(STATUS "OpenCV not found")  
+	endif()
+  add_subdirectory(usecases)
+endif()
 #-----------------------------------------------------------------------------------------
 #
 # Installation

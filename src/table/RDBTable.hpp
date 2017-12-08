@@ -32,6 +32,7 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/signals2.hpp>
+#include <table/TableInfo.hpp>
 
 #include "fmt/format.h"
 
@@ -41,7 +42,6 @@
 
 #include "table/BaseTable.hpp"
 #include "table/TableException.hpp"
-#include "table/TableInfo.hpp"
 
 namespace pfabric {
 

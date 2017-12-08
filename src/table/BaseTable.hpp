@@ -33,11 +33,10 @@
 #include <shared_mutex>
 
 #include <boost/signals2.hpp>
-
-#include "fmt/format.h"
-
 #include "table/TableInfo.hpp"
 #include "table/TableException.hpp"
+
+#include "fmt/format.h"
 
 namespace pfabric {
 

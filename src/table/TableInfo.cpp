@@ -1,4 +1,4 @@
-#include "TableInfo.hpp"
+#include <table/TableInfo.hpp>
 #include <sstream>
 
 using namespace pfabric;
@@ -12,7 +12,7 @@ std::string TableInfo::generateTypeDef() const {
       first = false;
     else
       os << ", ";
-    os << col.mColType;
+    os << col.getType();
   }
   os << ">";
   return os.str();
@@ -22,7 +22,7 @@ std::string TableInfo::typeSignature() const {
   std::ostringstream os;
   os << "[";
   for (auto& col : mColumns) {
-    switch (col.mColType) {
+    switch (col.getType()) {
       case ColumnInfo::Void_Type:
         os << "V";
         break;
@@ -43,7 +43,7 @@ std::string TableInfo::typeSignature() const {
 
 int TableInfo::findColumnByName(const std::string& colName) const {
   for (std::size_t i = 0; i < mColumns.size(); i++) {
-    if (mColumns[i].mColName == colName) return (int)i;
+    if (mColumns[i].getName() == colName) return (int)i;
   }
   return -1;
 }

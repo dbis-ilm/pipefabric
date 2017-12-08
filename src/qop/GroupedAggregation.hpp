@@ -258,10 +258,6 @@ private:
 	 */
 	void processPunctuation( const PunctuationPtr& punctuation ) {
 			Lock lock( mAggrMtx );
-
-    	const Timestamp timestamp = punctuation->getTimestamp();
-    	const bool outdated = false;
-			produceAggregates( timestamp, outdated, lock );
 			this->getOutputPunctuationChannel().publish(punctuation);
 	}
 
@@ -351,29 +347,6 @@ private:
   }
 
 	/**
-	 * @brief Produce aggregate elements for all groups in the aggregation table.
-	 *
-	 * This method produces an aggregation result for each group that is currently
-	 * available in this operator. Groups having a timestamp older than the last
-	 * notification will be skipped, unless the operator was configured to always
-	 * produce a full result.
-	 *
-	 * @param[in] timestamp
-	 *    the timestamp for the result elements
-	 * @param[in] outdated
-	 *    flag indicating if the result elements should be marked as outdated
-	 * @param[in] lock
-	 *    a reference to the lock protecting the aggregation state
-	 */
-	void produceAggregates(const Timestamp& timestamp, const bool outdated, const Lock& lock) {
-		for (const auto groupEntry : mAggregateTable) {
-			const AggregateStatePtr& aggrState = groupEntry.second;
-
-      //produceAggregate(aggrState, timestamp, outdated, lock);
-		}
-	}
-
-	/**
 	 * @brief Produce a final aggregate for a specific state and publish it to all subscribers.
 	 *
 	 * This method applies the user-defined aggregation finalization operation to the
@@ -403,11 +376,7 @@ protected:
 	 * TODO
 	 */
   void notificationCallback() {
-    const bool outdated = false;
-    const Timestamp timestamp = 0; // = ????;
-
     Lock lock(mAggrMtx);
-    this->produceAggregates(timestamp, outdated, lock);
     PunctuationPtr punctuation = std::make_shared< Punctuation >( Punctuation::SlideExpired );
     this->getOutputPunctuationChannel().publish(punctuation);
   }

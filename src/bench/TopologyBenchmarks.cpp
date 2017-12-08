@@ -251,8 +251,7 @@ void TopologyPartitionedJoinTest(benchmark::State& state) {
 	  .join<int>(s1, [](auto tp1, auto tp2) { return true; })
 	  .merge();
 
-    t.start();
-	  t.wait();  
+    t.start(false);
 	//BAD: Takes far too long because of iteration number
 	//wait for results - stop timer
 	//state.PauseTiming();
