@@ -9,38 +9,188 @@
 
 #include "pfabric.hpp" 
 
-//parameters
-#define W 10 //time window steps
-#define N 5   //number of transitions to be considered in anomaly detection
-#define M 50  //number of maximum iterations for the clustering algorithm
-#define T 0.005 //maximum probability
-
-#define THREADS 1 //number of threads
-
-
 using namespace pfabric;
 
-//the structure of tuples we receive after extract
+
+/*
+ * -----------------------------------------------------------------------------------------------------------------------
+ * Parameters
+ * -----------------------------------------------------------------------------------------------------------------------
+ */
+
+int trans_num = 5; //number of transitions to be considered in anomaly detection
+double trans_prob = 0.005; //probability for anomaly detection
+int max_cluster_iterations = 50; //number of maximum iterations for the clustering algorithm
+
+//counter for performance and results
+long long tuples_processed = 0;
+long long anomalies_found = 0;
+
+
+/*
+ * -----------------------------------------------------------------------------------------------------------------------
+ * Metadata
+ * -----------------------------------------------------------------------------------------------------------------------
+ */
+
+//metadata location and dataset file
+std::string metadata_loc = "./3rdparty/DEBS2017/data_10M/molding_machine_10M.metadata.nt";
+
+//the structure of tuples we receive after extract as well as tuplifying
 typedef TuplePtr<std::string, std::string, std::string> Triple;
-//the structure of a tuple after RDF processing in data stream
-typedef TuplePtr<std::string, std::string, std::string, std::string, std::string> TInPreprocessing;
+
+//saves metadata in proper format for later usage
+std::unordered_map<string, int> MetadataMap;
+
+//machine number, used later for clustering
+int MdCluster;
+
+//helper method for storing metadata into container for later usage
+inline void processMetadata(Triple meta) {
+  std::string tempString = get<1>(meta);
+  if(tempString.size() < 1) {
+    tempString = get<0>(meta);
+    tempString.erase(tempString.begin(), tempString.begin()+84);
+    tempString.pop_back(); //now the value looks like AA_BBB with AA=machine, BBB=Value
+    MetadataMap.insert({tempString, MdCluster});
+  } else {
+    tempString = get<1>(meta);
+    tempString.erase(0,1);
+    tempString.erase(tempString.end()-41, tempString.end());
+    MdCluster = atoi(tempString.c_str());
+  }
+}
+
+//main method for processing the metadata
+inline void streamMetadata() {
+  std::cout<<"Processing metadata."<<std::endl;
+
+  Topology t;
+  auto s = t.newStreamFromFile(metadata_loc)
+    //first, extract the metadata and convert it to string triple
+    .extract<Triple>(' ')
+    //now transform the triples by grouping, according to a RDF schema
+    .tuplify<Triple>({ "<http://www.agtinternational.com/ontologies/WeidmullerMetadata#hasNumberOfClusters>",
+                      "<http://www.agtinternational.com/ontologies/IoTCore#valueLiteral>"},
+                     TuplifierParams::ORDERED)
+    //finally the metadata is processed and stored for later usage
+    .notify([&](auto tp, bool outdated) {
+      processMetadata(tp);
+    })
+    ;
+
+  t.start(false);
+
+  std::cout<<"Amount of stateful properties: "<<MetadataMap.size()<<"."<<std::endl;
+  std::cout<<"Metadata stored."<< std::endl;
+}
+
+
+/*
+ * -----------------------------------------------------------------------------------------------------------------------
+ * Preprocessing input data into state
+ * -----------------------------------------------------------------------------------------------------------------------
+ */
+
+//input data location and dataset file
+std::string inputdata_loc = "./3rdparty/DEBS2017/data_10M/molding_machine_10M.nt";
+
+//the structure of a tuple after RDF processing input data stream
+typedef TuplePtr<std::string, std::string, std::string, std::string, std::string> Input_tp;
 //the structure of the output after preprocessing map
-typedef TuplePtr<int, int, std::string, std::string, Timestamp, int, double, std::string, double> TInClustering;
-//the strucure of the output after clustering
-typedef TuplePtr<int, int, std::string, std::string, Timestamp, int, double, std::string, double, std::vector<int>> TInMarkov;
-//the structure of the output of the metadata rdf tuple
-typedef TuplePtr<std::string, std::string, std::string> MetadataRDFTuple;
+typedef TuplePtr<int, int, std::string, std::string, Timestamp, int, double, std::string, double> Preproc_Output_tp;
 
 //used for input data
-struct MyState{
-  MyState() : ValueDouble(0.0), ThresholdNumber(0.0), cnt(0), PassTuple(0), HasMetadata(0), NumberOfClusters(0), MetadataIDString(""), TS(""), Observation(""), Value(""), T1(0.0){}
-  double ValueDouble, ThresholdNumber; //ValueDouble stores current value, ThresholdNumber stores current threshold
-  int cnt, PassTuple, HasMetadata, NumberOfClusters; //cnt counts stateful properties per observation group(normally counts till 55, also used as counter for partitioning),
-                                                     //PassTuple is a forward flag, HasMetadata indicates if currently observed property has metadata -> statefulProperty,
-                                                     //NumberOfClusters stores the amount of clusters a property has
-  std::string MetadataIDString, TS, Observation, Value; //MetadataIDSring stores the MetadataID/ID, TS stores the Timestamp as string, Value stores the current data point
-  Timestamp T1; //stores the timestamp
+struct InputState {
+  //constructor
+  InputState() : valueDouble(0.0), thresholdNumber(0.0), property_cnt(0), passTuple(0), hasMetadata(0),
+    numberOfClusters(0), metadataIDString(""), timestamp_str(""), observation(""), value(""), timestamp(0.0) {
+  }
+
+  double valueDouble; //stores current input value
+  double thresholdNumber; //stores current threshold
+
+  int property_cnt; //counts stateful properties per observation group
+  int passTuple; //forward flag
+  int hasMetadata; //check for available metadata
+  int numberOfClusters; //amount of clusters a property has
+
+  std::string metadataIDString; //stores the MetadataID/ID
+  std::string timestamp_str; //stores the timestamp as string
+  std::string observation; //stores the tuple ID for anomaly output
+  std::string value; //stores the current data point
+
+  Timestamp timestamp; //stores the raw timestamp
 };
+
+//helper method for writing the states
+inline Preproc_Output_tp calculateStates(Input_tp tp, std::shared_ptr<InputState> state) {
+  std::string testString = get<0>(tp);
+  state->passTuple = 0;
+
+  if(testString.find("Observation_") != std::string::npos){
+    //get the Value ID, it starts at the 51th position of the string
+    //and the ">" at the end of the string has to be deleted
+    state->observation = testString.substr(57);
+    state->observation.pop_back();
+    state->metadataIDString = get<1>(tp);
+    state->metadataIDString.erase(state->metadataIDString.begin(), state->metadataIDString.begin()+64);
+    state->metadataIDString.pop_back();
+
+    //check if the data has metadata (otherwise it is useless)
+    std::unordered_map<std::string,int>::const_iterator got = MetadataMap.find (state->metadataIDString);
+    if(got != MetadataMap.end()){
+      state->hasMetadata++;
+      state->numberOfClusters = MetadataMap[state->metadataIDString];
+    }else{
+      state->hasMetadata = 0;
+    }
+  } else {
+    if(testString.find("Value") != std::string::npos){
+      if(state->hasMetadata > 0){
+        state->property_cnt++;
+        state->value = get<3>(tp);
+        state->value.erase(0,1);
+
+        if(state->value.size() > 0){ //needed as catch if it doesn't contain content
+          state->value.erase(state->value.end()-44, state->value.end());
+          state->valueDouble = std::stod(state->value); //convert the string into double
+          state->passTuple = 1;
+        }
+      }
+    } else {
+      if(testString.find("Timestamp") != std::string::npos){ //get timestamp
+        state->timestamp_str = get<3>(tp); //get the whole date+time
+        state->timestamp_str.erase(0,1);
+        state->timestamp_str.erase(state->timestamp_str.end()-52, state->timestamp_str.end());
+        state->timestamp = TimestampHelper::stringToTimestamp(state->timestamp_str);
+
+        //now the TS variable is used to store the time stamp name
+        state->timestamp_str = testString;
+        state->timestamp_str = state->timestamp_str.substr(45);
+        state->timestamp_str.pop_back();
+        state->property_cnt = 0;
+      }
+    }
+  }
+  return makeTuplePtr(state->property_cnt-1, state->passTuple, state->metadataIDString, state->timestamp_str,
+                      state->timestamp, state->numberOfClusters, state->thresholdNumber, state->observation,
+                      state->valueDouble);
+}
+
+
+/*
+ * -----------------------------------------------------------------------------------------------------------------------
+ * Clustering
+ * -----------------------------------------------------------------------------------------------------------------------
+ */
+
+//locks shared variables for multithreading
+std::mutex mtx;
+
+//the strucure of the output after clustering
+typedef TuplePtr<int, int, std::string, std::string, Timestamp, int, double,
+                 std::string, double, std::vector<int>> Cluster_Output_tp;
 
 //used for cluster
 struct ClusterState{
@@ -48,319 +198,278 @@ struct ClusterState{
   std::vector<std::vector<double> > DataVectorNew;
 };
 
-//metadata variables
-int MdMachine, MdCluster;
-std::string MdID;
-std::vector<TuplePtr<std::string, int>> VectorOfMetadata;
+//main method for clustering
+inline Cluster_Output_tp calculateClusters(Preproc_Output_tp tp, bool outdated, std::shared_ptr<ClusterState> state) {
 
-//counter for anomalies
-long long SimpleCounter = 0;
-std::vector<double> tempDoubleVector;
+  //clustering variables
+  bool foundRowNew = false;
+  int rowNumberNew = 0;
+  int hasEnoughValues = 0;
+  std::vector<int> clusterSequence(0, 0);
+  std::string tempMetadataString = get<2>(tp); //check for outdated tuple or not (within the window or not)
+  double tempMachineNumber = std::stod(tempMetadataString.substr(0, tempMetadataString.find("_")));
+  double tempValueNumber = std::stod(tempMetadataString.substr(tempMetadataString.find("_")+1));
 
-//counter for performance
-long long tpProc = 0;
-
-int main(int argc, char **argv){
-
-  //define Parameters
-  int WindowSize = 10;
-  int ThreadAmount = 3;
-
-  std::mutex mtx; //locks shared variables (used in clustering)
-  std::string tempString; //string for temp storage
-  tempDoubleVector.push_back(0.0); //double vector for temp storage
-  unordered_map<string, int> MetadataMap; //stores the metadata, currently only cluster center is saved, since threshold is always 0.005 in the metadata
-
-  std::cout<<"Processing Metadata"<<std::endl;
-
-  //metadata stream handling
-  Topology t2;
-  auto s2 = t2.newStreamFromFile("./3rdparty/DEBS2017/data_10M/molding_machine_10M.metadata.nt") //input different source for metadata here
-    .extract<Triple>(' ')
-    .tuplify<MetadataRDFTuple>({ "<http://www.agtinternational.com/ontologies/WeidmullerMetadata#hasNumberOfClusters>",
-                                "<http://www.agtinternational.com/ontologies/IoTCore#valueLiteral>"},
-                               TuplifierParams::ORDERED)
-    .notify([&](auto tp, bool outdated) {
-      tempString=get<1>(tp);
-      if(tempString.size() < 1){
-        tempString = get<0>(tp);
-        tempString.erase(tempString.begin(), tempString.begin()+84);
-        tempString.pop_back(); //now the value looks like AA_BBB with AA=machine, BBB=Value
-        MdID = tempString;
-        MetadataMap.insert({MdID, MdCluster});
-      }else{
-        tempString = get<1>(tp);
-        tempString.erase(0,1);
-        tempString.erase(tempString.end()-41, tempString.end());
-        MdCluster = atoi(tempString.c_str());
+  //check where the data point belongs to
+  for (auto rowNew = state->DataVectorNew.begin(); rowNew != state->DataVectorNew.end(); rowNew++) {
+    auto colNew = rowNew->begin();
+    if(( *colNew) == tempMachineNumber) {
+      colNew++;
+      if((*colNew) == tempValueNumber) {
+        foundRowNew = true;
+        break;
       }
-    });
+    }
+    rowNumberNew++;
+  }
 
-  t2.start(false);
+  //check if outside of the window
+  if(outdated == true) {
+    mtx.lock();
+    state->DataVectorNew[rowNumberNew].erase(state->DataVectorNew[rowNumberNew].begin() + 2);
+    mtx.unlock();
 
-  std::cout<<"Stateful Properties: "<<MetadataMap.size()<<std::endl;
-  std::cout<<"Metadata stored"<< std::endl;
+  //if the data is not outdated it should be processed
+  } else {
+    //if there is already data to this id
+    if(!foundRowNew){
+      mtx.lock();
+      std::vector<double> tempDoubleVector;
+      tempDoubleVector.push_back(tempMachineNumber);
+      tempDoubleVector.push_back(tempValueNumber);
+      tempDoubleVector.push_back(get<8>(tp));
+      //create new variable
+      state->DataVectorNew.push_back(tempDoubleVector);
+      mtx.unlock();
+    } else {
+      mtx.lock();
+      //add data at the end of row x
+      state->DataVectorNew[rowNumberNew].push_back(get<8>(tp));
+      mtx.unlock();
+    }
 
-  //actual stream with real-time data
-  Topology t;
-  auto s = t.newStreamFromFile("./3rdparty/DEBS2017/data_10M/molding_machine_10M.nt") //input different source for metadata here
-    .extract<Triple>(' ')
-    .tuplify<TInPreprocessing>({"<http://purl.oclc.org/NET/ssnx/ssn#observedProperty>",
-                                "<http://www.agtinternational.com/ontologies/I4.0#observedCycle>",
-                                "<http://www.agtinternational.com/ontologies/IoTCore#valueLiteral>",
-                                "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>",
-                                "<http://www.agtinternational.com/ontologies/IoTCore#valueLiteral>"},
-                               TuplifierParams::ORDERED)
-    .statefulMap<TInClustering, MyState>([&](auto tp, bool, std::shared_ptr<MyState> state){
-      tpProc++;
-      std::string testString = get<0>(tp);
-      state->PassTuple = 0; //initialize the flag
+    int NumberOfValues = (int)state->DataVectorNew[rowNumberNew].size()-2;
 
-      if(testString.find("Observation_") != std::string::npos){
-        //get the Value ID, it starts at the 51th position of the string and the ">" at the end of the string has to be deleted
-        state->Observation = testString.substr(57);
-        state->Observation.pop_back();
-        state->MetadataIDString = get<1>(tp);
-        state->MetadataIDString.erase(state->MetadataIDString.begin(), state->MetadataIDString.begin()+64);
-        state->MetadataIDString.pop_back();
+    //check if there are enough values for clustering
+    if(NumberOfValues > trans_num) {
+      std::vector<double> clusterValueVector (1, 0.0);
+      std::vector<int> clusterAssignVector(NumberOfValues, 0);
+      std::vector<double> valuesVector;
+      valuesVector.assign(state->DataVectorNew[rowNumberNew].begin()+2, state->DataVectorNew[rowNumberNew].end());
 
-        //check if the data has metadata (otherwise it is useless)
-        std::unordered_map<std::string,int>::const_iterator got = MetadataMap.find (state->MetadataIDString);
-        if(got != MetadataMap.end()){
-          state->HasMetadata++;
-          state->NumberOfClusters = MetadataMap[state->MetadataIDString];
-        }else{
-          state->HasMetadata = 0;
+      //initialize clusterValueVector, use the distinct first values of valuesVector
+      clusterValueVector[0] = valuesVector[0];
+
+      for(int i = 1; (int)clusterValueVector.size() < get<5>(tp) && i <= (int)valuesVector.size(); i++) {
+        if(!(std::find(clusterValueVector.begin(), clusterValueVector.end(), valuesVector[i])
+             != clusterValueVector.end())) {
+          clusterValueVector.push_back(valuesVector[i]);
         }
-      }else{
-        if(testString.find("Value") != std::string::npos){
-          if(state->HasMetadata > 0){
-            state->cnt++;
-            state->Value = get<3>(tp);
-            state->Value.erase(0,1);
+      }
 
-            if(state->Value.size()>0){ //needed as catch if it doesn't contain content
-              state->Value.erase(state->Value.end()-44, state->Value.end());
-              //convert the string into double
-              state->ValueDouble = std::stod(state->Value);
-              state->PassTuple = 1;
+      //iterate to convergence
+      int numberOfChanges = 1;
+      int clusterIt = 0;
+
+      //start clustering actualization
+      while(clusterIt<max_cluster_iterations && numberOfChanges != 0) {
+        numberOfChanges = 0;
+        //calculate distance for each value, iterate through all values
+        for(int i = 0; (int)valuesVector.size() > i; i++){
+          //distance to the current assigned clustercenter
+          double oldDistance = (valuesVector[i]-clusterValueVector[clusterAssignVector[i]])
+            *(valuesVector[i]-clusterValueVector[clusterAssignVector[i]]);
+
+          //first values get doublechecked
+          for(int j = 0; (int)clusterValueVector.size() > j; j++) {
+            //distance to the other clustercenters
+            double newDistance = (valuesVector[i]-clusterValueVector[j])*(valuesVector[i]-clusterValueVector[j]);
+            //check if the distance is the same
+            if (newDistance == oldDistance){
+              if (clusterValueVector[j] > clusterValueVector[clusterAssignVector[i]]) {
+                clusterAssignVector[i] = j;
+              }
+            //check if the distance is smaller
+            } else if (newDistance < oldDistance) {
+              oldDistance = newDistance;
+              clusterAssignVector[i] = j;
+              numberOfChanges++;
             }
           }
-        }else{
-          if(testString.find("Timestamp") != std::string::npos){ //get timestamp
-            state->TS = get<3>(tp); //get the whole date+time
-            state->TS.erase(0,1);
-            state->TS.erase(state->TS.end()-52, state->TS.end());
-            state->T1 = TimestampHelper::stringToTimestamp(state->TS); //is the new TS and the following TS calculations are obsolete
+        }
 
-            //now the TS variable is used to store the time stamp name
-            state->TS = testString;
-            state->TS = state->TS.substr(45);
-            state->TS.pop_back();
-            //counter for partitionBy, counts the amount of properties in one timestamp
-            state->cnt = 0; 
+        //calculate new clustercenters
+        for(int i = 0; (int)clusterValueVector.size() > i; i++) {
+          int centerCounter = 0;
+          double clusterSum = 0;
+          for(int j = 0; (int)clusterAssignVector.size() > j; j++) {
+            if(clusterAssignVector[j] == i){
+              centerCounter++;
+              clusterSum += valuesVector[j];
+            }
+          }
+
+          if (clusterSum != 0) {
+            double newClusterValueVector = clusterSum/(double)centerCounter;
+
+            //clusterValueVector is different so another iteration is needed
+            if(newClusterValueVector != clusterValueVector[i]) {
+              numberOfChanges++;
+            }
+            clusterValueVector[i] = newClusterValueVector;
+          }
+        }
+        clusterIt++;
+      }
+      clusterSequence = clusterAssignVector;
+      hasEnoughValues = 1;
+    } else {
+      hasEnoughValues = 0;
+    }
+  }
+  return makeTuplePtr(get<0>(tp), hasEnoughValues, get<2>(tp), get<3>(tp), get<4>(tp), get<5>(tp), get<6>(tp),
+                      get<7>(tp), get<8>(tp), clusterSequence);
+}
+
+
+/*
+ * -----------------------------------------------------------------------------------------------------------------------
+ * Markov chain
+ * -----------------------------------------------------------------------------------------------------------------------
+ */
+
+//main method for Markov chain
+inline void calculateMarkov(Cluster_Output_tp tp, bool outdated) {
+  std::vector<int> sequenceVector = get<9>(tp);
+
+  //if data not outdated and enough data points
+  if(!outdated && (get<1>(tp)==1)){
+    int nrOfCluster = get<5>(tp);
+
+    //sequenz is equal/bigger the the amount of clusters and the seqence is bigger as the required amount
+    if((int)sequenceVector.size() > trans_num) {
+      //matrix to count the transitions
+      double transitionCounter[nrOfCluster][nrOfCluster];
+      memset(transitionCounter, 0, sizeof(transitionCounter));
+      int lastClusterCenter = sequenceVector[0];
+      int nextClusterCenter = 0;
+
+      //count the transitions
+      for(int i = 1; (int)sequenceVector.size() > i; i++) {
+        nextClusterCenter = sequenceVector[i];
+        transitionCounter[lastClusterCenter][nextClusterCenter]++;
+        lastClusterCenter = nextClusterCenter;
+      }
+
+      //calculate the transition probability
+      for(int i = 0; nrOfCluster > i; i++) {
+        double sum = 0.0;
+        for(int j = 0; nrOfCluster > j; j++) {
+          sum += transitionCounter[i][j];
+        }
+        if(sum != 0) {
+          for(int j = 0; nrOfCluster > j; j++) {
+            transitionCounter[i][j] = transitionCounter[i][j]/sum;
           }
         }
       }
 
-      return makeTuplePtr(state->cnt-1, state->PassTuple, state->MetadataIDString, state->TS, state->T1, state->NumberOfClusters, state->ThresholdNumber, state->Observation,
-                          state->ValueDouble);
+      //calculate the probability of the sequence
+      double transitionProbability = 1;
+      lastClusterCenter = sequenceVector[(int)sequenceVector.size()-trans_num-1];
+      for(int i = 1; i <= trans_num; i++ ){
+        nextClusterCenter = sequenceVector[(int)sequenceVector.size()-trans_num-1+i];
+        transitionProbability *= transitionCounter[lastClusterCenter][nextClusterCenter];
+        lastClusterCenter = nextClusterCenter;
+      }
+
+      //anomaly found
+      if(transitionProbability < trans_prob){
+        anomalies_found++;
+        std::cout<<anomalies_found<<"th Anomaly! TransitionProb: "<<transitionProbability<<" "
+          <<get<3>(tp)<<" with time: "<<TimestampHelper::timestampToString(get<4>(tp))
+          <<" Observation: "<<get<7>(tp)<<" MetadataID: "<<get<2>(tp)<<std::endl;
+      }
+    }
+  }
+}
+
+
+/*
+ * -----------------------------------------------------------------------------------------------------------------------
+ * Main
+ * -----------------------------------------------------------------------------------------------------------------------
+ */
+
+int main(int argc, char **argv) {
+
+  //individual parameters for the query
+  int windowSize = 10;
+  int threadAmount = 3;
+
+
+  //-----Processing Metadata-----
+  streamMetadata();
+
+  //-----Start DEBS2017 challenge query-----
+  Topology top;
+  auto s = top.newStreamFromFile(inputdata_loc)
+    //first, extract the metadata and convert it to string triple
+    .extract<Triple>(' ')
+    //now transform the triples by grouping, according to a RDF schema
+    .tuplify<Input_tp>({"<http://purl.oclc.org/NET/ssnx/ssn#observedProperty>",
+                             "<http://www.agtinternational.com/ontologies/I4.0#observedCycle>",
+                             "<http://www.agtinternational.com/ontologies/IoTCore#valueLiteral>",
+                             "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>",
+                             "<http://www.agtinternational.com/ontologies/IoTCore#valueLiteral>"},
+                            TuplifierParams::ORDERED)
+
+  //-----Preprocessing Input data-----
+    //write the tuples to state, return the preprocessed state as new tuple
+    .statefulMap<Preproc_Output_tp, InputState>([&](auto tp, bool, std::shared_ptr<InputState> state) {
+      tuples_processed++; //for statistics
+      return calculateStates(tp, state);
     })
-    .where([](auto tp, bool){return get<1>(tp) != 0; }) //filters unuseful and redundant tuples
+    //filters unuseful and redundant tuples
+    .where([](auto tp, bool){return get<1>(tp) != 0; })
+    //timestamps
     .assignTimestamps<4>()
-    .slidingWindow(WindowParams::RangeWindow, WindowSize-1) //W-1 so it has W tuples in the window
-    .partitionBy([&ThreadAmount](auto tp) { return get<0>(tp) % ThreadAmount; }, ThreadAmount)
-    .statefulMap<TInMarkov, ClusterState>([&mtx](auto tp, bool outdated, std::shared_ptr<ClusterState> state){ //this operator clusters
-      int FoundRowNew = 0, RowNumberNew = 0, HasEnoughValues = 0;
-      std::vector<int> ClusterSequence(0, 0); //handover variable 
-      std::string TempMetadataString = get<2>(tp); //check for outdated tuple or not (within the window or not)
-      double TempMachineNumber, TempValueNumber;
-      TempMachineNumber = std::stod(TempMetadataString.substr(0, TempMetadataString.find("_")));
-      TempValueNumber = std::stod(TempMetadataString.substr(TempMetadataString.find("_")+1));
-      vector< vector<double> >::iterator RowNew;
-      vector<double>::iterator ColNew;
+    //use a window for regarding only the newest tuples
+    .slidingWindow(WindowParams::RangeWindow, windowSize-1)
+    //partitioning for multithreaded execution, improving performance
+    .partitionBy([&threadAmount](auto tp) { return get<0>(tp) % threadAmount; }, threadAmount)
 
-      if(outdated == true){ //check if outdated
-        for (RowNew = state->DataVectorNew.begin(); RowNew != state->DataVectorNew.end(); RowNew++){
-          ColNew = RowNew->begin();
-          if((*ColNew) == TempMachineNumber){
-            ColNew++;
-            if((*ColNew) == TempValueNumber){
-              FoundRowNew++;
-              break;
-            }
-          }
-          RowNumberNew++;
-        }
-        mtx.lock();
-        state->DataVectorNew[RowNumberNew].erase(state->DataVectorNew[RowNumberNew].begin() + 2);
-        mtx.unlock();
-      }else{//if the data is not outdated it should be processed
-        vector< vector<double> >::iterator RowNew;
-        vector<double>::iterator ColNew;
-
-        //check where to add the new datapoint
-        for (RowNew = state->DataVectorNew.begin(); RowNew != state->DataVectorNew.end(); RowNew++){
-          ColNew = RowNew->begin();
-          if(( *ColNew) == TempMachineNumber){
-            ColNew++;
-            if((*ColNew) == TempValueNumber){
-              FoundRowNew++;
-              break;
-            }
-          }
-          RowNumberNew++;
-        }
-
-        if(FoundRowNew == 0){ //is there already data to this id
-          mtx.lock();
-          tempDoubleVector.clear();
-          tempDoubleVector.push_back(TempMachineNumber);
-          tempDoubleVector.push_back(TempValueNumber);
-          tempDoubleVector.push_back(get<8>(tp));
-          state->DataVectorNew.push_back(tempDoubleVector); //create new variable
-          mtx.unlock();
-        }else{
-          mtx.lock();
-          state->DataVectorNew[RowNumberNew].push_back(get<8>(tp)); //add data at the end of row x
-          mtx.unlock();
-        }
-
-        int NumberOfClusters = get<5>(tp);
-        int NumberOfValues = (int)state->DataVectorNew[RowNumberNew].size()-2;
-
-        if(NumberOfValues > N){ //check if there are enough values for clustering
-          std::vector<double> ClusterValueVector (1, 0.0);
-          std::vector<int> ClusterAssignVector(NumberOfValues, 0);
-          std::vector<double>::iterator it1;
-          it1 = state->DataVectorNew[RowNumberNew].begin()+2;
-          std::vector<double> ValuesVector; 
-          ValuesVector.assign(it1, state->DataVectorNew[RowNumberNew].end());
-
-          ClusterValueVector[0] = ValuesVector[0]; //initialize ClusterVector, use the distinct first values of ValuesVector
-          for(int i = 1; (int)ClusterValueVector.size() < NumberOfClusters && i <= (int)ValuesVector.size(); i++){
-            if(std::find(ClusterValueVector.begin(), ClusterValueVector.end(), ValuesVector[i]) != ClusterValueVector.end()){
-            }else{
-              ClusterValueVector.push_back(ValuesVector[i]);
-            }
-          }
-
-          //iterate to convergence
-          int NumberOfChanges = 1;
-          int ClusterIt = 0;
-          while(ClusterIt<M && NumberOfChanges != 0){
-            NumberOfChanges = 0;
-            //calculate distance for each value, iterate through all values
-            for(int i = 0; (int)ValuesVector.size() > i; i++){
-              //distance to the current assigned clustercenter
-              double OldDistance = (ValuesVector[i]-ClusterValueVector[ClusterAssignVector[i]])*(ValuesVector[i]-ClusterValueVector[ClusterAssignVector[i]]);
-              for(int j = 0; (int)ClusterValueVector.size() > j; j++){ //first values get doublechecked
-                //distance to the other clustercenters
-                double NewDistance = (ValuesVector[i]-ClusterValueVector[j])*(ValuesVector[i]-ClusterValueVector[j]);
-                //check if the distance is the same
-                if (NewDistance == OldDistance){
-                  if (ClusterValueVector[j] > ClusterValueVector[ClusterAssignVector[i]]){
-                    ClusterAssignVector[i] = j;
-                  }
-                }
-                //check if the distance is smaller
-                if (NewDistance < OldDistance){
-                  OldDistance = NewDistance;
-                  ClusterAssignVector[i] = j;
-                  NumberOfChanges++;
-                }
-              }
-            }
-
-            //calculate new clustercenters
-            for(int i = 0; (int)ClusterValueVector.size() > i; i++){
-              int CenterCounter = 0;
-              double ClusterSum = 0;
-              for(int j = 0; (int)ClusterAssignVector.size() > j; j++){
-                if(ClusterAssignVector[j] == i){
-                  CenterCounter++;
-                  ClusterSum += ValuesVector[j];
-                }
-              }
-
-              if (ClusterSum != 0){ //check for 0
-                double NewClusterValueVector = ClusterSum/(double)CenterCounter;
-                if(NewClusterValueVector != ClusterValueVector[i]){ //clusterValueVector is different so another iteration is needed
-                  NumberOfChanges++;
-                }
-                ClusterValueVector[i] = NewClusterValueVector;
-              }
-            }
-            ClusterIt++;
-          }
-          ClusterSequence = ClusterAssignVector;
-          HasEnoughValues = 1;
-        }else{
-          HasEnoughValues = 0;
-        }
-      }
-
-      return makeTuplePtr(get<0>(tp), HasEnoughValues, get<2>(tp), get<3>(tp), get<4>(tp), get<5>(tp), get<6>(tp), get<7>(tp), get<8>(tp), ClusterSequence);
+  //-----Clustering step-----
+    .statefulMap<Cluster_Output_tp, ClusterState>([](auto tp, bool outdated, std::shared_ptr<ClusterState> state){
+      return calculateClusters(tp, outdated, state);
     })
-    .map<TInMarkov>([](auto tp, bool outdated){ //here does the Markov-Magic happen
-      std::vector<int> SequenceVector = get<9>(tp);
-      if(!outdated && (get<1>(tp)==1)){ //current data and enough data points?
-        int NrOfCluster = get<5>(tp);
-        //sequenz is equal/bigger the the amount of clusters and the seqence is bigger as the required amount 
-        if((int)SequenceVector.size() > N){
-          double TransitionCounter[NrOfCluster][NrOfCluster]; //matrix to count the transitions
-          memset(TransitionCounter, 0, sizeof(TransitionCounter));  //only used because for whatever reason ={{0}} doesn't work
-          int LastClusterCenter = SequenceVector[0];
-          int NextClusterCenter = 0;
 
-          for(int i = 1; (int)SequenceVector.size() > i; i++){ //count the transitions
-            NextClusterCenter = SequenceVector[i];
-            TransitionCounter[LastClusterCenter][NextClusterCenter]++;
-            LastClusterCenter = NextClusterCenter;
-          }
-
-          for(int i = 0; NrOfCluster > i; i++){ //calculate the transition probability
-            double sum = 0.0;
-            for(int j = 0; NrOfCluster > j; j++){
-              sum += TransitionCounter[i][j];
-            }
-            if(sum != 0){
-              for(int j = 0; NrOfCluster > j; j++){
-                TransitionCounter[i][j] = TransitionCounter[i][j]/sum;
-              }
-            }
-          }
-
-          //calculate the probability of the sequence
-          double TransitionProbability = 1;
-          LastClusterCenter = SequenceVector[(int)SequenceVector.size()-N-1];
-          for(int i = 1; i <= N; i++ ){
-            NextClusterCenter = SequenceVector[(int)SequenceVector.size()-N-1+i];
-            TransitionProbability *= TransitionCounter[LastClusterCenter][NextClusterCenter];
-            LastClusterCenter = NextClusterCenter;
-          }
-
-          if(TransitionProbability < T){
-            SimpleCounter++;
-            std::cout<<SimpleCounter<<"th Anomaly! TransitionProb: "<<TransitionProbability<<" "<<get<3>(tp)<<" with time: "<<TimestampHelper::timestampToString(get<4>(tp))
-              <<" Observation: "<<get<7>(tp)<<" MetadataID: "<<get<2>(tp)<<std::endl;
-          }
-        }
-      }
+  //-----Markov chain-----
+    .map<Cluster_Output_tp>([](auto tp, bool outdated) {
+      calculateMarkov(tp, outdated);
       return tp;
     })
     ;
 
+  /*
+  * ---------------------------------------------------------------------------------------------------------------------
+  * Performance measurements
+  * ---------------------------------------------------------------------------------------------------------------------
+  */
+
   int cmpCnt = 0;
   auto start = std::chrono::high_resolution_clock::now();
-  t.start(false);
-  while(SimpleCounter!=cmpCnt) {
+  top.start(false);
+
+  //periodically check if no more anomalies are found
+  while(anomalies_found!=cmpCnt) {
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    cmpCnt = SimpleCounter;
+    cmpCnt = anomalies_found;
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
   }
   auto end = std::chrono::high_resolution_clock::now();
 
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
-  std::cout<<"Finished. Time taken: "<<duration<<"ms for "<<SimpleCounter<<" anomalies in "<<tpProc<<" processed tuples."<<std::endl;
+  std::cout<<"Finished. Time taken: "<<duration<<"ms for "<<anomalies_found<<" anomalies in "
+    <<tuples_processed<<" processed tuples."<<std::endl;
 }

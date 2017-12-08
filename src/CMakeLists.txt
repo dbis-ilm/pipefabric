@@ -15,18 +15,36 @@ include(CTest)
 # Installation path
 set(PIPEFABRIC_DIR "/usr/local/pfabric")
 
-# The following variables enable or disable additional functionalities, 
+# The following variables enable or disable additional functionalities,
 # which can be switched off to reduce build time.
 
-# Support Matrix Operations (needs Eigen library to be installed) 
-option(SUPPORT_MATRICES 
-	"support matrix operations as tuple and state type" 
-	OFF)
+# Support Matrix Operations (needs Eigen library to be installed)
+option(SUPPORT_MATRICES
+  "support matrix operations as tuple and state type"
+  OFF
+)
 
 # Build use cases
 option(BUILD_USE_CASES
-	""
-  ON)
+  "build use cases to show functionality examples"
+  OFF
+)
+
+# Use RabbitMQ as network source
+option(USE_RABBITMQ
+  "use RabbitMQ as network source"
+  OFF
+)
+# Use Apache Kafka as network source
+option(USE_KAFKA
+  "use Apache Kafka as network source"
+  OFF
+)
+# Use MQTT as network source
+option(USE_MQTT
+  "use MQTT as network source"
+  OFF
+)
 
 # Use the boost::spirit parser for converting strings to numbers
 option(USE_BOOST_SPIRIT_PARSER
@@ -53,13 +71,13 @@ option(BUILD_ONLY_LIBS
 # If switched to off, no tests will be build
 option(BUILD_TEST_CASES
   "build tests for pipefabric functionality"
-	ON
+  ON
 )
 
 #Build google benchmark library
 option(BUILD_GOOGLE_BENCH
   "build google benchmark"
-	ON
+  ON
 )
 
 # Build benchmark test
@@ -88,7 +106,7 @@ endif()
 #CMAKE_FORCE_CXX_COMPILER(icpc "Intel C++ Compiler")
 
 # C++ compiler flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated -g -O3 -Wsign-compare")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated -g -O1 -Wsign-compare")
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedefs -Wno-#pragma-messages")
 elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
@@ -141,7 +159,7 @@ else()
 endif()
 
 ########################
-# RocksDB database library 
+# RocksDB database library
 ########################
 #
 if (USE_ROCKSDB_TABLE)
@@ -237,14 +255,13 @@ if(SUPPORT_MATRICES)
 	####################################
 	find_package(Eigen3)
  	if(EIGEN3_FOUND)
-	  message(STATUS "using Eigen3 library for linear algebra")    
+	  message(STATUS "using Eigen3 library for linear algebra")
 		include_directories(${EIGEN3_INCLUDE_DIR})
 	else()
 		message(STATUS "Eigen3 not found")
 	endif()
 	add_definitions(-DSUPPORT_MATRICES)
 endif()
-
 
 #-----------------------------------------------------------------------------------------
 #
@@ -298,13 +315,79 @@ if(BUILD_GOOGLE_BENCH)
   )
 endif()
 
+set(core_libs
+  ${BOOST_LIBRARIES}
+  ${ZEROMQ_LIBRARIES}
+)
+
+#-----------------------------------------------------------------------------------------
+#
+##########
+# RabbitMQ
+##########
+#
+#
+if(USE_RABBITMQ)
+  add_definitions(-DUSE_RABBITMQ)
+  set(core_libs
+    ${core_libs}
+    amqpcpp
+    rabbitmq
+  )
+  set(core_sources
+    ${core_sources}
+    net/RabbitMQSource.cpp
+  )
+endif()
+#-----------------------------------------------------------------------------------------
+#
+##############
+# Apache Kafka
+##############
+#
+#
+if(USE_KAFKA)
+  add_definitions(-DUSE_KAFKA)
+  set(core_libs
+    ${core_libs}
+    cppkafka
+    rdkafka
+  )
+  set(core_sources
+    ${core_sources}
+    net/KafkaSource.cpp
+  )
+endif()
+#-----------------------------------------------------------------------------------------
+#
+######
+# MQTT
+######
+#
+#
+if(USE_MQTT)
+  add_definitions(-DUSE_MQTT)
+  set(core_libs
+    ${core_libs}
+    paho-mqtt3c
+    paho-mqtt3cs
+    paho-mqtt3a
+    paho-mqtt3as
+    paho-mqttpp3
+  )
+  set(core_sources
+    ${core_sources}
+    net/MQTTSource.cpp
+  )
+endif()
+#-----------------------------------------------------------------------------------------
+
 add_library(pfabric_core SHARED
   ${core_sources}
 )
 
 target_link_libraries(pfabric_core
-		${BOOST_LIBRARIES}
-		${ZEROMQ_LIBRARIES}
+  ${core_libs}
 )
 
 #-----------------------------------------------------------------------------------------
@@ -359,10 +442,10 @@ if(BUILD_USE_CASES)
 	#######################################
 	find_package(OpenCV REQUIRED)
 	if(OpenCV_FOUND)
-	 message(STATUS "using OpenCV library for image processing")  
-	 include_directories(${OpenCV_INCLUDE_DIR}) 
+	 message(STATUS "using OpenCV library for image processing")
+	 include_directories(${OpenCV_INCLUDE_DIR})
 	else()
-		message(STATUS "OpenCV not found")  
+		message(STATUS "OpenCV not found")
 	endif()
 endif()
   add_subdirectory(usecases)

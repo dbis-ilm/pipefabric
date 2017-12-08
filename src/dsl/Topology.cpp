@@ -98,11 +98,48 @@ Pipe<TStringPtr> Topology::newStreamFromFile(const std::string& fname, unsigned 
   return Pipe<TStringPtr>(dataflow, dataflow->addPublisher(op));
 }
 
+#ifdef USE_RABBITMQ
+Pipe<TStringPtr> Topology::newStreamFromRabbitMQ(const std::string& info, const std::string& queueName) {
+  // create a new RabbitMQSource
+  auto op = std::make_shared<RabbitMQSource>(info, queueName);
+  // register it's start function
+  registerStartupFunction(std::bind(&RabbitMQSource::start, op.get()));
+  // and create a new pipe; we use a raw pointer here because
+  // we want to return a reference to a Pipe object
+  return Pipe<TStringPtr>(dataflow, dataflow->addPublisher(op));
+}
+#endif
+
+#ifdef USE_KAFKA
+Pipe<TStringPtr> Topology::newStreamFromKafka(const std::string& broker, const std::string& topic,
+                                              const std::string& groupID) {
+  // create a new KafkaSource
+  auto op = std::make_shared<KafkaSource>(broker, topic, groupID);
+  // register it's start function
+  registerStartupFunction(std::bind(&KafkaSource::start, op.get()));
+  // and create a new pipe; we use a raw pointer here because
+  // we want to return a reference to a Pipe object
+  return Pipe<TStringPtr>(dataflow, dataflow->addPublisher(op));
+}
+#endif
+
+#ifdef USE_MQTT
+Pipe<TStringPtr> Topology::newStreamFromMQTT(const std::string& conn, const std::string& channel) {
+  // create a new MQTTSource
+  auto op = std::make_shared<MQTTSource>(conn, channel);
+  // register it's start function
+  registerStartupFunction(std::bind(&MQTTSource::start, op.get()));
+  // and create a new pipe; we use a raw pointer here because
+  // we want to return a reference to a Pipe object
+  return Pipe<TStringPtr>(dataflow, dataflow->addPublisher(op));
+}
+#endif
+
 Pipe<TStringPtr> Topology::newStreamFromREST(unsigned int port,
                                   const std::string& path,
                                   RESTSource::RESTMethod method,
                                   unsigned short numThreads) {
-  // create a new TextFileSource
+  // create a new RESTSource
   auto op = std::make_shared<RESTSource>(port, path, method, numThreads);
   // register it's start function
   registerStartupFunction(std::bind(&RESTSource::start, op.get()));
