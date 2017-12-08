@@ -62,7 +62,7 @@ option(USE_ROCKSDB_TABLE
 # Use Non-Volatile Memory Library for implementing tables
 option(USE_NVML_TABLE
 	"use nvml for implementing persistent memory tables"
-  ON
+  OFF
 )
 
 # Build only pipefabric libraries (cep and core)
