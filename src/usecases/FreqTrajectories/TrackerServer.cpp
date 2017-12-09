@@ -77,7 +77,7 @@ FreqTrajectoryBatch findFrequentTrajectories(BatchPtr<TuplePtr<Pattern>> batchPt
 }
 #endif
 
-WaypointPtr findClosestWaypoint(std::shared_ptr<Table<Landmark::element_type, uint_t>> landmarksTable, 
+WaypointPtr findClosestWaypoint(std::shared_ptr<Table<Landmark::element_type, uint_t>> landmarksTable,
     TrackpointPtr tp) {
   // waypoint to trackpoint
   auto iter = landmarksTable->select();
@@ -91,7 +91,7 @@ WaypointPtr findClosestWaypoint(std::shared_ptr<Table<Landmark::element_type, ui
       closestTrackpoint = *iter;
     }
   }
-  return makeTuplePtr(get<0>(tp), get<0>(closestTrackpoint), 
+  return makeTuplePtr(get<0>(tp), get<0>(closestTrackpoint),
                       get<1>(closestTrackpoint), get<2>(closestTrackpoint), get<3>(tp));
 }
 
@@ -138,7 +138,7 @@ int main(int argc, char **argv) {
   /* ----------------------------------------------------------------- */
 
   PFabricContext ctx;
-  
+
   /* --- Create the necessary tables --- */
   createTables(ctx, importFile);
 
@@ -146,7 +146,7 @@ int main(int argc, char **argv) {
   auto landmarksTable = ctx.getTable<Landmark::element_type, uint_t>("landmarks");
   auto tracksTable = ctx.getTable<UserTrack::element_type, uint_t>("user_tracks");
 
-  /* --- Topology #1: Receive user positions via REST, store them in the user_tracks table and 
+  /* --- Topology #1: Receive user positions via REST, store them in the user_tracks table and
    *     update the visits table --- */
   auto t1 = ctx.createTopology();
   auto s = t1->newStreamFromREST(8099, "^/track$", RESTSource::POST_METHOD)
@@ -160,13 +160,13 @@ int main(int argc, char **argv) {
 
   // store the waypoint in the user_tracks table
   auto s0 = s.keyBy<0, uint_t>()
-    .updateTable<UserTrack, uint_t>(tracksTable, 
+    .updateTable<UserTrack, uint_t>(tracksTable,
         [](WaypointPtr tp, bool outdated, UserTrack::element_type& rec) -> bool {
           get<1>(rec).push_back(Trackpoint(get<4>(tp), get<1>(tp)));
           return true;
         },
         [](WaypointPtr tp) -> UserTrack::element_type {
-          return UserTrack::element_type(get<0>(tp), 
+          return UserTrack::element_type(get<0>(tp),
               std::vector<Trackpoint>({ Trackpoint(get<4>(tp), get<1>(tp)) }));
         }
     );
@@ -179,7 +179,7 @@ int main(int argc, char **argv) {
     })
     .keyBy<0, uint_t>() // LandmarkID
     .toTable<uint_t>(visitsTable);
-  
+
 //  auto s2 = s.print(std::cout);
 
   t1->start();
@@ -190,8 +190,7 @@ int main(int argc, char **argv) {
   auto d = t2->selectFromTable<Visit, uint_t>(visitsTable)
     .print(std::cout);
 
-  using namespace std::chrono_literals;
-  t2->runEvery(1min);
+  t2->runEvery(60);
 #endif
 
 #if 1
@@ -210,7 +209,7 @@ int main(int argc, char **argv) {
       }
     });
 
-  t3->runEvery(2min);
+  t3->runEvery(120);
 #endif
 
   /* --- Start the internal Web server for serving files --- */

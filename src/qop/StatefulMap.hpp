@@ -57,7 +57,8 @@ public:
 	/**
 	 * Typedef for a function pointer to a projection function.
 	 */
-	typedef std::function<OutputStreamElement (const InputStreamElement&, bool, StateRepPtr)> MapFunc;
+	typedef std::function<OutputStreamElement (const InputStreamElement&, bool,
+		 StatefulMap<InputStreamElement, OutputStreamElement, StateRep>&)> MapFunc;
 
 	/**
 	 * @brief Construct a new instance of the stateful map operator.
@@ -81,6 +82,12 @@ public:
 
 	const std::string opName() const override { return std::string("StatefulMap"); }
 
+	StateRepPtr state() { return mState; }
+
+	void publishPunctuation( const PunctuationPtr& punctuation ) {
+		this->getOutputPunctuationChannel().publish(punctuation);
+	}
+	
 private:
 
 	/**
@@ -106,7 +113,7 @@ private:
 	 *    flag indicating whether the tuple is new or invalidated now
 	 */
 	void processDataElement( const InputStreamElement& data, const bool outdated ) {
-		auto res = mFunc( data, outdated, mState );
+		auto res = mFunc( data, outdated, *this );
 		this->getOutputDataChannel().publish( res, outdated );
 	}
 

@@ -19,19 +19,22 @@
  * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
  */
 
-
+#include <boost/thread.hpp>
+#include <boost/chrono.hpp>
 #include "Topology.hpp"
 #include "qop/ZMQSource.hpp"
 
 using namespace pfabric;
 
 Topology::~Topology() {
-  // delete all pipes we have created
-  /*
-  for (auto i : pipes) {
-    delete i;
+  if (!wakeupTimers.empty()) {
+    for (auto& thr : wakeupTimers) {
+      thr.interrupt();
+    }
+    for (auto& thr : wakeupTimers) {
+      thr.join();
+    }
   }
-  */
 }
 
 void Topology::registerStartupFunction(StartupFunc func) {
@@ -79,11 +82,11 @@ void Topology::wait() {
       f.get();
 }
 
-void Topology::runEvery(const std::chrono::seconds& secs) {
-  wakeupTimers.push_back(std::thread([&](){
+void Topology::runEvery(unsigned long secs) {
+  wakeupTimers.push_back(boost::thread([this, secs](){
         while(true) {
-          std::this_thread::sleep_for(secs);
-          startAsync();
+          boost::this_thread::sleep_for(boost::chrono::seconds(secs));
+          this->start(false);
         }
   }));
 }
@@ -93,8 +96,7 @@ Pipe<TStringPtr> Topology::newStreamFromFile(const std::string& fname, unsigned 
   auto op = std::make_shared<TextFileSource>(fname, limit);
   // register it's start function
   registerStartupFunction(std::bind(&TextFileSource::start, op.get()));
-  // and create a new pipe; we use a raw pointer here because
-  // we want to return a reference to a Pipe object
+  // and create a new pipe
   return Pipe<TStringPtr>(dataflow, dataflow->addPublisher(op));
 }
 
@@ -104,8 +106,7 @@ Pipe<TStringPtr> Topology::newStreamFromRabbitMQ(const std::string& info, const 
   auto op = std::make_shared<RabbitMQSource>(info, queueName);
   // register it's start function
   registerStartupFunction(std::bind(&RabbitMQSource::start, op.get()));
-  // and create a new pipe; we use a raw pointer here because
-  // we want to return a reference to a Pipe object
+  // and create a new pipe
   return Pipe<TStringPtr>(dataflow, dataflow->addPublisher(op));
 }
 #endif
@@ -117,8 +118,7 @@ Pipe<TStringPtr> Topology::newStreamFromKafka(const std::string& broker, const s
   auto op = std::make_shared<KafkaSource>(broker, topic, groupID);
   // register it's start function
   registerStartupFunction(std::bind(&KafkaSource::start, op.get()));
-  // and create a new pipe; we use a raw pointer here because
-  // we want to return a reference to a Pipe object
+  // and create a new pipe
   return Pipe<TStringPtr>(dataflow, dataflow->addPublisher(op));
 }
 #endif
@@ -129,8 +129,7 @@ Pipe<TStringPtr> Topology::newStreamFromMQTT(const std::string& conn, const std:
   auto op = std::make_shared<MQTTSource>(conn, channel);
   // register it's start function
   registerStartupFunction(std::bind(&MQTTSource::start, op.get()));
-  // and create a new pipe; we use a raw pointer here because
-  // we want to return a reference to a Pipe object
+  // and create a new pipe
   return Pipe<TStringPtr>(dataflow, dataflow->addPublisher(op));
 }
 #endif
@@ -143,8 +142,7 @@ Pipe<TStringPtr> Topology::newStreamFromREST(unsigned int port,
   auto op = std::make_shared<RESTSource>(port, path, method, numThreads);
   // register it's start function
   registerStartupFunction(std::bind(&RESTSource::start, op.get()));
-  // and create a new pipe; we use a raw pointer here because
-  // we want to return a reference to a Pipe object
+  // and create a new pipe
   return Pipe<TStringPtr>(dataflow, dataflow->addPublisher(op));
 }
 

@@ -79,12 +79,12 @@ TEST_CASE("Applying a stateful map function to a tuple stream", "[StatefulMap]")
 
 	auto mockup = std::make_shared< StreamMockup<InTuplePtr, OutTuplePtr> >(input, expected);
 
-	auto map_fun = [&]( const InTuplePtr& tp, bool, TestMap::StateRepPtr state) -> OutTuplePtr {
-		state->cnt++;
-		state->sum += tp->getAttribute<2>();
+	auto map_fun = [&]( const InTuplePtr& tp, bool, TestMap& self) -> OutTuplePtr {
+		self.state()->cnt++;
+		self.state()->sum += tp->getAttribute<2>();
 		return makeTuplePtr(
 			tp->getAttribute<0>(), tp->getAttribute<2>(),
-			state->cnt, state->sum
+			self.state()->cnt, self.state()->sum
 		);
 	};
 	auto mop = std::make_shared< TestMap >(map_fun);

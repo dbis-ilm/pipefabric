@@ -27,6 +27,7 @@
 #include <future>
 #include <mutex>
 #include <chrono>
+#include <boost/thread.hpp>
 
 #include "core/Tuple.hpp"
 
@@ -40,6 +41,7 @@
 #include "qop/ToTable.hpp"
 #include "qop/FromTable.hpp"
 #include "qop/SelectFromTable.hpp"
+#include "qop/SelectFromTxTable.hpp"
 #include "qop/StreamGenerator.hpp"
 #ifdef SUPPORT_MATRICES
   #include "qop/FromMatrix.hpp"
@@ -90,12 +92,11 @@ namespace pfabric {
     /// the signature of a startup function
     typedef std::function<unsigned long()> StartupFunc;
 
-//    std::list<Pipe*> pipes;               //< the list of pipes created for this topology
     std::vector<StartupFunc> startupList; //< the list of functions to be called for startup
     std::vector<StartupFunc> prepareList; //< the list of functions to be called for startup
     bool asyncStarted;                    //< true if we started asynchronously
     std::vector<std::future<unsigned long> > startupFutures; //< futures for the startup functions
-    std::vector<std::thread> wakeupTimers; //< threads for runEvery queries
+    std::vector<boost::thread> wakeupTimers; //< interruptible threads for runEvery queries
     std::mutex mMutex;                    //< mutex for accessing startupFutures
 
     DataflowPtr dataflow;
@@ -157,8 +158,8 @@ namespace pfabric {
      *
      * @param[in] secs
      *  the period of time between two invocations
-     */ 
-    void runEvery(const std::chrono::seconds& secs);
+     */
+    void runEvery(unsigned long secs);
 
     /**
      * @brief Waits until the execution of the topology stopped.
@@ -375,6 +376,13 @@ namespace pfabric {
       return Pipe<T>(dataflow, dataflow->addPublisher(op));
     }
 
+    template<typename T, typename KeyType = DefaultKeyType>
+    Pipe<T> selectFromTxTable(std::shared_ptr<TxTable<typename T::element_type, KeyType>> tbl,
+        typename TxTable<typename T::element_type, KeyType>::Predicate pred = nullptr) {
+      auto op = std::make_shared<SelectFromTxTable<T, KeyType>>(tbl, pred);
+      registerStartupFunction([=]() -> unsigned long { return op->start(); });
+      return Pipe<T>(dataflow, dataflow->addPublisher(op));
+    }
     /**
      * @brief Create a StreamGenerator operator as data source.
      *

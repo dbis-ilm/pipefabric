@@ -60,5 +60,6 @@ using Table = pfabric::HashMapTable<RecordType, KeyType>;
 
 #endif
 
-#endif
+#include "table/TxTable.hpp"
 
+#endif

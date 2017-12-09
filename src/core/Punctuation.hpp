@@ -51,6 +51,11 @@ public:
 		EndOfSubStream = (1u << 1), //< the end of a substream was identified
 		WindowExpired  = (1u << 2), //< the window was expired (used together with tumbling windows)
 		SlideExpired   = (1u << 3), //< ???
+		TxBegin        = (1u << 4), //< begin of transaction (requires the TransactionID in mData field)
+		TxCommit       = (1u << 5), //< commit of the transaction whose TransactionID is
+																//< given in the mData field
+		TxAbort        = (1u << 6), //< aborting the transaction whose TransactionID is
+																//< given in the mData field
 		All            = (~0u),     //< all of the above, used for masking
 	};
 
@@ -62,7 +67,7 @@ public:
 		mPtype(pt), mData(val), mTstamp(ts) {
 	}
 
-	Punctuation(PType pt, Timestamp ts  = TimestampHelper::timestampFromCurrentTime()) :
+	Punctuation(PType pt, Timestamp ts = TimestampHelper::timestampFromCurrentTime()) :
 		mPtype(pt), mTstamp(ts) {
 	}
 

@@ -7,7 +7,7 @@
 #include <vector> //cluster and Markov chain
 #include <chrono> //measuring necessary time for anomaly detection
 
-#include "pfabric.hpp" 
+#include "pfabric.hpp"
 
 using namespace pfabric;
 
@@ -426,9 +426,10 @@ int main(int argc, char **argv) {
 
   //-----Preprocessing Input data-----
     //write the tuples to state, return the preprocessed state as new tuple
-    .statefulMap<Preproc_Output_tp, InputState>([&](auto tp, bool, std::shared_ptr<InputState> state) {
+    .statefulMap<Preproc_Output_tp, InputState>([&](auto tp, bool,
+      StatefulMap<Input_tp, Preproc_Output_tp, InputState>& self) {
       tuples_processed++; //for statistics
-      return calculateStates(tp, state);
+      return calculateStates(tp, self.state());
     })
     //filters unuseful and redundant tuples
     .where([](auto tp, bool){return get<1>(tp) != 0; })
@@ -440,8 +441,9 @@ int main(int argc, char **argv) {
     .partitionBy([&threadAmount](auto tp) { return get<0>(tp) % threadAmount; }, threadAmount)
 
   //-----Clustering step-----
-    .statefulMap<Cluster_Output_tp, ClusterState>([](auto tp, bool outdated, std::shared_ptr<ClusterState> state){
-      return calculateClusters(tp, outdated, state);
+    .statefulMap<Cluster_Output_tp, ClusterState>([](auto tp, bool outdated,
+      StatefulMap<Preproc_Output_tp, Cluster_Output_tp, ClusterState>& self){
+      return calculateClusters(tp, outdated, self.state());
     })
 
   //-----Markov chain-----

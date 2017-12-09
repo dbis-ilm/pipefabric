@@ -51,6 +51,7 @@
 #include "qop/StatefulMap.hpp"
 #include "qop/TextFileSource.hpp"
 #include "qop/ToTable.hpp"
+#include "qop/ToTxTable.hpp"
 #include "qop/TumblingWindow.hpp"
 #include "qop/TupleDeserializer.hpp"
 #include "qop/TupleExtractor.hpp"
@@ -98,6 +99,7 @@ class Pipe {
   boost::any timestampExtractor;  // a function pointer to a timestamp extractor
                                   // function
   boost::any keyExtractor;  // a function pointer to a key extractor function
+  boost::any transactionIDExtractor;
   unsigned int numPartitions;
   DataflowPtr dataflow;
   OpIterator tailIter;
@@ -118,11 +120,12 @@ class Pipe {
 
  public:
   Pipe(DataflowPtr ptr, Dataflow::BaseOpIterator iter, boost::any keyFunc,
-       boost::any tsFunc, PartitioningState pState,
+       boost::any tsFunc, boost::any txFunc, PartitioningState pState,
        unsigned int nPartitions = 0)
       : partitioningState(pState),
         timestampExtractor(tsFunc),
         keyExtractor(keyFunc),
+        transactionIDExtractor(txFunc),
         numPartitions(nPartitions),
         dataflow(ptr),
         tailIter(iter) {}
@@ -281,6 +284,11 @@ class Pipe {
    */
   ~Pipe() {}
 
+  Pipe<T> assignTransactionID(std::function<TransactionID(const T&)> func) {
+      return Pipe<T>(dataflow, tailIter, keyExtractor,
+        timestampExtractor, func, partitioningState, numPartitions);
+  }
+
   /**
    * @brief Defines the key extractor function for all subsequent operators.
    *
@@ -298,7 +306,7 @@ class Pipe {
    */
   template <typename KeyType = DefaultKeyType>
   Pipe<T> keyBy(std::function<KeyType(const T&)> func) {
-    return Pipe<T>(dataflow, tailIter, func, timestampExtractor,
+    return Pipe<T>(dataflow, tailIter, func, timestampExtractor, transactionIDExtractor,
                    partitioningState, numPartitions);
   }
 
@@ -322,7 +330,7 @@ class Pipe {
     std::function<KeyType(const T&)> func = [](const T& tp) -> KeyType {
       return getAttribute<N>(tp);
     };
-    return Pipe<T>(dataflow, tailIter, func, timestampExtractor,
+    return Pipe<T>(dataflow, tailIter, func, timestampExtractor, transactionIDExtractor,
                    partitioningState, numPartitions);
   }
 
@@ -340,7 +348,8 @@ class Pipe {
    * @return a new pipe
    */
   Pipe<T> assignTimestamps(typename Window<T>::TimestampExtractorFunc func) {
-    return Pipe<T>(dataflow, tailIter, keyExtractor, func, partitioningState,
+    return Pipe<T>(dataflow, tailIter, keyExtractor, func, transactionIDExtractor,
+       partitioningState,
                    numPartitions);
   }
 
@@ -362,7 +371,8 @@ class Pipe {
     std::function<Timestamp(const T&)> func = [](const T& tp) -> Timestamp {
       return getAttribute<N>(tp);
     };
-    return Pipe<T>(dataflow, tailIter, keyExtractor, func, partitioningState,
+    return Pipe<T>(dataflow, tailIter, keyExtractor, func,  transactionIDExtractor,
+      partitioningState,
                    numPartitions);
   }
 
@@ -405,7 +415,7 @@ class Pipe {
         } else
           op = std::make_shared<SlidingWindow<T>>(wt, sz, windowFunc, ei);
         auto iter = addPublisher<SlidingWindow<T>, DataSource<T>>(op);
-        return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor,
+        return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                        partitioningState, numPartitions);
       } else {
         std::vector<std::shared_ptr<SlidingWindow<T>>> ops;
@@ -421,7 +431,7 @@ class Pipe {
           }
         }
         auto iter = addPartitionedPublisher<SlidingWindow<T>, T>(ops);
-        return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor,
+        return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor,  transactionIDExtractor,
                        partitioningState, numPartitions);
       }
     } catch (boost::bad_any_cast& e) {
@@ -464,7 +474,7 @@ class Pipe {
         } else
           op = std::make_shared<TumblingWindow<T>>(wt, sz, windowFunc);
         auto iter = addPublisher<TumblingWindow<T>, DataSource<T>>(op);
-        return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor,
+        return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                        partitioningState, numPartitions);
       } else {
         std::vector<std::shared_ptr<TumblingWindow<T>>> ops;
@@ -480,7 +490,7 @@ class Pipe {
           }
         }
         auto iter = addPartitionedPublisher<TumblingWindow<T>, T>(ops);
-        return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor,
+        return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                        partitioningState, numPartitions);
       }
     } catch (boost::bad_any_cast& e) {
@@ -517,7 +527,7 @@ class Pipe {
     // we don't save the operator in publishers because ConsoleWriter
     // cannot act as Publisher
     dataflow->addSink(op);
-    return Pipe<T>(dataflow, tailIter, keyExtractor, timestampExtractor,
+    return Pipe<T>(dataflow, tailIter, keyExtractor, timestampExtractor, transactionIDExtractor,
                    partitioningState, numPartitions);
   }
 
@@ -546,7 +556,7 @@ class Pipe {
     // we don't save the operator in publishers because FileWriter
     // cannot act as Publisher
     dataflow->addSink(op);
-    return Pipe<T>(dataflow, tailIter, keyExtractor, timestampExtractor,
+    return Pipe<T>(dataflow, tailIter, keyExtractor, timestampExtractor, transactionIDExtractor,
                    partitioningState, numPartitions);
   }
 
@@ -577,7 +587,7 @@ class Pipe {
       // we don't save the operator in publishers because ZMQSink
       // cannot act as Publisher
       dataflow->addSink(op);
-      return Pipe<T>(dataflow, tailIter, keyExtractor, timestampExtractor,
+      return Pipe<T>(dataflow, tailIter, keyExtractor, timestampExtractor, transactionIDExtractor,
                      partitioningState, numPartitions);
     } else {
       std::vector<std::shared_ptr<ZMQSink<T>>> ops;
@@ -585,7 +595,7 @@ class Pipe {
         ops.push_back(std::make_shared<ZMQSink<T>>());
       }
       auto iter = addPartitionedPublisher<ZMQSink<T>, T>(ops);
-      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor,
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                      partitioningState, numPartitions);
     }
   }
@@ -609,7 +619,7 @@ class Pipe {
       auto op = std::make_shared<TupleExtractor<Tout>>(sep);
       auto iter =
           addPublisher<TupleExtractor<Tout>, DataSource<TStringPtr>>(op);
-      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                         partitioningState, numPartitions);
     } else {
       std::vector<std::shared_ptr<TupleExtractor<Tout>>> ops;
@@ -618,7 +628,7 @@ class Pipe {
       }
       auto iter =
           addPartitionedPublisher<TupleExtractor<Tout>, TStringPtr>(ops);
-      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                         partitioningState, numPartitions);
     }
   }
@@ -641,7 +651,7 @@ class Pipe {
     if (partitioningState == NoPartitioning) {
       auto op = std::make_shared<JsonExtractor<Tout>>(keyList);
       auto iter = addPublisher<JsonExtractor<Tout>, DataSource<TStringPtr>>(op);
-      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                         partitioningState, numPartitions);
     } else {
       std::vector<std::shared_ptr<JsonExtractor<Tout>>> ops;
@@ -649,7 +659,7 @@ class Pipe {
         ops.push_back(std::make_shared<JsonExtractor<Tout>>(keyList));
       }
       auto iter = addPartitionedPublisher<JsonExtractor<Tout>, TStringPtr>(ops);
-      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                         partitioningState, numPartitions);
     }
   }
@@ -660,7 +670,7 @@ class Pipe {
   Pipe<BatchPtr<T>> batch(std::size_t bsize = SIZE_MAX) throw(TopologyException) {
     auto op = std::make_shared<Batcher<T>>(bsize);
     auto iter = addPublisher<Batcher<T>, DataSource<T>>(op);
-    return Pipe<BatchPtr<T>>(dataflow, iter, keyExtractor, timestampExtractor,
+    return Pipe<BatchPtr<T>>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                              partitioningState, numPartitions);
   }
 
@@ -687,7 +697,7 @@ class Pipe {
       auto op = std::make_shared<TupleDeserializer<Tout>>();
       auto iter =
           addPublisher<TupleDeserializer<Tout>, DataSource<TBufPtr>>(op);
-      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                         partitioningState, numPartitions);
     } else {
       std::vector<std::shared_ptr<TupleDeserializer<Tout>>> ops;
@@ -696,7 +706,7 @@ class Pipe {
       }
       auto iter =
           addPartitionedPublisher<TupleDeserializer<Tout>, TBufPtr>(ops);
-      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor,
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                      partitioningState, numPartitions);
     }
   }
@@ -722,7 +732,7 @@ class Pipe {
     if (partitioningState == NoPartitioning) {
       auto op = std::make_shared<Where<T>>(func);
       auto iter = addPublisher<Where<T>, DataSource<T>>(op);
-      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor,
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                      partitioningState, numPartitions);
     } else {
       std::vector<std::shared_ptr<Where<T>>> ops;
@@ -730,7 +740,7 @@ class Pipe {
         ops.push_back(std::make_shared<Where<T>>(func));
       }
       auto iter = addPartitionedPublisher<Where<T>, T>(ops);
-      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor,
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                      partitioningState, numPartitions);
     }
   }
@@ -761,7 +771,7 @@ class Pipe {
 
     auto op = std::make_shared<Notify<T>>(func, pfunc);
     auto iter = addPublisher<Notify<T>, DataSource<T>>(op);
-    return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor,
+    return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                    partitioningState, numPartitions);
   }
 
@@ -781,7 +791,7 @@ class Pipe {
     if (partitioningState == NoPartitioning) {
       auto op = std::make_shared<Queue<T>>();
       auto iter = addPublisher<Queue<T>, DataSource<T>>(op);
-      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor,
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                      partitioningState, numPartitions);
     } else {
       std::vector<std::shared_ptr<Queue<T>>> ops;
@@ -789,7 +799,7 @@ class Pipe {
         ops.push_back(std::make_shared<Queue<T>>());
       }
       auto iter = addPartitionedPublisher<Queue<T>, T>(ops);
-      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor,
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                      partitioningState, numPartitions);
     }
   }
@@ -812,7 +822,7 @@ class Pipe {
     auto queueOp = castOperator<Queue<T>>(stream);
     auto pOp = castOperator<DataSource<T>>(getPublisher());
     CREATE_LINK(pOp, queueOp);
-    return Pipe<T>(dataflow, tailIter, keyExtractor, timestampExtractor,
+    return Pipe<T>(dataflow, tailIter, keyExtractor, timestampExtractor, transactionIDExtractor,
                    partitioningState, numPartitions);
   }
 
@@ -839,7 +849,7 @@ class Pipe {
     if (partitioningState == NoPartitioning) {
       auto op = std::make_shared<Map<T, Tout>>(func);
       auto iter = addPublisher<Map<T, Tout>, DataSource<T>>(op);
-      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                         partitioningState, numPartitions);
 
     } else {
@@ -848,18 +858,18 @@ class Pipe {
         ops.push_back(std::make_shared<Map<T, Tout>>(func));
       }
       auto iter = addPartitionedPublisher<Map<T, Tout>, T>(ops);
-      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                         partitioningState, numPartitions);
     }
   }
 
   template <typename Tout>
-  Pipe<Tout> tuplify(const std::initializer_list<std::string>& predList, TuplifierParams::TuplifyMode m, 
+  Pipe<Tout> tuplify(const std::initializer_list<std::string>& predList, TuplifierParams::TuplifyMode m,
       unsigned int ws = 0) throw(TopologyException) {
     if (partitioningState == NoPartitioning) {
       auto op = std::make_shared<Tuplifier<T, Tout>>(predList, m, ws);
       auto iter = addPublisher<Tuplifier<T, Tout>, DataSource<T>>(op);
-      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                         partitioningState, numPartitions);
 
     } else {
@@ -868,7 +878,7 @@ class Pipe {
         ops.push_back(std::make_shared<Tuplifier<T, Tout>>(predList, m, ws));
       }
       auto iter = addPartitionedPublisher<Tuplifier<T, Tout>, T>(ops);
-      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                         partitioningState, numPartitions);
     }
   }
@@ -899,7 +909,7 @@ class Pipe {
     if (partitioningState == NoPartitioning) {
       auto op = std::make_shared<StatefulMap<T, Tout, State>>(func);
       auto iter = addPublisher<StatefulMap<T, Tout, State>, DataSource<T>>(op);
-      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                         partitioningState, numPartitions);
 
     } else {
@@ -908,7 +918,7 @@ class Pipe {
         ops.push_back(std::make_shared<StatefulMap<T, Tout, State>>(func));
       }
       auto iter = addPartitionedPublisher<StatefulMap<T, Tout, State>, T>(ops);
-      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                         partitioningState, numPartitions);
     }
   }
@@ -1008,7 +1018,7 @@ class Pipe {
           finalFun, iterFun, tType, tInterval);
       auto iter =
           addPublisher<Aggregation<T, Tout, AggrState>, DataSource<T>>(op);
-      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                         partitioningState, numPartitions);
     } else {
       std::vector<std::shared_ptr<Aggregation<T, Tout, AggrState>>> ops;
@@ -1018,7 +1028,7 @@ class Pipe {
       }
       auto iter =
           addPartitionedPublisher<Aggregation<T, Tout, AggrState>, T>(ops);
-      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                         partitioningState, numPartitions);
     }
   }
@@ -1110,7 +1120,7 @@ class Pipe {
         auto iter =
             addPublisher<GroupedAggregation<T, Tout, AggrState, KeyType>,
                          DataSource<T>>(op);
-        return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+        return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                           partitioningState, numPartitions);
       } else {
         std::vector<
@@ -1123,7 +1133,7 @@ class Pipe {
         }
         auto iter =
             addPartitionedPublisher<GroupedAggregation<T, Tout, AggrState, KeyType>, T>(ops);
-        return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+        return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                           partitioningState, numPartitions);
       }
     } catch (boost::bad_any_cast& e) {
@@ -1162,7 +1172,7 @@ class Pipe {
     op->setNFAController(nfa);
     auto iter =
         addPublisher<Matcher<T, Tout, RelatedValueType>, DataSource<T>>(op);
-    return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+    return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                       partitioningState, numPartitions);
   }
 
@@ -1195,7 +1205,7 @@ class Pipe {
     op->constructNFA(expr);
     auto iter =
         addPublisher<Matcher<T, Tout, RelatedValueType>, DataSource<T>>(op);
-    return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+    return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                       partitioningState, numPartitions);
   }
 
@@ -1255,7 +1265,7 @@ class Pipe {
                         op->getInputPunctuationChannel());
 
         auto iter = dataflow->addPublisher(op);
-        return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+        return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                           partitioningState, numPartitions);
       } else {
         // one of the input streams is already partitioned
@@ -1266,7 +1276,7 @@ class Pipe {
         }
         auto iter = addPartitionedJoin<T2, KeyType>(
             ops, otherOp, otherPipe.partitioningState);
-        return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+        return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                           partitioningState, numPartitions);
       }
     } catch (boost::bad_any_cast& e) {
@@ -1362,7 +1372,8 @@ class Pipe {
       auto iter = dataflow->addPublisher(combine);
 
       //return the pipe
-      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+         transactionIDExtractor, partitioningState, numPartitions);
 
     } catch (boost::bad_any_cast& e) {
       throw TopologyException("No KeyExtractor defined for join.");
@@ -1392,6 +1403,30 @@ class Pipe {
    * @return a new pipe
    */
   template <typename KeyType = DefaultKeyType>
+  Pipe<T> toTxTable(std::shared_ptr<TxTable<typename T::element_type, KeyType>> tbl,
+                  bool autoCommit = false) throw(TopologyException) {
+    typedef std::function<KeyType(const T&)> KeyExtractorFunc;
+    typedef std::function<TransactionID(const T&)> TxIDExtractorFunc;
+
+    assert(partitioningState == NoPartitioning);
+
+    try {
+      KeyExtractorFunc keyFunc =
+          boost::any_cast<KeyExtractorFunc>(keyExtractor);
+
+      TxIDExtractorFunc txFunc =
+        boost::any_cast<TxIDExtractorFunc>(transactionIDExtractor);
+
+      auto op = std::make_shared<ToTxTable<T, KeyType>>(tbl, keyFunc, txFunc, autoCommit);
+      auto iter = addPublisher<ToTxTable<T, KeyType>, DataSource<T>>(op);
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
+                     partitioningState, numPartitions);
+    } catch (boost::bad_any_cast& e) {
+      throw TopologyException("No KeyExtractor or TransactionIDExtractor defined for toTxTable.");
+    }
+  }
+
+  template <typename KeyType = DefaultKeyType>
   Pipe<T> toTable(std::shared_ptr<Table<typename T::element_type, KeyType>> tbl,
                   bool autoCommit = true) throw(TopologyException) {
     typedef std::function<KeyType(const T&)> KeyExtractorFunc;
@@ -1403,7 +1438,7 @@ class Pipe {
 
       auto op = std::make_shared<ToTable<T, KeyType>>(tbl, keyFunc, autoCommit);
       auto iter = addPublisher<ToTable<T, KeyType>, DataSource<T>>(op);
-      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor,
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                      partitioningState, numPartitions);
     } catch (boost::bad_any_cast& e) {
       throw TopologyException("No KeyExtractor defined for toTable.");
@@ -1454,11 +1489,11 @@ class Pipe {
           boost::any_cast<KeyExtractorFunc>(keyExtractor);
       return map<T>([=](auto tp, bool outdated) {
         KeyType key = keyFunc(tp);
-        if (!outdated) 
+        if (!outdated)
           tbl->updateOrDeleteByKey(
             key, [=](typename RecordType::element_type& old) -> bool {
               return updateFunc(tp, outdated, old);
-            }, 
+            },
             [=]() -> typename RecordType::element_type {
               return insertFunc(tp);
               });
@@ -1466,7 +1501,7 @@ class Pipe {
           tbl->updateOrDeleteByKey(
             key, [=](typename RecordType::element_type& old) -> bool {
               return updateFunc(tp, outdated, old);
-            }); 
+            });
         return tp;
       });
     } catch (boost::bad_any_cast& e) {
@@ -1491,7 +1526,7 @@ class Pipe {
     try {
       auto op = std::make_shared<ToMatrix<MatrixType>>(matrix);
       auto iter = addPublisher<ToMatrix<MatrixType>, DataSource<T> >(op);
-      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor,  transactionIDExtractor, partitioningState, numPartitions);
     } catch (...) {
       throw TopologyException("toMatrix: unknown error has occured");
     }
@@ -1515,7 +1550,7 @@ class Pipe {
     try {
       auto op = std::make_shared<MatrixSlice<T>>(pred, numParts);
       auto iter = addPublisher<MatrixSlice<T>, DataSource<T> >(op);
-      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor,  transactionIDExtractor, partitioningState, numPartitions);
     } catch (...) {
       throw TopologyException("matrix_slice: unknown error has occured");
     }
@@ -1532,7 +1567,7 @@ class Pipe {
     try {
       auto op = std::make_shared<MatrixMerge<T>>(numParts);
       auto iter = addPublisher<MatrixMerge<T>, DataSource<T> >(op);
-      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, partitioningState, numPartitions);
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor,  transactionIDExtractor, partitioningState, numPartitions);
     } catch (...) {
       throw TopologyException("matrix_merge: unknown error has occured");
     }
@@ -1568,7 +1603,7 @@ class Pipe {
           "Cannot partition an already partitioned stream.");
     auto op = std::make_shared<PartitionBy<T>>(pFun, nPartitions);
     auto iter = addPublisher<PartitionBy<T>, DataSource<T>>(op);
-    return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor,
+    return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                    FirstInPartitioning, nPartitions);
   }
 
@@ -1601,7 +1636,7 @@ class Pipe {
     CREATE_LINK(op, queue);
     auto iter2 = dataflow->addPublisher(queue);
 
-    return Pipe<T>(dataflow, iter2, keyExtractor, timestampExtractor,
+    return Pipe<T>(dataflow, iter2, keyExtractor, timestampExtractor,  transactionIDExtractor,
                    NoPartitioning, 0);
   }
 
@@ -1626,7 +1661,7 @@ class Pipe {
     if (partitioningState == NoPartitioning) {
       auto op = std::make_shared<Barrier<T>>(cVar, mtx, f);
       auto iter = addPublisher<Barrier<T>, DataSource<T>>(op);
-      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor,
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                      partitioningState, numPartitions);
     } else {
       std::vector<std::shared_ptr<Barrier<T>>> ops;
@@ -1634,7 +1669,7 @@ class Pipe {
         ops.push_back(std::make_shared<Barrier<T>>(cVar, mtx, f));
       }
       auto iter = addPartitionedPublisher<Barrier<T>, T>(ops);
-      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor,
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                      partitioningState, numPartitions);
     }
   }

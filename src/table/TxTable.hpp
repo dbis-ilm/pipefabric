@@ -187,7 +187,8 @@ class TxTable : public BaseTable {
    */
   unsigned long updateOrDeleteByKey(KeyType key, UpdelFunc ufunc, InsertFunc ifunc = nullptr) {
     // TODO: Tx support
-    return rdbTable.updateOrDeleteByKey(key, ufunc, ifunc);
+    // return rdbTable.updateOrDeleteByKey(key, ufunc, ifunc);
+    return 0;
   }
 
   /**

@@ -113,6 +113,19 @@ public:
     return tbl;
   }
 
+  template <typename RecordType, typename KeyType = DefaultKeyType>
+  std::shared_ptr<TxTable<RecordType, KeyType>> createTxTable(const TableInfo& tblInfo) throw (TableException) {
+    // first we check whether the table exists already
+    auto it = mTableSet.find(tblInfo.tableName());
+    if (it != mTableSet.end())
+      throw TableException("table already exists");
+
+    // create a new table and register it
+    auto tbl = std::make_shared<TxTable<RecordType, KeyType>>(tblInfo);
+    mTableSet[tblInfo.tableName()] = tbl;
+    return tbl;
+  }
+
   /**
    * @brief Gets a table by its name.
    *

@@ -4,7 +4,7 @@
  * marked by BEGIN and COMMIT. The stream elements are used to update a
  * relational table. A second batch topology (query) reads this table
  * periodically. The transactional context guarantees snapshot isolation
- * of this query. 
+ * of this query.
  */
 #include <chrono>
 #include <cmath>
@@ -99,4 +99,6 @@ int main(int argc, char **argv) {
   t2->runEvery(5);
 
   t1->wait();
+
+  accountTable->drop();
 }

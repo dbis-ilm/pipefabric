@@ -264,7 +264,7 @@ struct MySumState {
 TEST_CASE("Building and running a topology with stateful map", "[StatefulMap]") {
   typedef TuplePtr<unsigned long, double> MyTuplePtr;
   typedef TuplePtr<double> AggregationResultPtr;
-  typedef StatefulMap<AggregationResultPtr, AggregationResultPtr, MySumState> TestMap;
+  typedef StatefulMap<MyTuplePtr, AggregationResultPtr, MySumState> TestMap;
 
   StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {
     return makeTuplePtr(n, (double)n + 0.5);
@@ -274,9 +274,9 @@ TEST_CASE("Building and running a topology with stateful map", "[StatefulMap]") 
 
   std::vector<double> results;
 
-  auto mapFun = [&]( const MyTuplePtr& tp, bool, TestMap::StateRepPtr state) -> AggregationResultPtr {
-                    state->sum += get<1>(tp);
-                    return makeTuplePtr(state->sum);
+  auto mapFun = [&]( const MyTuplePtr& tp, bool, TestMap& self) -> AggregationResultPtr {
+                    self.state()->sum += get<1>(tp);
+                    return makeTuplePtr(self.state()->sum);
                 };
 
   Topology t;
