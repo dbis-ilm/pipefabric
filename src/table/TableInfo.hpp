@@ -13,19 +13,27 @@ struct ColumnInfo {
 
   ColumnInfo(const std::string& n, ColumnType ct) : mColName(n), mColType(ct) {}
 
+  const std::string& getName() const { return mColName; }
+
+  const ColumnType& getType() const { return mColType; }
+
+private:
   std::string mColName;
   ColumnType mColType;
 };
 
 class TableInfo {
  public:
-  typedef std::vector<ColumnInfo>::const_iterator ColumnIterator;
+  using ColumnVector = std::vector<ColumnInfo>;
+  using ColumnIterator = ColumnVector::const_iterator;
 
   TableInfo() {}
 
   TableInfo(const std::string& name, std::initializer_list<ColumnInfo> columns,
             ColumnInfo::ColumnType keyType = ColumnInfo::Void_Type)
       : mName(name), mColumns(columns), mKeyType(keyType) {}
+
+  TableInfo(const std::string& name) : mName(name), mColumns(), mKeyType(ColumnInfo::Void_Type) {}
 
   const std::string& tableName() const { return mName; }
 

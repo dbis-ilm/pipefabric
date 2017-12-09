@@ -1,6 +1,7 @@
 #include "TypeManager.hpp"
 #include "QueryCompileException.hpp"
 #include "UniqueNameGenerator.hpp"
+#include "table/TableInfo.hpp"
 
 using namespace pfabric;
 

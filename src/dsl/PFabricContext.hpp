@@ -21,10 +21,14 @@
 #ifndef PFabricContext_hpp_
 #define PFabricContext_hpp_
 
-#include <string>
+#include <iostream>
 #include <map>
+#include <memory>
+#include <string>
 
 #include "core/PFabricTypes.hpp"
+#include "dsl/Dataflow.hpp"
+#include "qop/Queue.hpp"
 #include "table/Table.hpp"
 #include "qop/Queue.hpp"
 #include "dsl/Topology.hpp"
@@ -88,7 +92,7 @@ public:
          a pointer to the newly created table
    */
   template <typename RecordType, typename KeyType = DefaultKeyType>
-  std::shared_ptr<Table<RecordType, KeyType>> createTable(const std::string& tblName) throw (TableException) {
+  std::shared_ptr<Table<RecordType, KeyType>> createTable(const std::string& tblName) noexcept(false) {
     // first we check whether the table exists already
     auto it = mTableSet.find(tblName);
     if (it != mTableSet.end())
@@ -101,7 +105,7 @@ public:
   }
 
   template <typename RecordType, typename KeyType = DefaultKeyType>
-  std::shared_ptr<Table<RecordType, KeyType>> createTable(const TableInfo& tblInfo) throw (TableException) {
+  std::shared_ptr<Table<RecordType, KeyType>> createTable(const TableInfo& tblInfo) noexcept(false) {
     // first we check whether the table exists already
     auto it = mTableSet.find(tblInfo.tableName());
     if (it != mTableSet.end())
@@ -207,12 +211,12 @@ public:
   }
 
 private:
-  typedef std::shared_ptr<BaseTable> BaseTablePtr;
+  using BaseTablePtr = typename std::shared_ptr<BaseTable>;
 
   std::map<std::string, BaseTablePtr> mTableSet;         //< a dictionary collecting all existing tables
   std::map<std::string, Dataflow::BaseOpPtr> mStreamSet; //< a dictionary collecting all named streams
 #ifdef SUPPORT_MATRICES
-  typedef std::shared_ptr<BaseMatrix> BaseMatrixPtr;
+  using BaseMatrixPtr = typename std::shared_ptr<BaseMatrix>;
   std::map<std::string, BaseMatrixPtr> matrixMap;        //< a dictionary collecting all existing matrix
 #endif
     };

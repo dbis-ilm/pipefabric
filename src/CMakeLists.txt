@@ -56,7 +56,13 @@ option(USE_BOOST_SPIRIT_PARSER
 # If switched to off, it will not be downloaded, saving initial building time.
 option(USE_ROCKSDB_TABLE
   "use RocksDB for implementing persistent tables"
-  ON
+  OFF
+)
+
+# Use Non-Volatile Memory Library for implementing tables
+option(USE_NVML_TABLE
+	"use nvml for implementing persistent memory tables"
+  OFF
 )
 
 # Build only pipefabric libraries (cep and core)
@@ -64,7 +70,7 @@ option(USE_ROCKSDB_TABLE
 # Building test cases is independent from this.
 option(BUILD_ONLY_LIBS
   "build only the two pipefabric libraries"
-  OFF
+  ON
 )
 
 # Build test cases for pipefabric functionality
@@ -182,6 +188,31 @@ if (USE_ROCKSDB_TABLE)
 else()
   message(STATUS "don't use RocksDB key-value store")
   set (ROCKSDB_LIB "")
+endif()
+
+########################
+# Non-Volatile Memory Library
+########################
+#
+if (USE_NVML_TABLE)
+	message(STATUS "using NVML based persistent table")
+	add_definitions(-DUSE_NVML_TABLE)
+	set (NVML_LIBRARIES
+            "${THIRD_PARTY_DIR}/nvml/lib/libpmemblk.a"
+            "${THIRD_PARTY_DIR}/nvml/lib/libpmemlog.a"
+            "${THIRD_PARTY_DIR}/nvml/lib/libpmemobj.a"
+            "${THIRD_PARTY_DIR}/nvml/lib/libpmempool.a"
+            "${THIRD_PARTY_DIR}/nvml/lib/libpmem.a"
+            ${DYLIB_LIBRARY}
+            "${THIRD_PARTY_DIR}/ptable/lib/libptable.so"
+            )
+    include_directories(
+            "${THIRD_PARTY_DIR}/nvml/include"
+            "${THIRD_PARTY_DIR}/ptable/include"
+            )
+else ()
+	message(STATUS "don't use NVML based persistent table")
+	set (NVML_LIBRARIES "")
 endif()
 
 ######################
@@ -358,6 +389,7 @@ if(USE_KAFKA)
     net/KafkaSource.cpp
   )
 endif()
+
 #-----------------------------------------------------------------------------------------
 #
 ######
@@ -378,6 +410,19 @@ if(USE_MQTT)
   set(core_sources
     ${core_sources}
     net/MQTTSource.cpp
+  )
+endif()
+
+if(USE_NVML_TABLE)
+  add_definitions(-DDO_LOG=0)
+  set(core_sources
+    ${core_sources}
+    ${THIRD_PARTY_DIR}/nvml
+    ${THIRD_PARTY_DIR}/ptable
+  )
+  set(core_libs
+    ${core_libs}
+    ${NVML_LIBRARIES}
   )
 endif()
 #-----------------------------------------------------------------------------------------
@@ -408,7 +453,28 @@ target_link_libraries(pfabric_cep
 #
 # Experimental SQL query compiler
 #
-add_subdirectory(qcomp)
+# if(!USE_NVML_TABLE)
+  #-----------------------------------------------------------------------------------------
+  #
+  # Building PipeFabric query compiler library
+  #
+  add_library(pfabric_qcomp SHARED
+    qcomp/Plan.cpp
+    qcomp/PlanCache.cpp
+    qcomp/QueryCompiler.cpp
+    qcomp/TypeManager.cpp
+    qcomp/UniqueNameGenerator.cpp
+    qcomp/SQLParser.cpp)
+
+  target_link_libraries(pfabric_qcomp
+    pfabric_core
+    ${Boost_PROGRAM_OPTIONS_LIBRARY}
+    ${Boost_FILESYSTEM_LIBRARY}
+    ${BOOST_LIBRARIES}
+  )
+
+  add_subdirectory(qcomp)
+# endif()
 
 #-----------------------------------------------------------------------------------------
 #

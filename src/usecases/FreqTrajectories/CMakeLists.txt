@@ -1,12 +1,13 @@
 if (NOT BUILD_ONLY_LIBS)
-	 add_executable(TrackerServer TrackerServer.cpp 
-      TrajectoryDB.cpp 
+	 add_executable(TrackerServer TrackerServer.cpp
+      TrajectoryDB.cpp
       GeoUtils.cpp
       QueryLoop.cpp
       Pattern.cpp
       PrefixSpan.cpp
       WebServer.cpp)
-   target_link_libraries(TrackerServer
+
+	 target_link_libraries(TrackerServer
      pfabric_qcomp
  		 pfabric_core
       ${ROCKSDB_LIB}
