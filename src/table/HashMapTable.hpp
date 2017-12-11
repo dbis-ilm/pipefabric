@@ -254,6 +254,9 @@ public:
         // don't forget to release the lock
         lock.unlock();
         return 1;
+      } else {
+        // release lock always after finished table altering
+        lock.unlock();      
       }
     }
     return 0;
