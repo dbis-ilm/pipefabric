@@ -45,10 +45,10 @@ add_custom_command(
         OUTPUT ${THIRD_PARTY_DIR}/fmt
         COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/fmt
         COMMAND ${CMAKE_COMMAND} -E copy
-                ${Format_SOURCE_DIR}/fmt/format.h
+                ${Format_SOURCE_DIR}/fmt/format.*
                 ${THIRD_PARTY_DIR}/fmt
         COMMAND ${CMAKE_COMMAND} -E copy
-                ${Format_SOURCE_DIR}/fmt/format.cc
+                ${Format_SOURCE_DIR}/fmt/ostream.*
                 ${THIRD_PARTY_DIR}/fmt)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DFMT_HEADER_ONLY=1")

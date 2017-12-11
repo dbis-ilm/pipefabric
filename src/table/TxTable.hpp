@@ -35,12 +35,16 @@
 
 #include "fmt/format.h"
 
+#ifdef USE_ROCKSDB_TABLE
 #include "rocksdb/db.h"
+#include "table/RDBTable.hpp"
+#else
+#include "table/HashMapTable.hpp"
+#endif
 
 #include "core/serialize.hpp"
 
 #include "table/BaseTable.hpp"
-#include "table/RDBTable.hpp"
 #include "table/TableException.hpp"
 #include "table/TableInfo.hpp"
 #include "table/LogBuffer.hpp"
@@ -63,37 +67,44 @@ namespace pfabric {
 template <typename RecordType, typename KeyType = DefaultKeyType>
 class TxTable : public BaseTable {
  public:
+
+#ifdef USE_ROCKSDB_TABLE
+  typedef RDBTable<RecordType, KeyType> Table;
+#else
+  typedef HashMapTable<RecordType, KeyType> Table;
+#endif
+
   //< typedef for a predicate evaluated using a scan
   // typedef std::function<bool(const RecordType&)> Predicate;
 
   //< typedef for a updater function which returns a modification of the
   // parameter tuple
-  typedef typename RDBTable<RecordType, KeyType>::UpdaterFunc UpdaterFunc;
+  typedef typename Table::UpdaterFunc UpdaterFunc;
 
   //< typedefs for a function performing updates + deletes. Similar to
   // UpdaterFunc
   //< it allows to update the tuple, but also to delete it (indictated by the
   //< setting the bool component of @c UpdateResult to false)
-  typedef typename RDBTable<RecordType, KeyType>::UpdelFunc UpdelFunc;
+  typedef typename Table::UpdelFunc UpdelFunc;
 
-  typedef typename RDBTable<RecordType, KeyType>::InsertFunc InsertFunc;
+  typedef typename Table::InsertFunc InsertFunc;
 
   //< typedef for an iterator to scan the table
-  typedef typename RDBTable<RecordType, KeyType>::TableIterator TableIterator;
+  typedef typename Table::TableIterator TableIterator;
 
   //< typedef for a predicate evaluated using a scan: see @TableIterator for
   // details
-  typedef typename RDBTable<RecordType, KeyType>::Predicate Predicate;
+  typedef typename Table::Predicate Predicate;
 
   TxTable(const TableInfo& tInfo) throw(TableException)
-      : BaseTable(tInfo), rdbTable(tInfo) {
+      : BaseTable(tInfo), tbl(tInfo) {
   }
 
   /**
    * Constructor for creating an empty table.
    */
   TxTable(const std::string& tableName) throw(TableException)
-  : rdbTable(tableName) {
+  : tbl(tableName) {
   }
 
   /**
@@ -108,13 +119,13 @@ class TxTable : public BaseTable {
     for (auto iter = logBuffer.begin(txID); iter != logBuffer.end(txID); iter++) {
       switch (iter->logOp) {
         case LogOp::Insert:
-          rdbTable.insert(iter->key, *(iter->recordPtr));
+          tbl.insert(iter->key, *(iter->recordPtr));
           break;
         case LogOp::Update:
           // TODO
           break;
         case LogOp::Delete:
-          rdbTable.deleteByKey(iter->key);
+          tbl.deleteByKey(iter->key);
           break;
       }
     }
@@ -168,7 +179,7 @@ class TxTable : public BaseTable {
    */
   unsigned long deleteWhere(Predicate func) {
     // TODO: Tx support
-    return rdbTable.deleteWhere(func);
+    return tbl.deleteWhere(func);
   }
 
   /**
@@ -187,7 +198,7 @@ class TxTable : public BaseTable {
    */
   unsigned long updateOrDeleteByKey(KeyType key, UpdelFunc ufunc, InsertFunc ifunc = nullptr) {
     // TODO: Tx support
-    // return rdbTable.updateOrDeleteByKey(key, ufunc, ifunc);
+    // return tbl.updateOrDeleteByKey(key, ufunc, ifunc);
     return 0;
   }
 
@@ -205,7 +216,7 @@ class TxTable : public BaseTable {
    */
   unsigned long updateByKey(KeyType key, UpdaterFunc ufunc) {
     // TODO: Tx support
-    return rdbTable.updateByKey(key, ufunc);
+    return tbl.updateByKey(key, ufunc);
   }
 
   /**
@@ -222,7 +233,7 @@ class TxTable : public BaseTable {
    */
   unsigned long updateWhere(Predicate pfunc, UpdaterFunc ufunc) {
     // TODO: Tx support
-    return rdbTable.updateWhere(pfunc, ufunc);
+    return tbl.updateWhere(pfunc, ufunc);
   }
 
   /**
@@ -234,7 +245,7 @@ class TxTable : public BaseTable {
    * @param key the key value
    * @return the tuple associated with the given key
    */
-  SmartPtr<RecordType> getByKey(KeyType key) throw(TableException) { return rdbTable.getByKey(key); }
+  SmartPtr<RecordType> getByKey(KeyType key) throw(TableException) { return tbl.getByKey(key); }
 
   /**
    * @brief Return a pair of iterators for scanning the table with a
@@ -254,7 +265,7 @@ class TxTable : public BaseTable {
    * @param func a function pointer to a predicate
    * @return a pair of iterators
    */
-  TableIterator select(Predicate func) { return rdbTable.select(func); }
+  TableIterator select(Predicate func) { return tbl.select(func); }
 
   /**
    * @brief Return a pair of iterators for scanning the whole table.
@@ -269,20 +280,20 @@ class TxTable : public BaseTable {
    *
    * @return a pair of iterators
    */
-  TableIterator select() { return rdbTable.select(); }
+  TableIterator select() { return tbl.select(); }
 
   /**
    * @brief Return the number of tuples stored in the table.
    *
    * @return the number of tuples
    */
-  unsigned long size() const { return rdbTable.size(); }
+  unsigned long size() const { return tbl.size(); }
 
-  void drop() { rdbTable.drop(); }
+  void drop() { tbl.drop(); }
 
  private:
   std::mutex tblMtx;
-  RDBTable<RecordType, KeyType> rdbTable;
+  Table tbl;
   LogBuffer<KeyType, RecordType> logBuffer;
 };
 }

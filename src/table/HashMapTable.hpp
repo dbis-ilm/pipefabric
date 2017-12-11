@@ -105,6 +105,8 @@ public:
   //< setting the bool component of @c UpdateResult to false)
   typedef std::function<bool(RecordType&)> UpdelFunc;
 
+  typedef std::function<RecordType()> InsertFunc;
+
   //< typedef for a callback function which is invoked when the table was updated
   typedef boost::signals2::signal<void (const RecordType&, TableParams::ModificationMode)> ObserverCallback;
 
@@ -221,7 +223,7 @@ public:
    *        or deleted (=false)
    * @return the number of modified tuples
    */
-  unsigned long updateOrDeleteByKey(KeyType key, UpdelFunc ufunc) {
+  unsigned long updateOrDeleteByKey(KeyType key, UpdelFunc ufunc, InsertFunc ifunc = nullptr) {
     // make sure we have exclusive access
     // note that we don't use a guard here!
     std::unique_lock<std::mutex> lock(mMtx);
@@ -246,8 +248,13 @@ public:
       return num;
     }
     else {
-      // don't forget to release the lock
-      lock.unlock();
+      // key doesn't exist
+      if (ifunc != nullptr) {
+        insert(key, ifunc());
+        // don't forget to release the lock
+        lock.unlock();
+        return 1;
+      }
     }
     return 0;
   }

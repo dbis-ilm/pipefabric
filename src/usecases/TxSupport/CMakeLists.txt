@@ -1,4 +1,3 @@
-if (NOT BUILD_ONLY_LIBS)
 add_executable(txproc TxProcessing.cpp)
 target_link_libraries(txproc
      pfabric_core
@@ -11,4 +10,3 @@ target_link_libraries(txproc
      ${Boost_FILESYSTEM_LIBRARY}
      ${Boost_THREAD_LIBRARY}
 )
-endif()

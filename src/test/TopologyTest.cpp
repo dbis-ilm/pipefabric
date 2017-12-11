@@ -410,3 +410,50 @@ TEST_CASE("Using a window with and without additional function", "[Window]") {
   t3.start(false);
   REQUIRE(strm3.str() == expected);
 }
+
+TEST_CASE("Building and running a topology with Transactions", "[Transactions]") {
+  //transaction id, user id, test string, test double
+  typedef TuplePtr<int, int, std::string, double> T1;
+  PFabricContext ctx;
+
+  //create table
+  TableInfo tblInfo("TestTable", {}, ColumnInfo::UInt_Type);
+  auto testTable = ctx.createTxTable<T1::element_type, int>(tblInfo);
+
+  //tuple production
+  StreamGenerator<T1>::Generator streamGen ([](unsigned long n) -> T1 {
+    return makeTuplePtr((int)n%3, (int)n, (std::string)"test string", (double)n + 0.5);
+  });
+  unsigned long num = 10;
+
+  //autocommit, else we need to update a state (tracking transactions)
+  bool autocommit = true;
+
+  auto t1 = ctx.createTopology();
+  //write to table
+  auto s1 = t1->streamFromGenerator<T1>(streamGen, num)
+    .assignTransactionID([](auto tp) { return get<0>(tp); })
+    .keyBy<1, int>()
+    .toTxTable<int>(testTable, autocommit);
+
+  t1->start();
+  t1->wait();
+
+  REQUIRE(testTable->size() == 10);
+
+  int tpCnt = 0;
+
+  auto t2 = ctx.createTopology();
+  //read from table
+  auto s2 = t2->selectFromTxTable<T1, int>(testTable)
+    .notify([&](auto tp, bool outdated) {
+      tpCnt++;
+    });
+
+  t2->start();
+  t2->wait();
+
+  REQUIRE(tpCnt == 10);
+
+	testTable->drop();
+}
