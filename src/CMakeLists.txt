@@ -4,7 +4,7 @@ project (pipefabric)
 set(CMAKE_MACOSX_RPATH 1)
 
 set (PipeFabric_VERSION_MAJOR 0)
-set (PipeFabric_VERSION_MINOR 2)
+set (PipeFabric_VERSION_MINOR 3)
 
 include(CTest)
 
@@ -231,6 +231,7 @@ find_package(Boost ${BOOST_MIN_VERSION} REQUIRED COMPONENTS
     serialization
     thread
     regex
+    python3
     chrono
     date_time
 )
@@ -261,6 +262,29 @@ set(BOOST_LIBRARIES
 		${Boost_REGEX_LIBRARY}
 	    ${DYLIB_LIBRARY}
 )
+
+######################
+# Python
+######################
+#
+find_package(PythonLibs)
+FIND_PACKAGE(PythonInterp)
+if (PYTHONLIBS_FOUND)
+message(STATUS "Python Version ${PYTHON_VERSION_MAJOR} found - building the Python API.")
+set (PYTHON_INCLUDE_DIRS "/Users/kai/miniconda3/include/python3.5m")
+message("PythonInclude ${PYTHON_INCLUDE_DIRS}")
+message("PythonLibs ${PYTHON_LIBDIR}")
+
+include_directories(${PYTHON_INCLUDE_DIRS})
+link_directories(${PYTHON_LIBDIR})
+
+set(PYTHON_SOURCES
+  python/PyTopology.cpp
+)
+else()
+  set (PYTHON_SOURCES "")
+
+endif(PYTHONLIBS_FOUND)
 
 ######################
 # ZeroMQ library
@@ -447,6 +471,23 @@ add_library(pfabric_cep SHARED
 
 target_link_libraries(pfabric_cep
                 ${BOOST_LIBRARIES}
+)
+
+#-----------------------------------------------------------------------------------------
+#
+# Building PipeFabric Python library
+#
+add_library(pfabric SHARED
+                  ${PYTHON_SOURCES}
+                  # we need this as dependency to download the sources from github
+                  ${THIRD_PARTY_DIR}/fmt
+)
+
+target_link_libraries(pfabric
+              ${Boost_PYTHON3_LIBRARY}
+              ${PYTHON_LIBRARIES}
+              pfabric_core
+              ${BOOST_LIBRARIES}
 )
 
 #-----------------------------------------------------------------------------------------

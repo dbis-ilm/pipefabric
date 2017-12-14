@@ -23,3 +23,4 @@ operators and utility classes. It consists of the following main components:
  + [Tutorial: How to build and use a Docker image](/documentation/Docker.md)
  + [PipeFabric Use Cases](/documentation/UseCases.md)
  + [Additional network sources](/documentation/Network.md)
+ + [Python Integration](/documentation/Python.md)

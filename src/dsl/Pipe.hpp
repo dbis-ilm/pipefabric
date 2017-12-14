@@ -75,8 +75,7 @@ enum PartitioningState {
 
 /**
  * @brief Pipe represents a sequence of operators applied to a data stream.
- * Pipes are used
- *        mainly to construct a dataflow programatically.
+ * Pipes are used mainly to construct a dataflow programatically.
  *
  * A Pipe is used to construct and represent a dataflow program. Pipes are
  * constructed by
@@ -720,7 +719,7 @@ class Pipe {
     * @tparam T
     *      the input tuple type (usually a TuplePtr) for the operator.
     * @param[in] func
-    *      a function pointer or lambda function implementing a predicate by
+    *      a function pointer or lambda function implementing a predicate.
    * returning a @c bool
     *      value for the input tuple
     * @return a new pipe
