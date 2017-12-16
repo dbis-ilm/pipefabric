@@ -93,6 +93,53 @@ struct PyPipe {
   PyPipe map(bp::object fun);
 
   /**
+   * @brief Creates a notify operator for passing stream tuples
+   * to a callback function.
+   *
+   * Creates a notify operator for triggering a callback on each input tuple
+   * and forwarding the tuples to the next operator on the pipe.
+
+   * @param[in] func
+   *      a lambda function representing the callback that is invoked for
+   *      each input tuple
+   * @param[in] pfunc
+   *      an optional lambda function representing the callback
+   *      that is invoked for each punctuation
+   * @return a new PyPipe object
+   */
+  PyPipe notify(bp::object fun);
+
+  /**
+   * @brief Defines the timestamp extractor function for all subsequent
+   * operators.
+   *
+   * Defines a function for extracting a timestamp from a tuple which is used
+   * for all subsequent operators which require such a function, e.g. windows.
+   *
+   * @param[in] func
+   *      a function for extracting the timestamp of the tuple
+   * @return a new pipe
+   */
+  PyPipe assignTimestamps(bp::object fun);
+
+  /**
+   * @brief Creates a sliding window operator as the next operator on the pipe.
+   *
+   * Creates a sliding window operator of the given type and size.
+   *
+   * @param[in] wt
+   *      the type of the window (row or range)
+   * @param[in] sz
+   *      the window size (in number of tuples for row window or in milliseconds
+   *      for range windows)
+   * @param[in] ei
+   *      the eviction interval, i.e., time for triggering the eviction (in
+   *      milliseconds)
+   * @return a new pipe
+   */
+  PyPipe slidingWindow(WindowParams::WinType wt, unsigned int size, unsigned int interval = 0);
+
+  /**
    * @brief Creates a print operator.
    *
    * Creates an operator for printing tuples to the console

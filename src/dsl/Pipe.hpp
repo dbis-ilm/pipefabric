@@ -134,6 +134,9 @@ class Pipe {
     numPartitions = p.numPartitions;
     dataflow = p.dataflow;
     tailIter = p.tailIter;
+    keyExtractor = p.keyExtractor;
+    timestampExtractor = p.timestampExtractor;
+    transactionIDExtractor = p.transactionIDExtractor;
   }
 
  private:

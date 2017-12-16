@@ -15,9 +15,9 @@ processed in such a topology are native Python tuples, lambda functions of the
 different operators (e.g. `where`, `map` etc.) can be written directly in Python.
 
 ```Python
-import libpfabric
+import pyfabric
 
-t = libpfabric.Topology()
+t = pyfabric.Topology()
 p = t.newStreamFromFile("data.csv") \
      .extract(',') \
      .map(lambda t, o: (int(t[0]), t[1], t[2])) \

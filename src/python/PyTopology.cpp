@@ -20,6 +20,8 @@
  */
 #include "PyTopology.hpp"
 
+#include <boost/python/enum.hpp>
+
 using namespace pfabric;
 
 namespace bp = boost::python;
@@ -59,6 +61,27 @@ PyPipe PyPipe::map(bp::object fun) {
   }));
 }
 
+PyPipe PyPipe::slidingWindow(WindowParams::WinType wt, unsigned int size,
+  unsigned int interval) {
+  auto pipe = boost::get<TuplePipe&>(pipeImpl);
+  return PyPipe(pipe.slidingWindow(wt, size, nullptr, interval));
+}
+
+PyPipe PyPipe::notify(bp::object fun) {
+  auto pipe = boost::get<TuplePipe&>(pipeImpl);
+  return PyPipe(pipe.notify([fun](auto tp, bool o) {
+    fun(get<0>(tp), o);
+  }));
+}
+
+PyPipe PyPipe::assignTimestamps(bp::object fun) {
+  auto pipe = boost::get<TuplePipe&>(pipeImpl);
+  return PyPipe(pipe.assignTimestamps([fun](auto tp) -> Timestamp {
+    auto res = fun(get<0>(tp));
+    return (Timestamp) bp::extract<long>(res); 
+  }));
+}
+
 PyPipe PyPipe::print() {
   auto pipe = boost::get<TuplePipe&>(pipeImpl);
   auto pyFormatter = [](std::ostream& os, auto tp) {
@@ -84,7 +107,7 @@ void PyTopology::start() {
     topo->start(false);
 }
 
-BOOST_PYTHON_MODULE(libpfabric) {
+BOOST_PYTHON_MODULE(pyfabric) {
     bp::class_<pfabric::PyTopology>("Topology")
     .def("newStreamFromFile", &pfabric::PyTopology::newStreamFromFile)
       .def("start", &pfabric::PyTopology::start)
@@ -94,7 +117,15 @@ BOOST_PYTHON_MODULE(libpfabric) {
       .def("extract", &pfabric::PyPipe::extract)
         .def("where", &pfabric::PyPipe::where)
         .def("map", &pfabric::PyPipe::map)
+        .def("assign_timestamps", &pfabric::PyPipe::assignTimestamps)
+        .def("sliding_window", &pfabric::PyPipe::slidingWindow)
+        .def("notify", &pfabric::PyPipe::notify)
         .def("print", &pfabric::PyPipe::print)
-
     ;
+
+    bp::enum_<pfabric::WindowParams::WinType>("wintype")
+        .value("range", pfabric::WindowParams::RangeWindow)
+        .value("row", pfabric::WindowParams::RowWindow)
+        ;
+
 }

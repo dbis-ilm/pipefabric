@@ -477,19 +477,20 @@ target_link_libraries(pfabric_cep
 #
 # Building PipeFabric Python library
 #
-add_library(pfabric SHARED
+add_library(pyfabric SHARED
                   ${PYTHON_SOURCES}
                   # we need this as dependency to download the sources from github
                   ${THIRD_PARTY_DIR}/fmt
 )
 
-target_link_libraries(pfabric
+target_link_libraries(pyfabric
               ${Boost_PYTHON3_LIBRARY}
               ${PYTHON_LIBRARIES}
               pfabric_core
               ${BOOST_LIBRARIES}
 )
 
+set_target_properties(pyfabric PROPERTIES PREFIX "" SUFFIX ".so")
 #-----------------------------------------------------------------------------------------
 #
 # Experimental SQL query compiler
