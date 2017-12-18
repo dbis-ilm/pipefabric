@@ -1032,6 +1032,32 @@ class Pipe {
     }
   }
 
+  template <typename Tout, typename AggrState>
+  Pipe<Tout> aggregate(
+      typename AggrState::AggrStatePtr state,
+      typename Aggregation<T, Tout, AggrState>::FinalFunc finalFun,
+      typename Aggregation<T, Tout, AggrState>::IterateFunc iterFun,
+      AggregationTriggerType tType = TriggerAll,
+      const unsigned int tInterval = 0) noexcept(false) {
+    if (partitioningState == NoPartitioning) {
+      auto op = std::make_shared<Aggregation<T, Tout, AggrState>>(
+          state, finalFun, iterFun, tType, tInterval);
+      auto iter =
+          addPublisher<Aggregation<T, Tout, AggrState>, DataSource<T>>(op);
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
+                        partitioningState, numPartitions);
+    } else {
+      std::vector<std::shared_ptr<Aggregation<T, Tout, AggrState>>> ops;
+      for (auto i = 0u; i < numPartitions; i++) {
+        ops.push_back(std::make_shared<Aggregation<T, Tout, AggrState>>(
+            state, finalFun, iterFun, tType, tInterval));
+      }
+      auto iter =
+          addPartitionedPublisher<Aggregation<T, Tout, AggrState>, T>(ops);
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
+                        partitioningState, numPartitions);
+    }
+  }
   /**
    * @brief Creates an operator for calculating grouped aggregates over the
    entire stream.

@@ -18,7 +18,7 @@
  * along with this program; see the file LICENSE.
  * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
  */
- 
+
 #ifndef AggregateFunc_hpp_
 #define AggregateFunc_hpp_
 
@@ -36,11 +36,22 @@ namespace pfabric {
  *              generally a bad idea since the object instance does not exist completely,
  *              so it might resolve to an incomplete type. CRTP would avoid this.
  */
+class AggregateFuncBase {
+protected:
+  AggregateFuncBase() {}
+
+public:
+    virtual ~AggregateFuncBase() {}
+    virtual void init() = 0;
+ };
+
+typedef AggregateFuncBase* AggregateFuncBasePtr;
+
 template<
 	typename Tin,
 	typename Tres
 >
-class AggregateFunc {
+class AggregateFunc : public AggregateFuncBase {
 public:
 	typedef Tres ResultType;
 

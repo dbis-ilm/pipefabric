@@ -29,9 +29,34 @@ namespace bp = boost::python;
 
 namespace pfabric {
 
+enum class AggrFuncType {
+    IntSum, DoubleSum,
+    Count,
+    IntAvg, DoubleAvg,
+    IntMin, DoubleMin, StringMin,
+    IntMax, DoubleMax, StringMax
+};
+
 /// We handle only tuples consisting of a single field that represents
 /// a Python tuple.
 typedef TuplePtr<bp::object> PyTuplePtr;
+
+struct PyAggregateState : public AggregateStateBase<PyTuplePtr> {
+public:
+  typedef std::shared_ptr<PyAggregateState> AggrStatePtr;
+
+  PyAggregateState(const std::vector<int>& cols, const std::vector<AggrFuncType>& funcs);
+
+  virtual void init();
+
+  static void iterate(const PyTuplePtr& tp, AggrStatePtr state, const bool outdated);
+
+  static PyTuplePtr finalize(AggrStatePtr state);
+
+  std::vector<int> mColumns;
+  std::vector<AggrFuncType> mFuncSpecs;
+  std::vector<AggregateFuncBasePtr> mAggrFuncs;
+};
 
 /**
  * @brief PyPipe represents a sequence of operators applied to a data stream.
@@ -123,6 +148,20 @@ struct PyPipe {
   PyPipe assignTimestamps(bp::object fun);
 
   /**
+   * @brief Defines the key extractor function for all subsequent operators.
+   *
+   * Defines a function for extracting a key value from a tuple which is used
+   * for all subsequent operators which require such a function,
+   * e.g. join, groupBy.
+   *
+   * @param[in] func
+   *      a function for extracting the key from the tuple
+   * @return a new pipe
+   */
+
+  PyPipe keyBy(bp::object fun);
+
+  /**
    * @brief Creates a sliding window operator as the next operator on the pipe.
    *
    * Creates a sliding window operator of the given type and size.
@@ -138,6 +177,8 @@ struct PyPipe {
    * @return a new pipe
    */
   PyPipe slidingWindow(WindowParams::WinType wt, unsigned int size, unsigned int interval = 0);
+
+  PyPipe aggregate(bp::list columns, bp::list aggrFuncs);
 
   /**
    * @brief Creates a print operator.

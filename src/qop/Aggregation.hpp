@@ -119,6 +119,15 @@ namespace pfabric {
                 mLastTriggerTime(0), mTriggerType(tType), mTriggerInterval( tInterval ), mCounter(0) {
     }
 
+    Aggregation(AggregateStatePtr state, FinalFunc final_fun, IterateFunc it_fun,
+                AggregationTriggerType tType = TriggerAll, const unsigned int tInterval = 0) :
+                mAggrState(state),
+                mIterateFunc( it_fun ),
+                mFinalFunc( final_fun ),
+                mNotifier(tInterval > 0 && tType == TriggerByTime ?
+                  new TriggerNotifier(std::bind(&Aggregation::notificationCallback, this), tInterval) : nullptr),
+                mLastTriggerTime(0), mTriggerType(tType), mTriggerInterval( tInterval ), mCounter(0) {
+    }
     /**
      * Create a new aggregation operator which receives an input stream and
      * applies the given aggregate function incrementally with a TriggerByTimestamp
@@ -142,6 +151,14 @@ namespace pfabric {
                 mNotifier(nullptr), mLastTriggerTime(0), mCounter(0) {
     }
 
+    Aggregation(AggregateStatePtr state, FinalFunc final_fun, IterateFunc it_fun,
+                TimestampExtractorFunc func, const unsigned int tInterval) :
+                mAggrState(state),
+                mIterateFunc( it_fun ), mFinalFunc( final_fun ),
+                mTimestampExtractor(func),
+                mTriggerType(TriggerByTimestamp), mTriggerInterval( tInterval ),
+                mNotifier(nullptr), mLastTriggerTime(0), mCounter(0) {
+    }
     /**
      * @brief Bind the callback for the data channel.
      */

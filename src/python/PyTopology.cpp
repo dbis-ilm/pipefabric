@@ -78,11 +78,40 @@ PyPipe PyPipe::assignTimestamps(bp::object fun) {
   auto pipe = boost::get<TuplePipe&>(pipeImpl);
   return PyPipe(pipe.assignTimestamps([fun](auto tp) -> Timestamp {
     auto res = fun(get<0>(tp));
-    return (Timestamp) bp::extract<long>(res); 
+    return (Timestamp) bp::extract<long>(res);
   }));
 }
 
+PyPipe PyPipe::keyBy(bp::object fun) {
+  auto pipe = boost::get<TuplePipe&>(pipeImpl);
+  return PyPipe(pipe.keyBy<bp::object>([fun](auto tp) {
+    return fun(get<0>(tp));
+  }));
+}
+
+PyPipe PyPipe::aggregate(bp::list columns, bp::list aggrFuncs) {
+  std::vector<int> columnVec;
+  std::vector<AggrFuncType> funcVec;
+  for (int i = 0; i < bp::len(columns); ++i) {
+    columnVec.push_back(bp::extract<int>(columns[i]));
+    funcVec.push_back(bp::extract<AggrFuncType>(aggrFuncs[i]));
+  }
+  auto pipe = boost::get<TuplePipe&>(pipeImpl);
+  auto state = std::make_shared<PyAggregateState>(columnVec, funcVec);
+  return PyPipe(pipe.aggregate<PyTuplePtr, PyAggregateState>(state, PyAggregateState::finalize,
+    PyAggregateState::iterate));
+}
+
 PyPipe PyPipe::print() {
+  /*
+  auto pipe = boost::get<TuplePipe&>(pipeImpl);
+  bp::object pyfabricModule = bp::import("pyfabric");
+  bp::object callback = pyfabricModule.attr("print_cb");
+  return PyPipe(pipe.notify([callback](auto tp, bool o) {
+    callback(get<0>(tp), o);
+  }));
+  */
+
   auto pipe = boost::get<TuplePipe&>(pipeImpl);
   auto pyFormatter = [](std::ostream& os, auto tp) {
     auto pyObj = get<0>(tp);
@@ -118,10 +147,26 @@ BOOST_PYTHON_MODULE(pyfabric) {
         .def("where", &pfabric::PyPipe::where)
         .def("map", &pfabric::PyPipe::map)
         .def("assign_timestamps", &pfabric::PyPipe::assignTimestamps)
+        .def("keyBy", &pfabric::PyPipe::keyBy)
+        .def("aggregate", &pfabric::PyPipe::aggregate)
         .def("sliding_window", &pfabric::PyPipe::slidingWindow)
         .def("notify", &pfabric::PyPipe::notify)
         .def("print", &pfabric::PyPipe::print)
     ;
+
+    bp::enum_<pfabric::AggrFuncType>("aggr")
+        .value("IntSum", pfabric::AggrFuncType::IntSum)
+        .value("DoubleSum", pfabric::AggrFuncType::DoubleSum)
+        .value("IntAvg", pfabric::AggrFuncType::IntAvg)
+        .value("DoubleAvg", pfabric::AggrFuncType::DoubleAvg)
+        .value("Count", pfabric::AggrFuncType::Count)
+        .value("IntMin", pfabric::AggrFuncType::IntMin)
+        .value("DoubleMin", pfabric::AggrFuncType::DoubleMin)
+        .value("StringMin", pfabric::AggrFuncType::StringMin)
+        .value("IntMax", pfabric::AggrFuncType::IntMax)
+        .value("DoubleMax", pfabric::AggrFuncType::DoubleMax)
+        .value("StringMax", pfabric::AggrFuncType::StringMax)
+        ;
 
     bp::enum_<pfabric::WindowParams::WinType>("wintype")
         .value("range", pfabric::WindowParams::RangeWindow)

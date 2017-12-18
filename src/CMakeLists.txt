@@ -280,6 +280,7 @@ link_directories(${PYTHON_LIBDIR})
 
 set(PYTHON_SOURCES
   python/PyTopology.cpp
+  python/PyAggregateState.cpp
 )
 else()
   set (PYTHON_SOURCES "")
