@@ -231,7 +231,7 @@ find_package(Boost ${BOOST_MIN_VERSION} REQUIRED COMPONENTS
     serialization
     thread
     regex
-    python3
+    ${BOOST_PYTHONLIB}
     chrono
     date_time
 )
@@ -271,7 +271,7 @@ find_package(PythonLibs)
 FIND_PACKAGE(PythonInterp)
 if (PYTHONLIBS_FOUND)
 message(STATUS "Python Version ${PYTHON_VERSION_MAJOR} found - building the Python API.")
-set (PYTHON_INCLUDE_DIRS "/Users/kai/miniconda3/include/python3.5m")
+#set (PYTHON_INCLUDE_DIRS "/Users/kai/miniconda3/include/python3.5m")
 message("PythonInclude ${PYTHON_INCLUDE_DIRS}")
 message("PythonLibs ${PYTHON_LIBDIR}")
 

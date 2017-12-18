@@ -73,7 +73,7 @@ add_custom_command(
 if (BUILD_GOOGLE_BENCH)
 download_project(PROJ               benchmark
                 GIT_REPOSITORY      https://github.com/google/benchmark.git
-                GIT_TAG             master
+                GIT_TAG             v1.2.0
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
