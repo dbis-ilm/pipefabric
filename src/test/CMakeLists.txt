@@ -71,4 +71,9 @@ if (BUILD_TEST_CASES)
   if(USE_MQTT)
     do_test(MQTTSourceTest)
   endif()
+
+  add_test(
+    NAME Python_Test
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/PyTest.py
+  )
 endif()

@@ -231,7 +231,7 @@ find_package(Boost ${BOOST_MIN_VERSION} REQUIRED COMPONENTS
     serialization
     thread
     regex
-    ${BOOST_PYTHONLIB}
+    python
     chrono
     date_time
 )
@@ -273,10 +273,10 @@ if (PYTHONLIBS_FOUND)
 message(STATUS "Python Version ${PYTHON_VERSION_MAJOR} found - building the Python API.")
 #set (PYTHON_INCLUDE_DIRS "/Users/kai/miniconda3/include/python3.5m")
 message("PythonInclude ${PYTHON_INCLUDE_DIRS}")
-message("PythonLibs ${PYTHON_LIBDIR}")
+message("PythonLibs ${PYTHON_LIBRARIES}")
 
 include_directories(${PYTHON_INCLUDE_DIRS})
-link_directories(${PYTHON_LIBDIR})
+link_directories(${PYTHON_LIBRARIES})
 
 set(PYTHON_SOURCES
   python/PyTopology.cpp
@@ -484,7 +484,7 @@ add_library(pfabric SHARED
 )
 
 target_link_libraries(pfabric
-              ${Boost_PYTHON3_LIBRARY}
+              ${Boost_PYTHON_LIBRARY}
               ${PYTHON_LIBRARIES}
               pfabric_core
               ${BOOST_LIBRARIES}

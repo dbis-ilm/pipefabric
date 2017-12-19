@@ -72,6 +72,13 @@ PyPipe PyPipe::print() {
   return PyPipe(pipe.print(std::cout, pyFormatter));
 }
 
+PyPipe PyPipe::notify(bp::object fun) {
+  auto pipe = boost::get<TuplePipe&>(pipeImpl);
+  return PyPipe(pipe.notify([fun](auto tp, bool o) {
+    return fun(get<0>(tp), o);
+  }));
+}
+
 PyTopology::PyTopology() {
   topo = ctx.createTopology();
 }
@@ -94,7 +101,7 @@ BOOST_PYTHON_MODULE(libpfabric) {
       .def("extract", &pfabric::PyPipe::extract)
         .def("where", &pfabric::PyPipe::where)
         .def("map", &pfabric::PyPipe::map)
-        .def("print", &pfabric::PyPipe::print)
-
+        .def("pfprint", &pfabric::PyPipe::print)
+        .def("notify", &pfabric::PyPipe::notify)
     ;
 }
