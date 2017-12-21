@@ -26,8 +26,20 @@ namespace bp = boost::python;
 
 PyAggregateState::PyAggregateState(const std::vector<int>& cols,
   const std::vector<AggrFuncType>& funcs) : mColumns(cols), mFuncSpecs(funcs) {
+    setupAggregateFuncs();
+}
+
+PyAggregateState::PyAggregateState(const PyAggregateState& s) :
+  mColumns(s.mColumns), mFuncSpecs(s.mFuncSpecs)  {
+  setupAggregateFuncs();
+}
+
+void PyAggregateState::setupAggregateFuncs() {
   for (auto f : mFuncSpecs) {
     switch (f) {
+      case AggrFuncType::GroupID:
+        mAggrFuncs.push_back(new AggrIdentity<std::string>());
+        break;
       case AggrFuncType::IntSum:
         mAggrFuncs.push_back(new AggrSum<int>());
         break;
@@ -71,20 +83,26 @@ void PyAggregateState::init() {
   }
 }
 
-void PyAggregateState::iterate(const PyTuplePtr& tp,
+void PyAggregateState::iterateForKey(const PyTuplePtr& tp, const std::string& key,
   AggrStatePtr state, const bool outdated) {
   auto tup = get<0>(tp);
   for (std::size_t i = 0; i < state->mFuncSpecs.size(); i++) {
+    auto pyObj = tup[state->mColumns[i]];
     switch (state->mFuncSpecs[i]) {
+      case AggrFuncType::GroupID: {
+        AggrIdentity<std::string> *aggr = dynamic_cast<AggrIdentity<std::string>*>(state->mAggrFuncs[i]);
+        aggr->iterate(key, outdated);
+        break;
+      }
       case AggrFuncType::IntSum: {
         AggrSum<int> *aggr = dynamic_cast<AggrSum<int>*>(state->mAggrFuncs[i]);
-        int val = bp::extract<int>(tup[i]);
+        int val = bp::extract<int>(pyObj);
         aggr->iterate(val, outdated);
         break;
       }
       case AggrFuncType::DoubleSum: {
         AggrSum<double> *aggr = dynamic_cast<AggrSum<double>*>(state->mAggrFuncs[i]);
-        double val = bp::extract<double>(tup[i]);
+        double val = bp::extract<double>(pyObj);
         aggr->iterate(val, outdated);
         break;
       }
@@ -106,42 +124,121 @@ void PyAggregateState::iterate(const PyTuplePtr& tp,
       case AggrFuncType::IntMin: {
         AggrMinMax<int, std::less<int>> *aggr =
           dynamic_cast<AggrMinMax<int, std::less<int>>*>(state->mAggrFuncs[i]);
-        int val = bp::extract<int>(tup[i]);
+        int val = bp::extract<int>(pyObj);
         aggr->iterate(val, outdated);
         break;
       }
       case AggrFuncType::DoubleMin: {
         AggrMinMax<double, std::less<double>> *aggr =
           dynamic_cast<AggrMinMax<double, std::less<double>>*>(state->mAggrFuncs[i]);
-        double val = bp::extract<double>(tup[i]);
+        double val = bp::extract<double>(pyObj);
         aggr->iterate(val, outdated);
         break;
       }
       case AggrFuncType::StringMin: {
         AggrMinMax<std::string, std::less<std::string>> *aggr =
           dynamic_cast<AggrMinMax<std::string, std::less<std::string>>*>(state->mAggrFuncs[i]);
-        std::string val = bp::extract<std::string>(tup[i]);
+        std::string val = bp::extract<std::string>(pyObj);
         aggr->iterate(val, outdated);
         break;
       }
       case AggrFuncType::IntMax: {
         AggrMinMax<int, std::greater<int>> *aggr =
           dynamic_cast<AggrMinMax<int, std::greater<int>>*>(state->mAggrFuncs[i]);
-        int val = bp::extract<int>(tup[i]);
+        int val = bp::extract<int>(pyObj);
         aggr->iterate(val, outdated);
         break;
       }
       case AggrFuncType::DoubleMax: {
         AggrMinMax<double, std::greater<double>> *aggr =
           dynamic_cast<AggrMinMax<double, std::greater<double>>*>(state->mAggrFuncs[i]);
-        double val = bp::extract<double>(tup[i]);
+        double val = bp::extract<double>(pyObj);
         aggr->iterate(val, outdated);
         break;
       }
       case AggrFuncType::StringMax: {
         AggrMinMax<std::string, std::greater<std::string>> *aggr =
           dynamic_cast<AggrMinMax<std::string, std::greater<std::string>>*>(state->mAggrFuncs[i]);
-        std::string val = bp::extract<std::string>(tup[i]);
+        std::string val = bp::extract<std::string>(pyObj);
+        aggr->iterate(val, outdated);
+        break;
+      }
+    }
+  }
+}
+
+void PyAggregateState::iterate(const PyTuplePtr& tp,
+  AggrStatePtr state, const bool outdated) {
+  auto tup = get<0>(tp);
+  for (std::size_t i = 0; i < state->mFuncSpecs.size(); i++) {
+    auto pyObj = tup[state->mColumns[i]];
+    switch (state->mFuncSpecs[i]) {
+      case AggrFuncType::IntSum: {
+        AggrSum<int> *aggr = dynamic_cast<AggrSum<int>*>(state->mAggrFuncs[i]);
+        int val = bp::extract<int>(pyObj);
+        aggr->iterate(val, outdated);
+        break;
+      }
+      case AggrFuncType::DoubleSum: {
+        AggrSum<double> *aggr = dynamic_cast<AggrSum<double>*>(state->mAggrFuncs[i]);
+        double val = bp::extract<double>(pyObj);
+        aggr->iterate(val, outdated);
+        break;
+      }
+      case AggrFuncType::Count: {
+        AggrCount<int, int> *aggr = dynamic_cast<AggrCount<int, int>*>(state->mAggrFuncs[i]);
+        aggr->iterate(1, outdated);
+        break;
+      }
+      case AggrFuncType::IntAvg: {
+        AggrAvg<int, int> *aggr = dynamic_cast<AggrAvg<int, int>*>(state->mAggrFuncs[i]);
+        aggr->iterate(1, outdated);
+        break;
+      }
+      case AggrFuncType::DoubleAvg: {
+        AggrAvg<double, double> *aggr = dynamic_cast<AggrAvg<double, double>*>(state->mAggrFuncs[i]);
+        aggr->iterate(1, outdated);
+        break;
+      }
+      case AggrFuncType::IntMin: {
+        AggrMinMax<int, std::less<int>> *aggr =
+          dynamic_cast<AggrMinMax<int, std::less<int>>*>(state->mAggrFuncs[i]);
+        int val = bp::extract<int>(pyObj);
+        aggr->iterate(val, outdated);
+        break;
+      }
+      case AggrFuncType::DoubleMin: {
+        AggrMinMax<double, std::less<double>> *aggr =
+          dynamic_cast<AggrMinMax<double, std::less<double>>*>(state->mAggrFuncs[i]);
+        double val = bp::extract<double>(pyObj);
+        aggr->iterate(val, outdated);
+        break;
+      }
+      case AggrFuncType::StringMin: {
+        AggrMinMax<std::string, std::less<std::string>> *aggr =
+          dynamic_cast<AggrMinMax<std::string, std::less<std::string>>*>(state->mAggrFuncs[i]);
+        std::string val = bp::extract<std::string>(pyObj);
+        aggr->iterate(val, outdated);
+        break;
+      }
+      case AggrFuncType::IntMax: {
+        AggrMinMax<int, std::greater<int>> *aggr =
+          dynamic_cast<AggrMinMax<int, std::greater<int>>*>(state->mAggrFuncs[i]);
+        int val = bp::extract<int>(pyObj);
+        aggr->iterate(val, outdated);
+        break;
+      }
+      case AggrFuncType::DoubleMax: {
+        AggrMinMax<double, std::greater<double>> *aggr =
+          dynamic_cast<AggrMinMax<double, std::greater<double>>*>(state->mAggrFuncs[i]);
+        double val = bp::extract<double>(pyObj);
+        aggr->iterate(val, outdated);
+        break;
+      }
+      case AggrFuncType::StringMax: {
+        AggrMinMax<std::string, std::greater<std::string>> *aggr =
+          dynamic_cast<AggrMinMax<std::string, std::greater<std::string>>*>(state->mAggrFuncs[i]);
+        std::string val = bp::extract<std::string>(pyObj);
         aggr->iterate(val, outdated);
         break;
       }
@@ -153,6 +250,11 @@ PyTuplePtr PyAggregateState::finalize(AggrStatePtr state) {
   bp::list seq;
   for (std::size_t i = 0; i < state->mFuncSpecs.size(); i++) {
     switch (state->mFuncSpecs[i]) {
+      case AggrFuncType::GroupID: {
+        AggrIdentity<std::string> *aggr = dynamic_cast<AggrIdentity<std::string>*>(state->mAggrFuncs[i]);
+        seq.append(aggr->value());
+        break;
+      }
       case AggrFuncType::IntSum: {
         AggrSum<int> *aggr = dynamic_cast<AggrSum<int>*>(state->mAggrFuncs[i]);
         seq.append(aggr->value());

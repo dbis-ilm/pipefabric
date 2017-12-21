@@ -112,7 +112,7 @@ struct AggrStateTraits : std::false_type{};
  * @tparam Aggr1Col
  *         the field number (0..n) in the input tuple used for aggregation
  */
-template <typename StreamElement, typename Aggr1Func, int Aggr1Col>
+template <typename StreamElement, typename Aggr1Func, int Aggr1Col, typename KeyType = DefaultKeyType>
 class Aggregator1 : public AggregateStateBase<StreamElement> {
 	Aggr1Func aggr1_;
 
@@ -125,7 +125,7 @@ public:
 	/**
 	 * Typedef for a pointer to the aggregation state.
 	 */
-	typedef std::shared_ptr<Aggregator1<StreamElement, Aggr1Func, Aggr1Col>> AggrStatePtr;
+	typedef std::shared_ptr<Aggregator1<StreamElement, Aggr1Func, Aggr1Col, KeyType>> AggrStatePtr;
 
 	/**
 	 * Create a new aggregation state instance.
@@ -147,6 +147,10 @@ public:
 	 * @param state the aggregate state object
 	 * @param outdated true if the tuple is outdated
 	 */
+	static void iterateForKey(const StreamElement& tp, const KeyType&, AggrStatePtr state, const bool outdated) {
+		state->aggr1_.iterate(getAttribute<Aggr1Col>(*tp), outdated);
+	}
+
 	static void iterate(const StreamElement& tp, AggrStatePtr state, const bool outdated) {
 		state->aggr1_.iterate(getAttribute<Aggr1Col>(*tp), outdated);
 	}
@@ -163,8 +167,8 @@ public:
 	}
 };
 
-template <typename StreamElement, typename Aggr1Func, int Aggr1Col>
-struct AggrStateTraits<Aggregator1<StreamElement, Aggr1Func, Aggr1Col>> : std::true_type{};
+template <typename StreamElement, typename Aggr1Func, int Aggr1Col, typename KeyType>
+struct AggrStateTraits<Aggregator1<StreamElement, Aggr1Func, Aggr1Col, KeyType>> : std::true_type{};
 
 /**
  * Aggregator2 represents the aggregation state for two aggregation
@@ -186,7 +190,8 @@ struct AggrStateTraits<Aggregator1<StreamElement, Aggr1Func, Aggr1Col>> : std::t
 template <
 	typename StreamElement,
 	typename Aggr1Func, int Aggr1Col,
-	typename Aggr2Func, int Aggr2Col
+	typename Aggr2Func, int Aggr2Col,
+	typename KeyType = DefaultKeyType
 >
 class Aggregator2 : public AggregateStateBase<StreamElement> {
 	Aggr1Func aggr1_;
@@ -202,7 +207,7 @@ public:
 	 * Typedef for a pointer to the aggregation state.
 	 */
 	typedef std::shared_ptr<Aggregator2<StreamElement, Aggr1Func, Aggr1Col,
-		Aggr2Func, Aggr2Col>> AggrStatePtr;
+		Aggr2Func, Aggr2Col, KeyType>> AggrStatePtr;
 
 		/**
 		 * Create a new aggregation state instance.
@@ -225,6 +230,11 @@ public:
 	 * @param state the aggregate state object
 	 * @param outdated true if the tuple is outdated
 	 */
+	static void iterateForKey(const StreamElement& tp, const KeyType&, AggrStatePtr state, const bool outdated) {
+		state->aggr1_.iterate(getAttribute<Aggr1Col>(*tp), outdated);
+		state->aggr2_.iterate(getAttribute<Aggr2Col>(*tp), outdated);
+	}
+
 	static void iterate(const StreamElement& tp, AggrStatePtr state, const bool outdated) {
 		state->aggr1_.iterate(getAttribute<Aggr1Col>(*tp), outdated);
 		state->aggr2_.iterate(getAttribute<Aggr2Col>(*tp), outdated);
@@ -245,11 +255,12 @@ public:
 template <
 	typename StreamElement,
 	typename Aggr1Func, int Aggr1Col,
-	typename Aggr2Func, int Aggr2Col
+	typename Aggr2Func, int Aggr2Col,
+	typename KeyType
 >
-struct AggrStateTraits<Aggregator2<StreamElement, 
+struct AggrStateTraits<Aggregator2<StreamElement,
   Aggr1Func, Aggr1Col,
-  Aggr2Func, Aggr2Col
+  Aggr2Func, Aggr2Col, KeyType
   >> : std::true_type{};
 
 /**
@@ -345,7 +356,7 @@ template <
 	typename Aggr2Func, int Aggr2Col,
 	typename Aggr3Func, int Aggr3Col
 >
-struct AggrStateTraits<Aggregator3<StreamElement, 
+struct AggrStateTraits<Aggregator3<StreamElement,
   Aggr1Func, Aggr1Col,
   Aggr2Func, Aggr2Col,
   Aggr3Func, Aggr3Col
@@ -456,7 +467,7 @@ template <
 	typename Aggr3Func, int Aggr3Col,
 	typename Aggr4Func, int Aggr4Col
 >
-struct AggrStateTraits<Aggregator4<StreamElement, 
+struct AggrStateTraits<Aggregator4<StreamElement,
   Aggr1Func, Aggr1Col,
   Aggr2Func, Aggr2Col,
   Aggr3Func, Aggr3Col,

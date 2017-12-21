@@ -1088,7 +1088,7 @@ class Pipe {
       const unsigned int tInterval = 0) noexcept(false) {
     static_assert(typename AggrStateTraits<AggrState>::type(), "groupBy requires an AggrState class");
     return groupBy<typename AggrState::ResultTypePtr, AggrState, KeyType>(
-        AggrState::finalize, AggrState::iterate, tType, tInterval);
+        AggrState::finalize, AggrState::iterateForKey, tType, tInterval);
   }
 
   /**
@@ -1124,6 +1124,51 @@ class Pipe {
    *    the interval for producing aggregate tuples
    * @return a new pipe
    */
+  template <typename Tout, typename AggrState,
+            typename KeyType = DefaultKeyType>
+  Pipe<Tout> groupBy(
+      typename AggrState::AggrStatePtr& state,
+      typename GroupedAggregation<T, Tout, AggrState, KeyType>::FactoryFunc
+          createFun,
+      typename GroupedAggregation<T, Tout, AggrState, KeyType>::FinalFunc
+          finalFun,
+      typename GroupedAggregation<T, Tout, AggrState, KeyType>::IterateFunc
+          iterFun,
+      AggregationTriggerType tType = TriggerAll,
+      const unsigned int tInterval = 0) noexcept(false) {
+    try {
+      typedef std::function<KeyType(const T&)> KeyExtractorFunc;
+      KeyExtractorFunc keyFunc =
+          boost::any_cast<KeyExtractorFunc>(keyExtractor);
+
+      if (partitioningState == NoPartitioning) {
+        auto op =
+            std::make_shared<GroupedAggregation<T, Tout, AggrState, KeyType>>(
+                state, createFun, keyFunc, finalFun, iterFun, tType, tInterval);
+        auto iter =
+            addPublisher<GroupedAggregation<T, Tout, AggrState, KeyType>,
+                         DataSource<T>>(op);
+        return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
+                          partitioningState, numPartitions);
+      } else {
+        std::vector<
+            std::shared_ptr<GroupedAggregation<T, Tout, AggrState, KeyType>>>
+            ops;
+        for (auto i = 0u; i < numPartitions; i++) {
+          ops.push_back(
+              std::make_shared<GroupedAggregation<T, Tout, AggrState, KeyType>>(
+                  state, createFun, keyFunc, finalFun, iterFun, tType, tInterval));
+        }
+        auto iter =
+            addPartitionedPublisher<GroupedAggregation<T, Tout, AggrState, KeyType>, T>(ops);
+        return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
+                          partitioningState, numPartitions);
+      }
+    } catch (boost::bad_any_cast& e) {
+      throw TopologyException("No KeyExtractor defined for groupBy.");
+    }
+  }
+
   template <typename Tout, typename AggrState,
             typename KeyType = DefaultKeyType>
   Pipe<Tout> groupBy(

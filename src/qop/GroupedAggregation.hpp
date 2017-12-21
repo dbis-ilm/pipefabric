@@ -100,7 +100,10 @@ public:
 	 *
 	 * This function gets the incoming stream element, the aggregate state, and the boolean flag for outdated elements.
 	 */
-	typedef std::function< void(const InputStreamElement&, AggregateStatePtr, const bool)> IterateFunc;
+	typedef std::function< void(const InputStreamElement&,
+		const KeyType&, AggregateStatePtr, const bool)> IterateFunc;
+
+	typedef std::function< AggregateStatePtr(AggregateStatePtr) > FactoryFunc;
 
 protected:
 	/// a mutex for protecting aggregation processing from concurrent sources
@@ -147,6 +150,50 @@ public:
     mNotifier(tInterval > 0 && tType == TriggerByTime ?
              new TriggerNotifier(std::bind(&GroupedAggregation::notificationCallback, this), tInterval) : nullptr),
     mLastTriggerTime(0), mTriggerType(tType), mCounter(0) {
+	}
+
+/**
+	* @brief Create a new instance of the GroupedAggregation operator.
+	*
+	* Create a new instance of the operator for computing aggregates per groups.
+	* The behaviour is defined by the trigger type (all, timestamp, count - see PipeFabricTypes.hpp)
+	* and the trigger interval. In contrast to the constructor above, a factory object
+  * for the aggregation state is provided by the caller.
+	*
+  * @param factory
+  *    a factory object that is used to create new instances representin a new group
+  * @param factory_fun
+  *    a function pointer to create a new instance of a group state from the factory object
+	* @param groupby_fun
+	*    a function pointer for getting the group id
+	* @param final_fun
+	*    a function pointer to the aggregation function
+	* @param it_fun
+	*    a function pointer to an iteration function called for each incoming tuple
+	* @param tType
+	*    the trigger type specifying when an aggregation tuple is produced
+	*    (TriggerAll = for each incoming tuple,
+	*     TriggerByCount = as soon as a number of tuples (tInterval) are processed,
+	*     TriggerByTime = after every tInterval seconds,
+	*     TriggerByTimestamp = as for TriggerByTime but based on timestamp of the tuples
+	*                          and not based on real time)
+	* @param tInterval
+	*    the time interval in seconds to produce aggregation tuples (for trigger by timestamp)
+	*    or in the number of tuples (for trigger by count)
+	*/
+	GroupedAggregation(AggregateStatePtr& factory, FactoryFunc factory_fun,
+			GroupByFunc groupby_fun,
+					FinalFunc final_fun,
+					IterateFunc it_fun,
+					AggregationTriggerType tType = TriggerAll,
+					const unsigned int tInterval = 0)  :
+		mGroupByFunc(groupby_fun),
+		mIterateFunc(it_fun), mFinalFunc(final_fun),
+    mTriggerInterval( tInterval ),
+    mNotifier(tInterval > 0 && tType == TriggerByTime ?
+             new TriggerNotifier(std::bind(&GroupedAggregation::notificationCallback, this), tInterval) : nullptr),
+    mLastTriggerTime(0), mTriggerType(tType), mCounter(0),
+		mFactory(factory), mFactoryFunc(factory_fun) {
 	}
 
 	/**
@@ -283,11 +330,12 @@ private:
     const Timestamp elementTime = mTimestampExtractor != nullptr ? mTimestampExtractor(data) : 0;
 
 		// create a new aggregation state
-		AggregateStatePtr newAggrState = std::make_shared<AggregateState>();
+    // if a factory object was provided we can call its create method
+		AggregateStatePtr newAggrState = mFactory ? mFactoryFunc(mFactory) : std::make_shared<AggregateState>();
 		newAggrState->setTimestamp(elementTime);
 
 		// ... call the iterate function
-		mIterateFunc(data, newAggrState, outdated);
+		mIterateFunc(data, grpKey, newAggrState, outdated);
 		// ... and insert it into the hashtable
 		mAggregateTable.insert({ grpKey, newAggrState });
 
@@ -330,7 +378,7 @@ private:
       aggrState->setTimestamp(elementTime);
       aggrState->updateCounter(outdated ? -1 : 1);
       const bool outdatedAggregate = (aggrState->getCounter() == 0);
-      mIterateFunc(data, aggrState, outdated);
+      mIterateFunc(data, grpKey, aggrState, outdated);
 
       // 3. directly publish the new aggregation result if no sliding window was specified
       // TODO: should an outdated tuple trigger also an aggregation tuple??
@@ -422,6 +470,8 @@ private:
     Timestamp mLastTriggerTime;                 //!< the timestamp of the last aggregate publishing
     AggregationTriggerType mTriggerType;        //!< the type of trigger activating the publishing of an aggregate value
     unsigned int mCounter;                      //!< the number of tuples processed since the last aggregate publishing
+		AggregateStatePtr mFactory;
+		FactoryFunc mFactoryFunc;
 };
 
 } /* end namespace pfabric */

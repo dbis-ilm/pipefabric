@@ -34,25 +34,39 @@ enum class AggrFuncType {
     Count,
     IntAvg, DoubleAvg,
     IntMin, DoubleMin, StringMin,
-    IntMax, DoubleMax, StringMax
+    IntMax, DoubleMax, StringMax,
+    GroupID
 };
 
 /// We handle only tuples consisting of a single field that represents
 /// a Python tuple.
 typedef TuplePtr<bp::object> PyTuplePtr;
 
-struct PyAggregateState : public AggregateStateBase<PyTuplePtr> {
+class PyAggregateState : public AggregateStateBase<PyTuplePtr> {
 public:
   typedef std::shared_ptr<PyAggregateState> AggrStatePtr;
 
+  PyAggregateState() {}
   PyAggregateState(const std::vector<int>& cols, const std::vector<AggrFuncType>& funcs);
+  PyAggregateState(const PyAggregateState& s);
 
   virtual void init();
 
-  static void iterate(const PyTuplePtr& tp, AggrStatePtr state, const bool outdated);
+  static AggrStatePtr create(AggrStatePtr state) {
+    PyAggregateState *self = state.get();
+    return std::make_shared<PyAggregateState>(PyAggregateState(*self));
+  }
+
+  static void iterate(const PyTuplePtr& tp,
+    AggrStatePtr state, const bool outdated);
+
+  static void iterateForKey(const PyTuplePtr& tp, const std::string& key,
+    AggrStatePtr state, const bool outdated);
 
   static PyTuplePtr finalize(AggrStatePtr state);
 
+private:
+  void setupAggregateFuncs();
   std::vector<int> mColumns;
   std::vector<AggrFuncType> mFuncSpecs;
   std::vector<AggregateFuncBasePtr> mAggrFuncs;
@@ -179,6 +193,8 @@ struct PyPipe {
   PyPipe slidingWindow(WindowParams::WinType wt, unsigned int size, unsigned int interval = 0);
 
   PyPipe aggregate(bp::list columns, bp::list aggrFuncs);
+
+  PyPipe groupBy(bp::list columns, bp::list aggrFuncs);
 
   /**
    * @brief Creates a print operator.

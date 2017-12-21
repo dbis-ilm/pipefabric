@@ -84,8 +84,10 @@ PyPipe PyPipe::assignTimestamps(bp::object fun) {
 
 PyPipe PyPipe::keyBy(bp::object fun) {
   auto pipe = boost::get<TuplePipe&>(pipeImpl);
-  return PyPipe(pipe.keyBy<bp::object>([fun](auto tp) {
-    return fun(get<0>(tp));
+  return PyPipe(pipe.keyBy<std::string>([fun](auto tp) -> std::string {
+    bp::object res = fun(get<0>(tp));
+    const char *s = bp::extract<const char *>(bp::str(res));
+    return std::string(s); // bp::extract<std::string>(bp::str(fun(get<0>(tp))));
   }));
 }
 
@@ -100,6 +102,24 @@ PyPipe PyPipe::aggregate(bp::list columns, bp::list aggrFuncs) {
   auto state = std::make_shared<PyAggregateState>(columnVec, funcVec);
   return PyPipe(pipe.aggregate<PyTuplePtr, PyAggregateState>(state, PyAggregateState::finalize,
     PyAggregateState::iterate));
+}
+
+PyPipe PyPipe::groupBy(bp::list columns, bp::list aggrFuncs) {
+  std::vector<int> columnVec;
+  std::vector<AggrFuncType> funcVec;
+
+  columnVec.push_back(0);
+  funcVec.push_back(AggrFuncType::GroupID);
+
+  for (int i = 0; i < bp::len(columns); ++i) {
+    columnVec.push_back(bp::extract<int>(columns[i]));
+    funcVec.push_back(bp::extract<AggrFuncType>(aggrFuncs[i]));
+  }
+  auto pipe = boost::get<TuplePipe&>(pipeImpl);
+  auto state = std::make_shared<PyAggregateState>(columnVec, funcVec);
+  return PyPipe(pipe.groupBy<PyTuplePtr, PyAggregateState, std::string>(state,
+    PyAggregateState::create,
+    PyAggregateState::finalize, PyAggregateState::iterateForKey));
 }
 
 PyPipe PyPipe::print() {
@@ -149,6 +169,7 @@ BOOST_PYTHON_MODULE(pyfabric) {
         .def("assign_timestamps", &pfabric::PyPipe::assignTimestamps)
         .def("keyBy", &pfabric::PyPipe::keyBy)
         .def("aggregate", &pfabric::PyPipe::aggregate)
+        .def("groupby_key", &pfabric::PyPipe::groupBy)
         .def("sliding_window", &pfabric::PyPipe::slidingWindow)
         .def("notify", &pfabric::PyPipe::notify)
         .def("print", &pfabric::PyPipe::print)

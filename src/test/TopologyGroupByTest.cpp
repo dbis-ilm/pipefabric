@@ -20,7 +20,8 @@ using namespace ns_types;
 TEST_CASE("Building and running a topology with standard grouping", "[GroupBy]") {
   typedef TuplePtr<std::string, int> MyTuplePtr;
   typedef TuplePtr<std::string, int> AggrRes;
-  typedef Aggregator2<MyTuplePtr, AggrIdentity<std::string>, 0, AggrCount<int, int>, 1> AggrState;
+  typedef Aggregator2<MyTuplePtr, AggrIdentity<std::string>, 0,
+  AggrCount<int, int>, 1, std::string> AggrState;
 
   std::map<std::string, int> results;
   Topology t;
@@ -56,12 +57,12 @@ public:
 	}
 };
 
-TEST_CASE("Building and running a topology with simple unpartitioned grouping", 
+TEST_CASE("Building and running a topology with simple unpartitioned grouping",
         "[Simple unpartitioned Grouping]") {
   typedef TuplePtr<unsigned long, double> MyTuplePtr;
   typedef TuplePtr<double> AggregationResultPtr;
   typedef Aggregator1<MyTuplePtr, AggrSum<double>, 1> AggrStateSum;
-        
+
   StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {
     if (n<500) return makeTuplePtr((unsigned long)0, (double)n + 0.5);
     else return makeTuplePtr((unsigned long)n, (double)n + 0.5);
@@ -96,24 +97,24 @@ TEST_CASE("Building and running a topology with simple unpartitioned grouping",
   }
 }
 
-TEST_CASE("Building and running a topology with unpartitioned grouping", 
+TEST_CASE("Building and running a topology with unpartitioned grouping",
         "[Unpartitioned Grouping]") {
   typedef TuplePtr<unsigned long, double> MyTuplePtr;
   typedef MyAggregateState<const MyTuplePtr&> MyAggrState;
   typedef std::shared_ptr<MyAggrState> MyAggrStatePtr;
-	
+
   auto finalFun = [&](MyAggrStatePtr myState) {
                       auto tp = makeTuplePtr(myState->group1_, myState->sum1_.value());
                       return tp;
                   };
-											 
-  auto iterFun = [&](const MyTuplePtr& tp, MyAggrStatePtr myState, const bool outdated) {
+
+  auto iterFun = [&](const MyTuplePtr& tp, const unsigned long&, MyAggrStatePtr myState, const bool outdated) {
 			          myState->group1_ = get<0>(tp);
 			          myState->sum1_.iterate(get<1>(tp), outdated);
 		          };
-	
+
   typedef TuplePtr<int, double> AggregationResultPtr;
-        
+
   StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {
     if (n<500) return makeTuplePtr((unsigned long)0, (double)n + 0.5);
     else return makeTuplePtr((unsigned long)n, (double)n + 0.5);
@@ -146,40 +147,41 @@ TEST_CASE("Building and running a topology with unpartitioned grouping",
   REQUIRE(results.size() == num);
 
   for (auto i=0u; i<num; i++) {
-    if (i==0) { 
+    if (i==0) {
 	  REQUIRE(results[i][0] == 0);
-	  REQUIRE(results[i][1] == 0.5); 
+	  REQUIRE(results[i][1] == 0.5);
 	} else if (i<500) {
 	  REQUIRE(results[i][0] == 0);
-	  REQUIRE(results[i][1] == results[i-1][1]+i+0.5); 
+	  REQUIRE(results[i][1] == results[i-1][1]+i+0.5);
 	} else if (i==500) {
-	  REQUIRE(results[i][0] == i); 
-	  REQUIRE(results[i][1] == 500.5); 
-	} else { 
 	  REQUIRE(results[i][0] == i);
-	  REQUIRE(results[i][1] == results[i-1][1]+1.0); 
+	  REQUIRE(results[i][1] == 500.5);
+	} else {
+	  REQUIRE(results[i][0] == i);
+	  REQUIRE(results[i][1] == results[i-1][1]+1.0);
 	}
   }
 }
 
-TEST_CASE("Building and running a topology with partitioned grouping", 
+TEST_CASE("Building and running a topology with partitioned grouping",
         "[Partitioned Grouping]") {
   typedef TuplePtr<unsigned long, double> MyTuplePtr;
   typedef MyAggregateState<const MyTuplePtr&> MyAggrState;
   typedef std::shared_ptr<MyAggrState> MyAggrStatePtr;
-	
+
   auto finalFun = [&](MyAggrStatePtr myState) {
                       auto tp = makeTuplePtr(myState->group1_, myState->sum1_.value());
                       return tp;
                   };
-											 
-  auto iterFun = [&](const MyTuplePtr& tp, MyAggrStatePtr myState, const bool outdated) {
+
+  auto iterFun = [&](const MyTuplePtr& tp, const unsigned long&,
+    MyAggrStatePtr myState, const bool outdated) {
 			          myState->group1_ = get<0>(tp);
 			          myState->sum1_.iterate(get<1>(tp), outdated);
 		          };
-	
+
   typedef TuplePtr<int, double> AggregationResultPtr;
-        
+
   StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {
     if (n<500) return makeTuplePtr((unsigned long)0, (double)n + 0.5);
     else return makeTuplePtr((unsigned long)n, (double)n + 0.5);
@@ -212,7 +214,7 @@ TEST_CASE("Building and running a topology with partitioned grouping",
   std::this_thread::sleep_for(2s);
 
   REQUIRE(results.size() == num);
-	
+
 //sorting (because of unordered results after partitioning)
   std::vector<std::vector<double>> resultsFirst;
   std::vector<std::vector<double>> resultsSecond;

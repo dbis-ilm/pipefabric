@@ -86,7 +86,7 @@ TEST_CASE( "Compute a simple punctuation based groupby with aggregates", "[Group
 			return tp;
 		},
 		/* iterate function */
-		[&](const InTuplePtr& tp, MyAggrStatePtr myState, const bool outdated) {
+		[&](const InTuplePtr& tp, const int&, MyAggrStatePtr myState, const bool outdated) {
 			myState->group1_ = tp->getAttribute<0>();
 			myState->sum1_.iterate(tp->getAttribute<1>(), outdated);
 			myState->avg2_.iterate(tp->getAttribute<1>(), outdated);
@@ -160,7 +160,7 @@ TEST_CASE( "Compute a groupby with incremental min/max aggregates", "[GroupedAgg
 			return tp;
 		},
 		/* iterate function */
-		[&](const InTuplePtr& tp, MyAggrState2Ptr myState, const bool outdated) {
+		[&](const InTuplePtr& tp, const int&, MyAggrState2Ptr myState, const bool outdated) {
 			myState->group1_ = tp->getAttribute<0>();
 			myState->min1_.iterate(tp->getAttribute<1>(), outdated);
 			myState->max2_.iterate(tp->getAttribute<1>(), outdated);
