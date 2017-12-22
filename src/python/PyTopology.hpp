@@ -125,7 +125,7 @@ struct PyPipe {
    * Creates a map operator which applies a mapping (projection) function
    * written in Python to each tuples as the next operator on the pipe.
    *
-   * @param[in] fun  a function pointer or lambda function producinh a new tuple
+   * @param[in] fun  a function pointer or lambda function producing a new tuple
    *                from the input tuple
    * @return a new PyPipe object
    */

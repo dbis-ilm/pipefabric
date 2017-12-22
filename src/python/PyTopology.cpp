@@ -198,7 +198,8 @@ BOOST_PYTHON_MODULE(pyfabric) {
         .def("join", &pfabric::PyPipe::join)
         .def("queue", &pfabric::PyPipe::queue)
         .def("notify", &pfabric::PyPipe::notify)
-        .def("print", &pfabric::PyPipe::print)
+        .def("pfprint", &pfabric::PyPipe::print)
+        .def("notify", &pfabric::PyPipe::notify)
     ;
 
     bp::enum_<pfabric::AggrFuncType>("aggr")
