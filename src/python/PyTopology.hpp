@@ -196,6 +196,10 @@ struct PyPipe {
 
   PyPipe groupBy(bp::list columns, bp::list aggrFuncs);
 
+  PyPipe join(PyPipe other, bp::object predicate);
+
+  PyPipe queue();
+
   /**
    * @brief Creates a print operator.
    *

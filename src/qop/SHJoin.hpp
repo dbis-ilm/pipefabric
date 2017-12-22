@@ -212,7 +212,7 @@ namespace pfabric {
       typename HashTable,
       typename StreamElement
       >
-      static void updateHashTable( HashTable& hashTable, const key_t& key,
+      static void updateHashTable( HashTable& hashTable, const KeyType& key,
                                   const StreamElement& newElement, const bool outdated, const Lock& lock ) {
         boost::ignore_unused( lock );
 
