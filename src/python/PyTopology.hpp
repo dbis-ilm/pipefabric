@@ -35,6 +35,7 @@ enum class AggrFuncType {
     IntAvg, DoubleAvg,
     IntMin, DoubleMin, StringMin,
     IntMax, DoubleMax, StringMax,
+    IntIdentity, DoubleIdentity, StringIdentity,
     GroupID
 };
 

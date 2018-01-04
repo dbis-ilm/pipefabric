@@ -182,7 +182,7 @@ void PyTopology::start() {
 
 BOOST_PYTHON_MODULE(pyfabric) {
     bp::class_<pfabric::PyTopology>("Topology")
-    .def("newStreamFromFile", &pfabric::PyTopology::newStreamFromFile)
+    .def("stream_from_file", &pfabric::PyTopology::newStreamFromFile)
       .def("start", &pfabric::PyTopology::start)
     ;
 
@@ -191,7 +191,7 @@ BOOST_PYTHON_MODULE(pyfabric) {
         .def("where", &pfabric::PyPipe::where)
         .def("map", &pfabric::PyPipe::map)
         .def("assign_timestamps", &pfabric::PyPipe::assignTimestamps)
-        .def("keyBy", &pfabric::PyPipe::keyBy)
+        .def("key_by", &pfabric::PyPipe::keyBy)
         .def("aggregate", &pfabric::PyPipe::aggregate)
         .def("groupby_key", &pfabric::PyPipe::groupBy)
         .def("sliding_window", &pfabric::PyPipe::slidingWindow)
@@ -203,6 +203,9 @@ BOOST_PYTHON_MODULE(pyfabric) {
     ;
 
     bp::enum_<pfabric::AggrFuncType>("aggr")
+        .value("Int", pfabric::AggrFuncType::IntIdentity)
+        .value("String", pfabric::AggrFuncType::StringIdentity)
+        .value("Double", pfabric::AggrFuncType::DoubleIdentity)
         .value("IntSum", pfabric::AggrFuncType::IntSum)
         .value("DoubleSum", pfabric::AggrFuncType::DoubleSum)
         .value("IntAvg", pfabric::AggrFuncType::IntAvg)

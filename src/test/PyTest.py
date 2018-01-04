@@ -20,7 +20,7 @@ class TestPipeFabricPython(unittest.TestCase):
     strm = []
     expected = ['1','teststring','1.5','2','teststring','2.5','3','teststring','3.5']
 
-    p = t.newStreamFromFile("data.csv") \
+    p = t.stream_from_file("data.csv") \
           .extract(',') \
           .notify(lambda tup, o: strm.extend((tup[0], tup[1], tup[2]))) \
           .pfprint() \
@@ -44,7 +44,7 @@ class TestPipeFabricPython(unittest.TestCase):
     strm = []
     expected = [(1,'teststring','1.5'),(2,'teststring','2.5'),(3,'teststring','3.5')]
 
-    p = t.newStreamFromFile("data.csv") \
+    p = t.stream_from_file("data.csv") \
           .extract(',') \
           .map(lambda t, o: (int(t[0]), t[1], t[2])) \
           .notify(lambda t, o: strm.append(t)) \
@@ -68,7 +68,7 @@ class TestPipeFabricPython(unittest.TestCase):
     strm = []
     expected = [(2,'teststring','2.5'),(3,'teststring','3.5')]
 
-    p = t.newStreamFromFile("data.csv") \
+    p = t.stream_from_file("data.csv") \
           .extract(',') \
           .map(lambda t, o: (int(t[0]), t[1], t[2])) \
           .where(lambda x, o: x[0] > 1) \
