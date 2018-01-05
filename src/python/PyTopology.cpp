@@ -128,15 +128,6 @@ PyPipe PyPipe::groupBy(bp::list columns, bp::list aggrFuncs) {
 }
 
 PyPipe PyPipe::print() {
-  /*
-  auto pipe = boost::get<TuplePipe&>(pipeImpl);
-  bp::object pyfabricModule = bp::import("pyfabric");
-  bp::object callback = pyfabricModule.attr("print_cb");
-  return PyPipe(pipe.notify([callback](auto tp, bool o) {
-    callback(get<0>(tp), o);
-  }));
-  */
-
   auto pipe = boost::get<TuplePipe&>(pipeImpl);
   auto pyFormatter = [](std::ostream& os, auto tp) {
     auto pyObj = get<0>(tp);
@@ -211,6 +202,7 @@ BOOST_PYTHON_MODULE(pyfabric) {
         .value("IntAvg", pfabric::AggrFuncType::IntAvg)
         .value("DoubleAvg", pfabric::AggrFuncType::DoubleAvg)
         .value("Count", pfabric::AggrFuncType::Count)
+        .value("DistinctCount", pfabric::AggrFuncType::DCount)
         .value("IntMin", pfabric::AggrFuncType::IntMin)
         .value("DoubleMin", pfabric::AggrFuncType::DoubleMin)
         .value("StringMin", pfabric::AggrFuncType::StringMin)

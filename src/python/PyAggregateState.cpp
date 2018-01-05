@@ -58,6 +58,9 @@ void PyAggregateState::setupAggregateFuncs() {
       case AggrFuncType::Count:
         mAggrFuncs.push_back(new AggrCount<int, int>());
         break;
+      case AggrFuncType::DCount:
+        mAggrFuncs.push_back(new AggrDCount<int, int>());
+        break;
       case AggrFuncType::IntAvg:
         mAggrFuncs.push_back(new AggrAvg<int, int>());
         break;
@@ -136,6 +139,12 @@ void PyAggregateState::iterateForKey(const PyTuplePtr& tp, const std::string& ke
       case AggrFuncType::Count: {
         AggrCount<int, int> *aggr = dynamic_cast<AggrCount<int, int>*>(state->mAggrFuncs[i]);
         aggr->iterate(1, outdated);
+        break;
+      }
+      case AggrFuncType::DCount: {
+        AggrDCount<int, int> *aggr = dynamic_cast<AggrDCount<int, int>*>(state->mAggrFuncs[i]);
+        int val = bp::extract<int>(pyObj);
+        aggr->iterate(val, outdated);
         break;
       }
       case AggrFuncType::IntAvg: {
@@ -237,6 +246,12 @@ void PyAggregateState::iterate(const PyTuplePtr& tp,
         aggr->iterate(1, outdated);
         break;
       }
+      case AggrFuncType::DCount: {
+        AggrDCount<int, int> *aggr = dynamic_cast<AggrDCount<int, int>*>(state->mAggrFuncs[i]);
+        int val = bp::extract<int>(pyObj);
+        aggr->iterate(val, outdated);
+        break;
+      }
       case AggrFuncType::IntAvg: {
         AggrAvg<int, int> *aggr = dynamic_cast<AggrAvg<int, int>*>(state->mAggrFuncs[i]);
         int val = bp::extract<int>(pyObj);
@@ -331,6 +346,11 @@ PyTuplePtr PyAggregateState::finalize(AggrStatePtr state) {
       }
       case AggrFuncType::Count: {
         AggrCount<int, int> *aggr = dynamic_cast<AggrCount<int, int>*>(state->mAggrFuncs[i]);
+        seq.append(aggr->value());
+        break;
+      }
+      case AggrFuncType::DCount: {
+        AggrDCount<int, int> *aggr = dynamic_cast<AggrDCount<int, int>*>(state->mAggrFuncs[i]);
         seq.append(aggr->value());
         break;
       }

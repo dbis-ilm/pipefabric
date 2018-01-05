@@ -31,7 +31,7 @@ namespace pfabric {
 
 enum class AggrFuncType {
     IntSum, DoubleSum,
-    Count,
+    Count, DCount,
     IntAvg, DoubleAvg,
     IntMin, DoubleMin, StringMin,
     IntMax, DoubleMax, StringMax,
