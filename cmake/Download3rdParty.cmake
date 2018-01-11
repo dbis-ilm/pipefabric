@@ -27,13 +27,17 @@ download_project(PROJ               json
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
+
 add_custom_command(
         OUTPUT ${THIRD_PARTY_DIR}/json
         COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/json
-        COMMAND ${CMAKE_COMMAND} -E copy
-                ${json_SOURCE_DIR}/src/json.hpp
-                ${THIRD_PARTY_DIR}/json)
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${json_SOURCE_DIR}/src/
+                ${THIRD_PARTY_DIR}/json/)
 
+include_directories("${THIRD_PARTY_DIR}/json")
+
+#--------------------------------------------------------------------------------
 # the format library
 download_project(PROJ               Format
                 GIT_REPOSITORY      https://github.com/fmtlib/fmt.git
@@ -41,6 +45,7 @@ download_project(PROJ               Format
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
+
 add_custom_command(
         OUTPUT ${THIRD_PARTY_DIR}/fmt
         COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/fmt
@@ -54,6 +59,7 @@ add_custom_command(
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DFMT_HEADER_ONLY=1")
 include_directories("${THIRD_PARTY_DIR}/fmt")
 
+#--------------------------------------------------------------------------------
 # the SimpleWeb library
 download_project(PROJ               SimpleWeb
                 GIT_REPOSITORY      https://github.com/eidheim/Simple-Web-Server.git
@@ -61,6 +67,7 @@ download_project(PROJ               SimpleWeb
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
+
 add_custom_command(
         OUTPUT ${THIRD_PARTY_DIR}/SimpleWeb
         COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/SimpleWeb

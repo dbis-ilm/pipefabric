@@ -3,9 +3,9 @@
 # Define a macro to simplify building and linking test executables
 #
 #=============================================
-macro( build_executable arg )
+macro(build_executable arg)
   include_directories("${PROJECT_SOURCE_DIR}/test")
-  add_executable( ${arg} "${arg}.cpp" )
+  add_executable( ${arg} "${arg}.cpp")
     target_link_libraries( ${arg}
       pfabric_core
       ${Boost_SYSTEM_LIBRARY}
@@ -14,7 +14,20 @@ macro( build_executable arg )
       ${BENCHMARK_LIB}
       ${MALLOC_LIB}
     )
-endmacro( build_executable )
+endmacro(build_executable)
+
+macro(build_catch_test arg)
+  include_directories("${PROJECT_SOURCE_DIR}/test")
+  add_executable( ${arg} "${arg}.cpp" $<TARGET_OBJECTS:TestMain>)
+    target_link_libraries( ${arg}
+      pfabric_core
+      ${Boost_SYSTEM_LIBRARY}
+      ${ROCKSDB_LIB}
+      ${NVML_LIBRARIES}
+      ${BENCHMARK_LIB}
+      ${MALLOC_LIB}
+    )
+endmacro(build_catch_test)
 
 #=============================================
 #
@@ -26,8 +39,16 @@ macro (do_test arg)
         NAME ${arg}
         COMMAND "${CMAKE_CURRENT_BINARY_DIR}/${arg}"
     )
-    build_executable( ${arg} )
+    build_catch_test( ${arg} )
 endmacro(do_test)
+
+macro (do_bench arg)
+    add_test(
+        NAME ${arg}
+        COMMAND "${CMAKE_CURRENT_BINARY_DIR}/${arg}"
+    )
+    build_executable( ${arg} )
+endmacro(do_bench)
 
 set (CTEST_ENVIRONMENT
   "DYLD_FALLBACK_LIBRARY_PATH=${DYLD_LIBRARY_PATH}"

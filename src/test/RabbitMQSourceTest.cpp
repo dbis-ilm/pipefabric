@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-17 The PipeFabric team,
+ * Copyright (c) 2014-18 The PipeFabric team,
  *                       All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
@@ -18,8 +18,6 @@
  * along with this program; see the file LICENSE.
  * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
  */
-
-#define CATCH_CONFIG_MAIN  // This tells Catch to provide a main() - only do this in one cpp file
 
 #include "catch.hpp"
 
