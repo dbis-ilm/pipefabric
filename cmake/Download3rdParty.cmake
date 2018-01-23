@@ -12,9 +12,8 @@ download_project(PROJ               Catch
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
-
 add_custom_command(
-  		OUTPUT ${THIRD_PARTY_DIR}/catch
+        OUTPUT ${THIRD_PARTY_DIR}/catch
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 ${Catch_SOURCE_DIR}/single_include/catch.hpp
                 ${PROJECT_SOURCE_DIR}/test)
@@ -27,7 +26,6 @@ download_project(PROJ               json
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
-
 add_custom_command(
         OUTPUT ${THIRD_PARTY_DIR}/json
         COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/json
@@ -45,7 +43,6 @@ download_project(PROJ               Format
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
-
 add_custom_command(
         OUTPUT ${THIRD_PARTY_DIR}/fmt
         COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/fmt
@@ -67,7 +64,6 @@ download_project(PROJ               SimpleWeb
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
-
 add_custom_command(
         OUTPUT ${THIRD_PARTY_DIR}/SimpleWeb
         COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/SimpleWeb
