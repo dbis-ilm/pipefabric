@@ -23,7 +23,7 @@ option(USE_KAFKA               "use Apache Kafka as network source"             
 option(USE_MQTT                "use MQTT as network source"                             OFF)
 option(USE_BOOST_SPIRIT_PARSER "use the boost::spirit::qi parsers (strings convertion)" ON )
 option(USE_ROCKSDB_TABLE       "use RocksDB for implementing persistent tables"         OFF)
-option(USE_NVML_TABLE          "use nvml for implementing persistent memory tables"     OFF)
+option(USE_NVM_TABLE           "use NVM for implementing persistent memory tables"      OFF)
 option(BUILD_ONLY_LIBS         "build only the two pipefabric libraries"                ON )
 option(BUILD_TEST_CASES        "build tests for pipefabric functionality"               ON )
 option(BUILD_GOOGLE_BENCH      "build google benchmark"                                 OFF)
@@ -161,35 +161,35 @@ endif()
 ############################################################################################
 #
 
-if (USE_NVML_TABLE)
-  message(STATUS "using NVML based persistent table")
-  add_definitions(-DUSE_NVML_TABLE)
-  set (NVML_LIBRARIES
-    "${THIRD_PARTY_DIR}/nvml/lib/libpmemblk.a"
-    "${THIRD_PARTY_DIR}/nvml/lib/libpmemlog.a"
-    "${THIRD_PARTY_DIR}/nvml/lib/libpmemobj.a"
-    "${THIRD_PARTY_DIR}/nvml/lib/libpmempool.a"
-    "${THIRD_PARTY_DIR}/nvml/lib/libpmem.a"
+if (USE_NVM_TABLE)
+  message(STATUS "using NVM based persistent table")
+  add_definitions(-DUSE_NVM_TABLE)
+  set (PMDK_LIBRARIES
+    "${THIRD_PARTY_DIR}/pmdk/lib/libpmemblk.a"
+    "${THIRD_PARTY_DIR}/pmdk/lib/libpmemlog.a"
+    "${THIRD_PARTY_DIR}/pmdk/lib/libpmemobj.a"
+    "${THIRD_PARTY_DIR}/pmdk/lib/libpmempool.a"
+    "${THIRD_PARTY_DIR}/pmdk/lib/libpmem.a"
      ${DYLIB_LIBRARY}
     "${THIRD_PARTY_DIR}/ptable/lib/libptable.so"
   )
   include_directories(
-    "${THIRD_PARTY_DIR}/nvml/include"
+    "${THIRD_PARTY_DIR}/pmdk/include"
     "${THIRD_PARTY_DIR}/ptable/include"
   )
   add_definitions(-DDO_LOG=0)
   set(core_sources
     ${core_sources}
-    ${THIRD_PARTY_DIR}/nvml
+    ${THIRD_PARTY_DIR}/pmdk
     ${THIRD_PARTY_DIR}/ptable
   )
   set(core_libs
     ${core_libs}
-    ${NVML_LIBRARIES}
+    ${PMDK_LIBRARIES}
   )
 else ()
-  message(STATUS "don't use NVML based persistent table")
-  set (NVML_LIBRARIES "")
+  message(STATUS "don't use NVM based persistent table")
+  set (PMDK_LIBRARIES "")
 endif()
 
 

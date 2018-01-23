@@ -121,23 +121,23 @@ struct is_tuple : is_tuple_impl<std::decay_t<T>> {};
 
 } /* namespace detail */
 
-using nvml::obj::delete_persistent;
-using nvml::obj::make_persistent;
-using nvml::obj::p;
-using nvml::obj::persistent_ptr;
-using nvml::obj::pool;
-using nvml::obj::transaction;
+using pmem::obj::delete_persistent;
+using pmem::obj::make_persistent;
+using pmem::obj::p;
+using pmem::obj::persistent_ptr;
+using pmem::obj::pool;
+using pmem::obj::transaction;
 using ptable::PTable;
 using ptable::PTuple;
 
-template<typename RecordType, typename KeyType>
+template<typename KeyType, typename RecordType>
 class NVMIterator {
  public:
   static_assert(detail::is_tuple<RecordType>::value, "Value type must be a pfabric::Tuple");
   using TupleType = typename RecordType::Base;
 //  using Predicate = std::function<bool(const PTuple<TupleType, KeyType> &)>;
   using Predicate = std::function<bool(const RecordType &)>;
-  using PTableType = PTable<TupleType, KeyType>;
+  using PTableType = PTable<KeyType, TupleType>;
 
   explicit NVMIterator() {
   }
@@ -179,12 +179,12 @@ class NVMIterator {
 
 };
 
-template<typename RecordType, typename KeyType>
-inline NVMIterator<RecordType, KeyType> makeNVMIterator(
-  typename PTable<typename RecordType::Base, KeyType>::iterator &&iter,
-  typename PTable<typename RecordType::Base, KeyType>::iterator &&end,
-  typename NVMIterator<RecordType, KeyType>::Predicate pred) {
-  return NVMIterator<RecordType, KeyType>(std::move(iter), std::move(end), pred);
+template<typename KeyType, typename RecordType>
+inline NVMIterator<KeyType, RecordType> makeNVMIterator(
+  typename PTable<KeyType, typename RecordType::Base>::iterator &&iter,
+  typename PTable<KeyType, typename RecordType::Base>::iterator &&end,
+  typename NVMIterator<KeyType, RecordType>::Predicate pred) {
+  return NVMIterator<KeyType, RecordType>(std::move(iter), std::move(end), pred);
 }
 
 /**************************************************************************//**
@@ -205,7 +205,7 @@ class NVMTable : public BaseTable {
  public:
   static_assert(detail::is_tuple<RecordType>::value, "Value type must be a pfabric::Tuple");
   using TupleType = typename RecordType::Base;
-  using PTableType = PTable<TupleType, KeyType>;
+  using PTableType = PTable<KeyType, TupleType>;
 
   struct root {
     persistent_ptr<PTableType> pTable;
@@ -224,7 +224,7 @@ class NVMTable : public BaseTable {
   using ObserverCallback = boost::signals2::signal<void(const RecordType &, TableParams::ModificationMode)>;
 
   /** typedef for an iterator to scan the table */
-  using TableIterator = NVMIterator<RecordType, KeyType>;
+  using TableIterator = NVMIterator<KeyType, RecordType>;
 
   /** typedef for a predicate evaluated using a scan: see \TableIterator for details */
   using Predicate = typename TableIterator::Predicate;
@@ -381,7 +381,7 @@ class NVMTable : public BaseTable {
    * \return a pair of iterators
    *****************************************************************************/
   TableIterator select(Predicate func) {
-    return makeNVMIterator<RecordType, KeyType>(std::move(pTable->begin()), std::move(pTable->end()), func);
+    return makeNVMIterator<KeyType, RecordType>(std::move(pTable->begin()), std::move(pTable->end()), func);
   }
 
   /************************************************************************//**
@@ -399,9 +399,7 @@ class NVMTable : public BaseTable {
    *****************************************************************************/
   TableIterator select() {
     auto alwaysTrue = [](const RecordType &) { return true; };
-//    auto alwaysTrue = [](const PTuple<TupleType, KeyType> &) { return true; };
-    return makeNVMIterator<RecordType, KeyType>(std::move(pTable->begin()), std::move(pTable->end()), alwaysTrue);
-
+    return makeNVMIterator<KeyType, RecordType>(std::move(pTable->begin()), std::move(pTable->end()), alwaysTrue);
   }
 
   /************************************************************************//**
@@ -450,32 +448,24 @@ class NVMTable : public BaseTable {
 
  private:
   void openOrCreateTable(const TableInfo &tableInfo) noexcept(false) {
-    std::string path = pathPrefix + tableInfo.tableName() + ".db";
+    const std::string path = pathPrefix + tableInfo.tableName() + ".db";
     pool<root> pop;
 
     if (access(path.c_str(), F_OK) != 0) {
-      pop = pool<root>::create(path, ptable::LAYOUT, 64 * 1024 * 1024);    //, (size_t)blockSize, 0666);
+      //TODO: How do we estimate the required pool size
+      pop = pool<root>::create(path, ptable::LAYOUT, 64 * 1024 * 1024);
       transaction::exec_tx(pop, [&] {
-        ptable::ColumnVector cVector;
-        for (auto &c : tableInfo) {
-          switch (c.getType()) {
-            case ColumnInfo::Void_Type:cVector.push_back(ptable::Column(c.getName(), ptable::Void_Type));
-              break;
-            case ColumnInfo::Int_Type:cVector.push_back(ptable::Column(c.getName(), ptable::Int_Type));
-              break;
-            case ColumnInfo::Double_Type:cVector.push_back(ptable::Column(c.getName(), ptable::Double_Type));
-              break;
-            case ColumnInfo::String_Type:cVector.push_back(ptable::Column(c.getName(), ptable::String_Type));
-          };
+        ptable::StringVector sVector;
+        for (const auto &c : tableInfo) {
+          sVector.emplace_back(c.getName());
         }
-        ptable::VTableInfo vTableInfo(tableInfo.tableName(), cVector);
-        auto tbl = make_persistent<PTableType>(vTableInfo);
-        pop.get_root()->pTable = tbl;
+        ptable::VTableInfo<KeyType, TupleType> vTableInfo(tableInfo.tableName(), std::move(sVector));
+        pop.get_root()->pTable = make_persistent<PTableType>(std::move(vTableInfo));
       });
     } else {
       pop = pool<root>::open(path, ptable::LAYOUT);
     }
-    q = pop.get_root();
+    q = std::move(pop.get_root());
     pTable = q->pTable;
   }
 

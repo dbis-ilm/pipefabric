@@ -10,7 +10,7 @@ macro(build_executable arg)
       pfabric_core
       ${Boost_SYSTEM_LIBRARY}
       ${ROCKSDB_LIB}
-      ${NVML_LIBRARIES}
+      ${PMDK_LIBRARIES}
       ${BENCHMARK_LIB}
       ${MALLOC_LIB}
     )
@@ -23,7 +23,7 @@ macro(build_catch_test arg)
       pfabric_core
       ${Boost_SYSTEM_LIBRARY}
       ${ROCKSDB_LIB}
-      ${NVML_LIBRARIES}
+      ${PMDK_LIBRARIES}
       ${BENCHMARK_LIB}
       ${MALLOC_LIB}
     )

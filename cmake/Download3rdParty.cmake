@@ -137,18 +137,18 @@ file(COPY ${PROJECT_BINARY_DIR}/data-src/DEBS2017
 endif()
 
 #--------------------------------------------------------------------------------
-if(USE_NVML_TABLE)
-# Non-Volatile Memory Library (pmem.io)
-download_project(PROJ               nvml
-                GIT_REPOSITORY      https://github.com/pmem/nvml.git
-                GIT_TAG             1.3.1-rc2
+if(USE_NVM_TABLE)
+# Peristent Memory Development Kit (pmem.io)
+download_project(PROJ               pmdk
+                GIT_REPOSITORY      https://github.com/pmem/pmdk.git
+                GIT_TAG             master
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
 add_custom_command(
-        OUTPUT ${THIRD_PARTY_DIR}/nvml
-        COMMAND ${CMAKE_COMMAND} -E chdir ${nvml_SOURCE_DIR} $(MAKE)
-	COMMAND ${CMAKE_COMMAND} -E chdir ${nvml_SOURCE_DIR} $(MAKE) install prefix=${THIRD_PARTY_DIR}/nvml
+    OUTPUT ${THIRD_PARTY_DIR}/pmdk
+    COMMAND ${CMAKE_COMMAND} -E chdir ${pmdk_SOURCE_DIR} $(MAKE)
+    COMMAND ${CMAKE_COMMAND} -E chdir ${pmdk_SOURCE_DIR} $(MAKE) install prefix=${THIRD_PARTY_DIR}/pmdk
 )
 
 # PTable (internal gitlab project) for NVM
@@ -159,8 +159,8 @@ download_project(PROJ               ptable
                 QUIET
 )
 add_custom_command(
-        OUTPUT ${THIRD_PARTY_DIR}/ptable
-        COMMAND ${CMAKE_COMMAND} -E chdir ${ptable_SOURCE_DIR} cmake -DPTABLE_DIR=${THIRD_PARTY_DIR}/ptable src
-	COMMAND ${CMAKE_COMMAND} -E chdir ${ptable_SOURCE_DIR} $(MAKE) install
+    OUTPUT ${THIRD_PARTY_DIR}/ptable
+    COMMAND ${CMAKE_COMMAND} -E chdir ${ptable_SOURCE_DIR} cmake -DPTABLE_DIR=${THIRD_PARTY_DIR}/ptable src
+    COMMAND ${CMAKE_COMMAND} -E chdir ${ptable_SOURCE_DIR} $(MAKE) install
 )
 endif()
