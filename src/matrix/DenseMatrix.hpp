@@ -1,3 +1,22 @@
+/*
+ * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ *
+ * This file is part of the PipeFabric package.
+ *
+ * PipeFabric is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * PipeFabric is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with PipeFabric. If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #ifndef DENSEMATRIX_HH
 #define DENSEMATRIX_HH
 
@@ -60,7 +79,7 @@ namespace pfabric
 			return !operator==(rhs);
 		}
 
-		bool operator!() const 
+		bool operator!() const
 		{
 			return row == rows && col == cols;
 		}
@@ -97,7 +116,7 @@ namespace pfabric
 
 		void incIters() {
 			++row;
-			if(row >= rows) {				
+			if(row >= rows) {
 				++col;
 				if (col < cols) row = 0;
 			}
@@ -105,17 +124,17 @@ namespace pfabric
 
 		void decIters() {
 			--row;
-			if(row < 0) {				
+			if(row < 0) {
 				--col;
 				if(col >= 0) row = rows-1;
-			} 
+			}
 		}
 
 	};
-	
 
-	/** 
-	* 
+
+	/**
+	*
 	* @brief The class uses dense matrix from Eigen library
 	* 	and implements wrapped member functions to operate on the matrix
 	* @tparam CellType
@@ -127,20 +146,20 @@ namespace pfabric
 	*	the number of cols of the matrix  which could be allocated at compile time
 	*	If it is -1 than cols would be allocated at runtime
 	**/
-	
+
 	template<typename CellType, int Rows = Eigen::Dynamic, int Cols = Eigen::Dynamic>
 	class DenseMatrix : public BaseMatrix
 	{
 	public:
 		typedef CellType 									element_type;		//< type of cell of the matrix
-		typedef Eigen::Index 								IndexType;			//< index type for traverse the matrix 
+		typedef Eigen::Index 								IndexType;			//< index type for traverse the matrix
 		typedef Eigen::Matrix<CellType, Rows, Cols> 		MatrixType;			//< typedef of the matrix
 		typedef DenseMatrix<CellType, Rows, Cols> 			self_type;			//< typedef of the class
 		typedef DenseIterator<const MatrixType>				const_iterator;		//< const iterator traverses over matrix
 		typedef std::tuple<IndexType, IndexType, CellType>	Triplet;			//< for incidents values
 		typedef boost::uuids::uuid 							Identifier; 		//< Type for unique identifier
 
-		DenseMatrix() 
+		DenseMatrix()
 		{
 		}
 		DenseMatrix(IndexType rows, IndexType cols)
@@ -165,7 +184,7 @@ namespace pfabric
 		, id(rhs.id)
 		, incidentIndexes(rhs.incidentIndexes)
 		{
-			
+
 		}
 
 		~DenseMatrix(){}
@@ -191,46 +210,46 @@ namespace pfabric
 		**/
 		inline
 		Identifier getID() const { return id; }
-		
 
-		void remove(IndexType x, IndexType y) 
+
+		void remove(IndexType x, IndexType y)
 		{
 			assert(x >= 0 && y >= 0);
 			assert(x < matrix.rows() && y < matrix.cols());
 
 			matrix(x, y) = 0;
 		}
-		
+
 		inline
 		void resize(IndexType newRows, IndexType newCols)
 		{
 			matrix.conservativeResize(newRows, newCols);
 		}
 		inline
-		void set(IndexType x, IndexType y, CellType value) { 
-			
-			auto resizeRow = x; auto resizeCol = y;	
+		void set(IndexType x, IndexType y, CellType value) {
+
+			auto resizeRow = x; auto resizeCol = y;
 
 			if(resizeRow >= this->getRows() || resizeCol >= this->getCols()) {
-				
+
 				if(resizeRow >= this->getRows()) {
 					resizeRow += 1;
 				}
 				else { resizeRow = this->getRows();}
-				
+
 				if(resizeCol >= this->getCols()) {
 					resizeCol += 1;
 				}
 				else {resizeCol = this->getCols();}
-				
+
 				resize(resizeRow, resizeCol);
-				
-			}			
+
+			}
 			assert(x < this->getRows()); assert(y < this->getCols());
 			matrix(x, y) = value;
 		}
 
-		inline 
+		inline
 		CellType& get(IndexType x, IndexType y) {
 			return matrix(x, y);
 		}
@@ -257,10 +276,10 @@ namespace pfabric
 
 		inline
 		IndexType getRows() const { return matrix.rows(); }
-		
+
 		inline
 		IndexType getCols() const { return matrix.cols(); }
-		
+
 		template <int R, int C>
 		void insertRow(IndexType row, const DenseMatrix<CellType, R, C>& other)
 		{
@@ -270,7 +289,7 @@ namespace pfabric
 			MatrixType temp = matrix;
 			auto resizeRows = other.getRows();
 			auto shiftedRows = matrix.rows() - row;
-			
+
 			resize(matrix.rows()+resizeRows, other.getCols());
 
 			matrix.bottomRows(shiftedRows) = matrix.block(row, 0, shiftedRows, matrix.cols());
@@ -285,7 +304,7 @@ namespace pfabric
 
 			MatrixType temp = matrix;
 			auto resizeCols = other.getCols();
-			auto shiftedCols = matrix.cols() - col; 
+			auto shiftedCols = matrix.cols() - col;
 
 			resize(other.getRows(), matrix.cols()+resizeCols);
 
@@ -300,12 +319,12 @@ namespace pfabric
 			if(row >= matrix.rows()) return;
 			BaseMatrix::removeRow(matrix, row);
 		}
-		inline 
+		inline
 		void removeCol(IndexType col)
 		{
 			assert(col >= 0);
 			if(col >= matrix.cols()) return;
-			BaseMatrix::removeCol(matrix, col);			
+			BaseMatrix::removeCol(matrix, col);
 		}
 		self_type& operator=(const self_type& rhs)
 		{
@@ -325,7 +344,7 @@ namespace pfabric
 
 		const_iterator begin() const { return const_iterator(&matrix, 0, 0, matrix.rows(), matrix.cols()); }
 		const_iterator end() const { return const_iterator(&matrix, matrix.rows(), matrix.cols(), matrix.rows(), matrix.cols()); }
-	
+
 		self_type& operator==(self_type&& rhs)
 		{
 			this->matrix = std::move(rhs.matrix);
@@ -342,7 +361,7 @@ namespace pfabric
 		*	If it column major matrix (3x3) like 	0 3 6 0 then it insert 9 to (3x3) position
 		*	matrix becomes (4x4)					1 4 7 0
 		*	and value appears at (3x3)				2 5 8 9 <-----
-		*	
+		*
 		* @param[in] value
 		*	the new value to be added
 		**/
@@ -355,8 +374,8 @@ namespace pfabric
 			} else {
 				i = matrix.rows() == 0 ? 0 : matrix.rows()-1;
 				j = matrix.cols();
-			}	
-			this->set(i, j, value);			
+			}
+			this->set(i, j, value);
 		}
 		/**
 		* @brief addIncident
@@ -380,14 +399,14 @@ namespace pfabric
 		*	return value according to storage model
 		*	If it is column major row will equal index
 		*	and columnd will be last element if matrix is not empty
-		*	Then it takes incidents indexes by index 
+		*	Then it takes incidents indexes by index
 		* 	and finally, returns tuple {row, column, value}
 		*
 		* @param[in] index
 		*	the index of incident indexes
 		* @return tuple with {row, column, value}
 		**/
-		Triplet getIncident(IndexType index) const 
+		Triplet getIncident(IndexType index) const
 		{
 			IndexType i, j;
 			if(MatrixType::Options == Eigen::ColMajor) {
@@ -408,7 +427,7 @@ namespace pfabric
 		* @return the number of incidents indexes
 		**/
 		std::size_t getCountIncidents() const { return incidentIndexes.size(); }
-		 
+
 		template<typename V, typename M>
 		static M vector2matrix(const V &vector, size_t rows, size_t cols)
 		{
@@ -428,10 +447,10 @@ namespace pfabric
 	};
 
 	/**
-	* @brief The class supports all method of Dense class 
+	* @brief The class supports all method of Dense class
 	*	and methods for stream like insert and erase a tuple
 	*
-	* @tparam CellType 
+	* @tparam CellType
 	*	the type determines scalar type of the matrix
 	* @tparam Visitor
 	*	the class defines the pattern of tuple elements and extracts them
@@ -441,9 +460,9 @@ namespace pfabric
 	* @param Cols
 	*	the number of cols of the matrix  which could be allocated at compile time
 	*	If it is -1 than cols would be allocated at runtime
-	**/	
+	**/
 	template<typename CellType, typename Visitor, int Rows = Eigen::Dynamic, int Cols = Eigen::Dynamic>
-	class DenseMatrixStream : public DenseMatrix <CellType, Rows, Cols> 
+	class DenseMatrixStream : public DenseMatrix <CellType, Rows, Cols>
 	{
 	public:
 		typedef typename Visitor::StreamElement StreamElement;		//< record type, TuplePtr< int, int, double >
@@ -452,7 +471,7 @@ namespace pfabric
 		{
 			Visitor v; v.erase(rec, this);
 		}
-		void insert(const StreamElement &rec) {	
+		void insert(const StreamElement &rec) {
 			Visitor v; v.insert(rec, this);
 		}
 	};
@@ -472,4 +491,3 @@ std::ostream & operator<<(std::ostream &stream, const pfabric::DenseMatrixStream
 }
 
 #endif //DENSEMATRIX_HH
-	

@@ -1,3 +1,22 @@
+/*
+ * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ *
+ * This file is part of the PipeFabric package.
+ *
+ * PipeFabric is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * PipeFabric is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with PipeFabric. If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #ifndef SPARSEMATRIX_HH
 #define SPARSEMATRIX_HH
 
@@ -34,11 +53,11 @@ namespace pfabric{
 	                       std::forward_iterator_tag,   // iterator_category
 	                       T
 	                       >
-	{		
+	{
 	public:
 		typedef SparseEdgeIterator<Matrix, T> 	self_type;
 		typedef T 								edge_descriptor;
-				
+
 		SparseEdgeIterator()
 		: index(0)
 		, matrix_ptr(nullptr)
@@ -57,10 +76,10 @@ namespace pfabric{
 		, iterator(rhs.iterator)
 		{}
 
-		bool operator==(const self_type &rhs) { 
+		bool operator==(const self_type &rhs) {
 			if(this->index != rhs.index) {
 				while(!this->iterator && this->index != rhs.index) {
-					++this->index; 
+					++this->index;
 					setIterator();
 				}
 				return !this->iterator;
@@ -68,18 +87,18 @@ namespace pfabric{
 				return !this->iterator;
 			}
 		}
-			
-		bool operator!=(const self_type &rhs) {				
-			return !operator==(rhs);									
+
+		bool operator!=(const self_type &rhs) {
+			return !operator==(rhs);
 		}
 
 		self_type& operator++() {
-			++iterator;					
+			++iterator;
 			return *this;
 		}
-			
-		self_type& operator--() { 
-			--iterator;		
+
+		self_type& operator--() {
+			--iterator;
 			return *this;
 		}
 
@@ -87,7 +106,7 @@ namespace pfabric{
 		self_type operator--(int) { auto tmp = *this; --iterator; return tmp; }
 
 		typename Matrix::IndexType
-		getIndex() const { 
+		getIndex() const {
 			return this->iterator.index();
 		}
 		T operator*() const
@@ -106,9 +125,9 @@ namespace pfabric{
 
 		void setIterator()
 		{
-			iterator = EdgeMatIterator(matrix_ptr->getMatrix(), index); 
+			iterator = EdgeMatIterator(matrix_ptr->getMatrix(), index);
 		}
-				
+
 	};
 
 	template<typename Matrix, typename T>
@@ -122,7 +141,7 @@ namespace pfabric{
 		SparseInEdgeIterator()
 		{
 			SparseEdgeIterator<Matrix, T>();
-		}		
+		}
 		SparseInEdgeIterator(Matrix *m, typename Matrix::IndexType id)
 		{
 			SparseEdgeIterator<Matrix, T>(m, id);
@@ -157,15 +176,15 @@ namespace pfabric{
 
     	SparseAdjVerticesIterator(const self_type &rhs)
     	{
-    		SparseEdgeIterator<Matrix, T>((const SparseEdgeIterator<Matrix, T>&) rhs);	
+    		SparseEdgeIterator<Matrix, T>((const SparseEdgeIterator<Matrix, T>&) rhs);
     	}
 
-    	T operator*() const 
+    	T operator*() const
     	{
     		return this->iterator.row();
     	}
     };
-    
+
     template<typename Matrix>
     struct SparseIterator : public SparseEdgeIterator< Matrix, typename Matrix::element_type >
     {
@@ -185,7 +204,7 @@ namespace pfabric{
     	: SparseEdgeIterator<Matrix, Type>((const SparseEdgeIterator<Matrix, Type>&) rhs)
     	{
     	}
-    	
+
     	typename Matrix::IndexType
     	getRow() const { return this->iterator.row(); }
 
@@ -212,27 +231,27 @@ namespace pfabric{
 	{
 	public:
 		typedef CellType 							element_type;		//< type of cell of the matrix
-		typedef Eigen::Index						IndexType;			//< index type for traverse the matrix 
+		typedef Eigen::Index						IndexType;			//< index type for traverse the matrix
 		typedef typename Visitor::StreamElement		StreamElement;		//< record type, TuplePtr< int, int, double >
 		typedef Eigen::SparseMatrix<CellType>	 	MatrixType;			//< typedef of the matrix
 		typedef Matrix<CellType, Visitor>			self_type;			//< typedef of the class
 
 		typedef SparseEdgeIterator<self_type, typename MatrixTraits<self_type>::edge > EdgeIterator;
 		typedef SparseInEdgeIterator<self_type, typename MatrixTraits<self_type>::edge > InEdgeIterator;
-		typedef SparseAdjVerticesIterator<self_type, element_type > AdjacentVertexIterator;		
+		typedef SparseAdjVerticesIterator<self_type, element_type > AdjacentVertexIterator;
 		typedef SparseIterator<self_type> iterator;
 
 		//< callback is involved when the matrix was updated
   		typedef boost::signals2::signal<void (const StreamElement&, MatrixParams::ModificationMode)> ObserverCallback;
 		typedef boost::uuids::uuid Identifier; //< Type for unique identifier
-		
+
 		Matrix() {}
 
 		Matrix(IndexType rows, IndexType cols)
 		: matrix(rows, cols)
 		{}
 
-		Matrix(self_type &&rhs)		
+		Matrix(self_type &&rhs)
 		{
 			std::lock_guard<std::mutex> g(rhs.mutex);
 			matrix 		= std::move(rhs.matrix);
@@ -258,11 +277,11 @@ namespace pfabric{
 		/**
 		* @brief set
 		* 	the method insert new value by x and y coordinates
-		*	If x/y is equal or greater than the current number 
+		*	If x/y is equal or greater than the current number
 		*	of rows/columns of the matrix. Then, it will resize the matrix
 		*
 		* @param[in] x
-		*	the x is a row 
+		*	the x is a row
 		* @param[in] y
 		*	the y is a column
 		* @param[in] value
@@ -271,13 +290,13 @@ namespace pfabric{
 		void set(IndexType x, IndexType y, CellType value)
 		{
 			std::lock_guard<std::mutex> lock(mutex);
-			auto resizeRow = x; auto resizeCol = y;			
-				
+			auto resizeRow = x; auto resizeCol = y;
+
 			if(resizeRow >= matrix.rows()) {
 				resizeRow += 1;
 			}
 			else { resizeRow = matrix.rows();}
-				
+
 			if(resizeCol >= matrix.cols()) {
 				resizeCol += 1;
 			}
@@ -285,14 +304,14 @@ namespace pfabric{
 
 			resize(resizeRow, resizeCol);
 			matrix.coeffRef(x, y) = value;
-			
+
 		}
 		void insert(const StreamElement &rec )
-		{		
+		{
 			Visitor v; v.insert(rec, this);
 			observer(rec, MatrixParams::Insert);
 		}
-		void remove(IndexType x, IndexType y) 
+		void remove(IndexType x, IndexType y)
 		{
 			std::lock_guard<std::mutex> guard(mutex);
 			matrix.coeffRef(x, y) = 0;
@@ -305,7 +324,7 @@ namespace pfabric{
 			Visitor v; v.erase(rec, this);
 			observer(rec, MatrixParams::Delete);
 		}
-		
+
 		void removeCol(IndexType col)
 		{
 			assert(col>=0);
@@ -321,8 +340,8 @@ namespace pfabric{
 			BaseMatrix::removeRow(cpMat, row);
 			matrix = cpMat;
 		}
-		
-		inline 
+
+		inline
 		CellType& get(IndexType x, IndexType y) {
 			return matrix.coeffRef(x, y);
 		}
@@ -337,39 +356,39 @@ namespace pfabric{
 		inline
 		CellType operator()(IndexType x, IndexType y) const {
 			return get(x, y);
-		}		
+		}
 		inline
 		IndexType getRows() const { return matrix.rows(); }
-		
+
 		inline
 		IndexType getCols() const { return matrix.cols(); }
 
-		inline 
+		inline
 		std::size_t getNumElements() const { return matrix.nonZeros(); }
 
 		inline
 		std::size_t getCountNonZerosByVer(IndexType index) const {
-			
+
 			auto id = matrix.outerIndexPtr()[index];
 			IndexType end;
     		if(matrix.isCompressed())
     		  end = matrix.outerIndexPtr()[index+1];
     		else
     		  end = id + matrix.innerNonZeroPtr()[index];
-    
+
     		return end - id;
 		}
 
 		inline
-		const MatrixType & getMatrix() const { 
+		const MatrixType & getMatrix() const {
 			std::lock_guard<std::mutex> g(this->mutex);
-			return matrix; 
+			return matrix;
 		}
 
 		inline
-		void setMatrix(const MatrixType& m) { 
+		void setMatrix(const MatrixType& m) {
 			std::lock_guard<std::mutex> g(this->mutex);
-			matrix = m; 
+			matrix = m;
 		}
 
 		self_type& operator=(self_type &&rhs)
@@ -377,16 +396,16 @@ namespace pfabric{
 			std::lock_guard<std::mutex> g(rhs.mutex);
 			matrix 		= std::move(rhs.matrix);
 			observer	= std::move(rhs.observer);
-			
+
 			return *this;
 		}
 
-		
+
 		template<typename V>
-		bool operator==(const Matrix<CellType, V> &cmp) const 
+		bool operator==(const Matrix<CellType, V> &cmp) const
 		{
 			std::lock_guard<std::mutex> g(cmp.mutex);
-			if(	this->matrix.rows() != cmp.matrix.rows() 
+			if(	this->matrix.rows() != cmp.matrix.rows()
 				|| this->matrix.cols() != cmp.matrix.cols())
 			{
 				return false;
@@ -404,7 +423,7 @@ namespace pfabric{
 			return *this;
 		}
 
-		friend 
+		friend
 		std::ostream & operator<<(std::ostream &stream, const self_type &m )
 		{
 			const MatrixType & matrix = m.getMatrix();
@@ -428,19 +447,19 @@ namespace pfabric{
 		iterator begin() const { return iterator(this, 0); }
 
 		inline
-		iterator end() const { 
-			
-			return iterator(this, matrix.outerSize()-1); 
+		iterator end() const {
+
+			return iterator(this, matrix.outerSize()-1);
 		}
 	private:
-		Identifier			id;		
+		Identifier			id;
 		MatrixType 			matrix;
 		ObserverCallback 	observer;
-		mutable std::mutex 	mutex;	
+		mutable std::mutex 	mutex;
 	};
 
 	template<typename CellType>
-	using SparseVector = Eigen::SparseVector<CellType>;	
+	using SparseVector = Eigen::SparseVector<CellType>;
 }
 
 #endif //SPARSEMATRIX_HH
