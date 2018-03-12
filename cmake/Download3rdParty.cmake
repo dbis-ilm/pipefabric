@@ -29,8 +29,8 @@ download_project(PROJ               json
 add_custom_command(
         OUTPUT ${THIRD_PARTY_DIR}/json
         COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/json
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-                ${json_SOURCE_DIR}/src/
+        COMMAND ${CMAKE_COMMAND} -E copy
+                ${json_SOURCE_DIR}/single_include/nlohmann/json.hpp
                 ${THIRD_PARTY_DIR}/json/)
 
 include_directories("${THIRD_PARTY_DIR}/json")
@@ -39,7 +39,7 @@ include_directories("${THIRD_PARTY_DIR}/json")
 # the format library
 download_project(PROJ               Format
                 GIT_REPOSITORY      https://github.com/fmtlib/fmt.git
-                GIT_TAG             master
+                GIT_TAG             4.1.0
                 UPDATE_DISCONNECTED 1
                 QUIET
 )

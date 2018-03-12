@@ -542,5 +542,8 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/"
 ############################################################################################
 #
 
+#add_executable(ExecutableName ExecutableFile.cpp)
+#target_link_libraries(ExecutableName pfabric_core)
+
 # show used compiler
 message("Using Compiler: ${CMAKE_CXX_COMPILER_ID}.")
