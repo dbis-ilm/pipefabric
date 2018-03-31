@@ -39,8 +39,10 @@
 #include "qop/MemorySource.hpp"
 #include "qop/ToTable.hpp"
 #include "qop/FromTable.hpp"
+#include "qop/FromMVCCTables.hpp"
 #include "qop/SelectFromTable.hpp"
 #include "qop/SelectFromTxTable.hpp"
+#include "qop/SelectFromMVCCTable.hpp"
 #include "qop/StreamGenerator.hpp"
 #ifdef SUPPORT_MATRICES
   #include "qop/FromMatrix.hpp"
@@ -382,6 +384,29 @@ namespace pfabric {
       registerStartupFunction([=]() -> unsigned long { return op->start(); });
       return Pipe<T>(dataflow, dataflow->addPublisher(op));
     }
+
+    template<typename T, typename KeyType = DefaultKeyType>
+    Pipe<T> selectFromMVCCTable(
+      std::shared_ptr<MVCCTable<typename T::element_type, KeyType>> tbl,
+      std::atomic<TransactionID>& aCnter,
+      typename MVCCTable<typename T::element_type,
+                         KeyType>::Predicate pred = nullptr) {
+      auto op = std::make_shared<SelectFromMVCCTable<T, KeyType>>(tbl, aCnter, pred);
+      registerStartupFunction([=]() -> unsigned long { return op->start(); });
+      return Pipe<T>(dataflow, dataflow->addPublisher(op));
+    }
+
+    template<typename T, typename KeyType = DefaultKeyType>
+    Pipe<T> fromMVCCTables(
+      std::shared_ptr<MVCCTable<typename T::element_type, KeyType>> (&tbls)[2],
+      KeyType (&keys)[2],
+      StateContext<typename T::element_type, KeyType>& sCtx) {
+      auto op = std::make_shared<FromMVCCTables<T, KeyType>>(tbls, keys, sCtx);
+      registerStartupFunction([=]() -> unsigned long { return op->start(); });
+      return Pipe<T>(dataflow, dataflow->addPublisher(op));
+    }
+
+
     /**
      * @brief Create a StreamGenerator operator as data source.
      *

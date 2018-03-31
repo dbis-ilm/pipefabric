@@ -17,7 +17,7 @@ include(CTest)
 # which can be switched off to reduce build time.
 
 option(SUPPORT_MATRICES        "support matrix operations as tuple and state type"      OFF)
-option(BUILD_USE_CASES         "build use cases to show functionality examples"         OFF)
+option(BUILD_USE_CASES         "build use cases to show functionality examples"         ON )
 option(USE_RABBITMQ            "use RabbitMQ as network source"                         OFF)
 option(USE_KAFKA               "use Apache Kafka as network source"                     OFF)
 option(USE_MQTT                "use MQTT as network source"                             OFF)
@@ -25,7 +25,7 @@ option(USE_BOOST_SPIRIT_PARSER "use the boost::spirit::qi parsers (strings conve
 option(USE_ROCKSDB_TABLE       "use RocksDB for implementing persistent tables"         OFF)
 option(USE_NVM_TABLE           "use NVM for implementing persistent memory tables"      OFF)
 option(BUILD_ONLY_LIBS         "build only the two pipefabric libraries"                ON )
-option(BUILD_TEST_CASES        "build tests for pipefabric functionality"               ON )
+option(BUILD_TEST_CASES        "build tests for pipefabric functionality"               OFF)
 option(BUILD_GOOGLE_BENCH      "build google benchmark"                                 OFF)
 option(BUILD_BENCHMARKS        "build benchmark test for pipefabric"                    OFF)
 option(BUILD_PYTHON            "build python interface for pipefabric"                  OFF)
