@@ -162,6 +162,9 @@ namespace pfabric {
      */
     void runEvery(unsigned long secs);
 
+    void cleanStartupFunctions();
+    void stopThreads();
+
     /**
      * @brief Waits until the execution of the topology stopped.
      *
@@ -398,10 +401,9 @@ namespace pfabric {
 
     template<typename T, typename KeyType = DefaultKeyType>
     Pipe<T> fromMVCCTables(
-      std::shared_ptr<MVCCTable<typename T::element_type, KeyType>> (&tbls)[2],
-      KeyType (&keys)[2],
+      unsigned int keyRange,
       StateContext<typename T::element_type, KeyType>& sCtx) {
-      auto op = std::make_shared<FromMVCCTables<T, KeyType>>(tbls, keys, sCtx);
+      auto op = std::make_shared<FromMVCCTables<T, KeyType>>(keyRange, sCtx);
       registerStartupFunction([=]() -> unsigned long { return op->start(); });
       return Pipe<T>(dataflow, dataflow->addPublisher(op));
     }

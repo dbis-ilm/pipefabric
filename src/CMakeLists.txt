@@ -26,7 +26,7 @@ option(USE_ROCKSDB_TABLE       "use RocksDB for implementing persistent tables" 
 option(USE_NVM_TABLE           "use NVM for implementing persistent memory tables"      OFF)
 option(BUILD_ONLY_LIBS         "build only the two pipefabric libraries"                ON )
 option(BUILD_TEST_CASES        "build tests for pipefabric functionality"               OFF)
-option(BUILD_GOOGLE_BENCH      "build google benchmark"                                 OFF)
+option(BUILD_GOOGLE_BENCH      "build google benchmark"                                 ON )
 option(BUILD_BENCHMARKS        "build benchmark test for pipefabric"                    OFF)
 option(BUILD_PYTHON            "build python interface for pipefabric"                  OFF)
 
@@ -52,7 +52,7 @@ endif()
 #CMAKE_FORCE_CXX_COMPILER(icpc "Intel C++ Compiler")
 
 # C++ compiler flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated -g -O3 -Wsign-compare")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated -O3 -Wsign-compare")
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedefs -Wno-#pragma-messages")
 elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")

@@ -14,6 +14,14 @@ target_link_libraries(txproc
 add_executable(txproc2 TxProcessing2.cpp)
 target_link_libraries(txproc2
   pfabric_core
+  ${Boost_SYSTEM_LIBRARY}
+  #${BENCHMARK_LIB}
+  ${MALLOC_LIB}
+  )
+
+add_executable(generateWorkloads generateWorkloads.cpp)
+target_link_libraries(generateWorkloads
+  pfabric_core
   ${Boost_PROGRAM_OPTIONS_LIBRARY}
   ${Boost_DATE_TIME_LIBRARY}
   ${Boost_FILESYSTEM_LIBRARY}

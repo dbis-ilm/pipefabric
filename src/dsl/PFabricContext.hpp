@@ -141,6 +141,7 @@ public:
 
     // create a new table and register it
     auto tbl = std::make_shared<MVCCTable<RecordType, KeyType>>(tblInfo, sCtx);
+    tbl->registerState();
     mTableSet[tblInfo.tableName()] = tbl;
     return tbl;
   }

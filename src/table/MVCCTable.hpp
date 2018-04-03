@@ -59,6 +59,8 @@ constexpr auto INCONSISTENT = 3;
 
 constexpr auto DTS_INF = std::numeric_limits<TransactionID>::max();
 
+using TableID = unsigned int;
+
 /* forward declaration*/
 template <typename RecordType, typename KeyType = DefaultKeyType>
 class MVCCTable;
@@ -66,26 +68,72 @@ class MVCCTable;
 enum class Status {Active, Commit, Abort};
 
 template <typename RecordType, typename KeyType>
-struct StateContext {
+class StateContext {
   using ReadCTS = TransactionID;
   using TablePtr = std::shared_ptr<MVCCTable<RecordType, KeyType>>;
-  using AccessedState = std::tuple<TablePtr, Status, ReadCTS>;
+  using AccessedState = std::tuple<TableID, Status, ReadCTS>;
   using AccessedStates =  std::array<AccessedState, 2>;
 
+ public:
   /** Atomic counter for assigning global transaction IDs */
   std::atomic<TransactionID> nextTxID{1};
+  /** Registered States */
+  TablePtr registeredStates[2];
   /** mapping from internal transaction ID to gloabl transaction ID */
   std::unordered_map<TransactionID, TransactionID> tToTX;
-  /** mapping from transaction ID to list of accessed states */
-  std::unordered_map<TransactionID, AccessedStates> activeTxs;
+  /** for evaluation: counting necessary restarts of txs */
+  std::atomic<unsigned int> restarts{0};
 
-  TransactionID newTx(const TablePtr (&tbls)[2]) {
+  bool running = true;
+
+  AccessedState &getStateStatus(const TransactionID txnID,
+                                const TableID tblID) {
+    std::lock_guard<std::mutex> guard(mtx);
+    return activeTxs.at(txnID).at(tblID);
+  }
+
+  const AccessedState &getStateStatus(const TransactionID txnID,
+                                      const TableID tblID) const {
+    std::lock_guard<std::mutex> guard(mtx);
+    return activeTxs.at(txnID).at(tblID);
+  }
+
+  void removeTx(const TransactionID txnID) {
+    std::lock_guard<std::mutex> guard(mtx);
+    activeTxs.erase(txnID);
+  }
+
+  TransactionID newTx() {
     const auto txnID = nextTxID.fetch_add(1);
+    std::lock_guard<std::mutex> guard(mtx);
     activeTxs.insert(std::make_pair(txnID, AccessedStates{
-      AccessedState{tbls[0], Status::Active, 0},
-      AccessedState{tbls[1], Status::Active, 0}}));
+      AccessedState{0, Status::Active, 0},
+      AccessedState{1, Status::Active, 0}}));
     return txnID;
   }
+
+  TableID registerState(const TablePtr& tbl) {
+    registeredStates[numStates++] = tbl;
+    return numStates-1;
+  }
+
+  void reset() {
+    std::lock_guard<std::mutex> guard(mtx);
+    nextTxID.store(1);
+    restarts.store(0);
+    tToTX.clear();
+//    activeTxs.clear();
+    registeredStates[0] = nullptr;
+    registeredStates[1] = nullptr;
+    numStates = 0u;
+
+  }
+
+ private:
+  /** mapping from transaction ID to list of accessed states */
+  std::unordered_map<TransactionID, AccessedStates> activeTxs;
+  unsigned int numStates = 0u;
+  std::mutex mtx;
 };
 
 template <typename RecordType, std::size_t VERSIONS = 16>
@@ -143,28 +191,30 @@ class SharedLocks {
  public:
   void lockShared(KeyType key) {
     auto &rowLock = locks[key];
-    rowLock.write.lock(); //< wait for possible writer
+    std::lock_guard<std::mutex> guard(rowLock.write); //< wait for possible writer
     rowLock.readers++;
-    rowLock.write.unlock();
+//    locks[key].lock();
   }
 
   void lockExclusive(KeyType key) {
     auto &rowLock = locks[key];
-    rowLock.write.lock();
     while(rowLock.readers > 0); //< wait for active readers
+//    locks[key].lock();
   }
 
   void unlockShared(KeyType key) {
-    auto &rowLock = locks[key];
-    rowLock.readers--;
+    locks[key].readers--;
+//    locks[key].unlock();
   }
 
   void unlockExclusive(KeyType key) {
     locks[key].write.unlock();
+//    locks[key].unlock();
   }
 
  private:
   std::unordered_map<KeyType, RowLock> locks;
+//  std::unordered_map<KeyType, std::mutex> locks;
 };
 
 
@@ -183,7 +233,9 @@ class SharedLocks {
  *         the data type of the key column (default = int)
  */
 template <typename RecordType, typename KeyType>
-class MVCCTable : public BaseTable {
+class MVCCTable : public BaseTable,
+                  public std::enable_shared_from_this<MVCCTable<RecordType,
+                                                                KeyType>> {
   using TupleType = typename RecordType::Base;
   using SCtxType = StateContext<RecordType, KeyType>;
  public:
@@ -230,48 +282,54 @@ class MVCCTable : public BaseTable {
     */
   ~MVCCTable() {}
 
+  void registerState() {
+    tblID = sCtx.registerState(this->shared_from_this());
+  }
+
   void transactionBegin(const TransactionID& txnID) {
     //sCtx.activeTxs[txnID]
     writeSet.txnID = txnID;
   }
 
   int transactionPreCommit(const TransactionID& txnID) {
-    auto& state1 = sCtx.activeTxs[txnID][0];
-    auto& state2 = sCtx.activeTxs[txnID][1];
+    TableID otherID = (tblID == 0) ? 1 : 0;
+
+    auto& thisState = sCtx.getStateStatus(txnID, tblID);
+    auto& otherState = sCtx.getStateStatus(txnID, otherID);;
     int s = NO_ERROR;
-    if (tbl.tableInfo()->tableName() == std::get<0>(state1)->tableInfo()->tableName()) {
-      std::get<1>(state1) = Status::Commit;
-      if(std::get<1>(state2) == Status::Commit) {
-        s = this->transactionCommit(txnID);
-        if (s != NO_ERROR) return s;
-        s = std::get<0>(state2)->transactionCommit(txnID);
-      }
-    } else {
-      std::get<1>(state2) = Status::Commit;
-      if(std::get<1>(state1) == Status::Commit) {
-        s = this->transactionCommit(txnID);
-        if (s != NO_ERROR) return s;
-        s = std::get<0>(state1)->transactionCommit(txnID);
-      }
+    std::get<1>(thisState) =Status::Commit;
+
+    if(std::get<1>(otherState) == Status::Commit) {
+      s = this->transactionCommit(txnID);
+      if (s != NO_ERROR) return s;
+      s = sCtx.registeredStates[otherID]->transactionCommit(txnID);
     }
     return s;
   }
 
   int transactionCommit(const TransactionID& txnID) {
-    std::vector<std::pair<KeyType, MVCCObject<TupleType>>> newEntries;
+    struct KeyMVCCPair {
+      KeyType key;
+      MVCCObject<TupleType> mvcc;
+    };
+    //using KeyMVCCPair = std::pair<KeyType, MVCCObject<TupleType>>;
+    const auto numEntries = writeSet.set.size();
+    KeyMVCCPair *newEntries = new KeyMVCCPair[numEntries];
 
     /* Buffer new MVCC entries */
-    for(const auto e : writeSet.set) {
+    int i = 0;
+    for(const auto &e : writeSet.set) {
       locks.lockExclusive(e.first);
       /* if entry exists */
       try {
-        newEntries.emplace_back(e.first, get<0>(*tbl.getByKey(e.first)));
-        auto &last = newEntries.back().second;
+        newEntries[i] = KeyMVCCPair{e.first, get<0>(*tbl.getByKey(e.first))};
+        auto &last = newEntries[i].mvcc;
         const auto iPos = getFreePos(last.usedSlots); //TODO: Check if higher than VERSIONS
         const auto dPos = last.getCurrent(txnID);
         if (isoLevel == LEVEL_SERIALIZABLE && last.headers[dPos].rts > txnID) {
-          for (const auto& e : newEntries)
-            locks.unlockExclusive(e.first); //< unlockAlL
+          for (;i >= 0; i--)
+            locks.unlockExclusive(newEntries[i].key); //< unlockAlL
+          sCtx.restarts.fetch_add(1);
           return ABORT;
         }
         last.headers[dPos].dts = txnID;
@@ -281,23 +339,25 @@ class MVCCTable : public BaseTable {
       }
       /* Entry does not exist yet */
       catch (TableException exc) {
-        newEntries.emplace_back(e.first, MVCCObject<TupleType>());
-        auto &last = newEntries.back().second;
+        newEntries[i] = {e.first, MVCCObject<TupleType>()};
+        auto &last = newEntries[i].mvcc;
         last.headers[0] = {txnID, DTS_INF, txnID};
         last.values[0] = e.second.data();
         last.usedSlots = 1;
       }
-
+      ++i;
     }
 
     /* Write new Entries */
-    for (const auto& e: newEntries) {
-      tbl.insert(e.first, e.second);
-    }
+    for (auto e = 0u; e < numEntries; e++)
+      tbl.insert(newEntries[e].key, newEntries[e].mvcc);
 
     lastCommitID = txnID;
-    for (const auto& e: newEntries) locks.unlockExclusive(e.first); //< unlockAll
+    for (auto e = 0u; e < numEntries; e++)
+      locks.unlockExclusive(newEntries[e].key); //< unlockAll
     writeSet.clean();
+    delete[] newEntries;
+    sCtx.removeTx(txnID);
     return NO_ERROR;
   }
 
@@ -319,15 +379,38 @@ class MVCCTable : public BaseTable {
   int insert(const TransactionID& txnID, KeyType key, const RecordType& rec) throw(TableException) {
     // Tx support
     if (isoLevel == LEVEL_SERIALIZABLE) {
-      locks.lockShared(key);
-      auto mvcc = get<0>(*tbl.getByKey(key));
-      locks.unlockShared(key);
-      auto pos = mvcc.getCurrent(txnID);
-      if(mvcc.headers[pos].rts > txnID)
-        return ABORT;
+      try {
+        locks.lockShared(key);
+        auto mvcc = get<0>(*tbl.getByKey(key));
+        locks.unlockShared(key);
+        auto pos = mvcc.getCurrent(txnID);
+        if(mvcc.headers[pos].rts > txnID)
+          return ABORT;
+      } catch (TableException exc) {
+        locks.unlockShared(key);
+      }
     }
     //writeSet.txnID = txnID; //Assumes single writer
     writeSet.set.insert(std::make_pair(key,rec));
+    return NO_ERROR;
+  }
+
+  int insert(const TransactionID& txnID, KeyType key, RecordType&& rec) {
+    // Tx support
+    if (isoLevel == LEVEL_SERIALIZABLE) {
+      try {
+        locks.lockShared(key);
+        auto mvcc = get<0>(*tbl.getByKey(key));
+        locks.unlockShared(key);
+        auto pos = mvcc.getCurrent(txnID);
+        if(mvcc.headers[pos].rts > txnID)
+          return ABORT;
+      } catch (TableException exc) {
+        locks.unlockShared(key);
+      }
+    }
+    //writeSet.txnID = txnID; //Assumes single writer
+    writeSet.set.insert(std::make_pair(key,std::move(rec)));
     return NO_ERROR;
   }
 
@@ -438,19 +521,23 @@ class MVCCTable : public BaseTable {
     try {
       tplPtr = tbl.getByKey(key);
     } catch (TableException exc) {
+      if (isoLevel != LEVEL_SERIALIZABLE)
+        locks.unlockShared(key);
+      else locks.unlockExclusive(key);
       return NOT_FOUND;
     }
     /* check if read is in time */
-    auto& state1 = sCtx.activeTxs[txnID][0];
-    auto& state2 = sCtx.activeTxs[txnID][1];
-    if ((std::get<2>(state1) != 0 && std::get<2>(state1) != lastCommitID) ||
-        (std::get<2>(state2) != 0 && std::get<2>(state2) != lastCommitID))
+    const auto& readCTS1 = std::get<2>(sCtx.getStateStatus(txnID, 0));
+    const auto& readCTS2 = std::get<2>(sCtx.getStateStatus(txnID, 1));
+    if ((readCTS1 != 0 && readCTS1 != lastCommitID) ||
+        (readCTS2 != 0 && readCTS2 != lastCommitID)) {
+      if (isoLevel != LEVEL_SERIALIZABLE)
+        locks.unlockShared(key);
+      else locks.unlockExclusive(key);
       return INCONSISTENT;
+    }
     /* Update readCTS of this table*/
-    if (tbl.tableInfo()->tableName() == std::get<0>(state1)->tableInfo()->tableName())
-      std::get<2>(state1) = lastCommitID;
-    else
-      std::get<2>(state2) = lastCommitID;
+    std::get<2>(sCtx.getStateStatus(txnID, tblID)) = lastCommitID;
     auto& mvcc = get<0>(*tplPtr);
     if (isoLevel != LEVEL_SERIALIZABLE)
       locks.unlockShared(key);
@@ -460,8 +547,10 @@ class MVCCTable : public BaseTable {
     if (pos == -1)
       return NOT_FOUND;
     if (isoLevel == LEVEL_SERIALIZABLE) {
-      mvcc.headers[pos].rts = std::max(mvcc.headers[pos].rts, txnID);
-      tbl.insert(key, *tplPtr);    // delete/insert
+      if (sCtx.running) { //TODO: dirty hack
+        mvcc.headers[pos].rts = std::max(mvcc.headers[pos].rts, txnID);
+        tbl.insert(key, *tplPtr);    // delete/insert
+      }
       locks.unlockExclusive(key);
     }
 
@@ -536,9 +625,11 @@ class MVCCTable : public BaseTable {
 
   SharedLocks<KeyType> locks;
   TransactionID lastCommitID = 0;
+  //uint8_t isoLevel = LEVEL_SERIALIZABLE;
   uint8_t isoLevel = LEVEL_SNAPSHOT;
   WriteSet<KeyType, RecordType> writeSet;
   Table tbl;
+  TableID tblID;
   SCtxType& sCtx;
 };
 }

@@ -20,6 +20,8 @@
 #ifndef FromMVCCTable_hpp_
 #define FromMVCCTable_hpp_
 
+#include <random>
+
 #include "core/Punctuation.hpp"
 #include "core/Tuple.hpp"
 #include "qop/DataSource.hpp"
@@ -59,8 +61,8 @@ namespace pfabric {
      * @param tbl the table that is read
      * @param pred an optional filter predicate
      */
-    FromMVCCTables(TablePtr (&tbls)[2], KeyType (&keys)[2], SCtxType& sCtx)
-      : mTables{tbls[0], tbls[1]}, mKeys{keys[0], keys[1]}, mSCtx{sCtx} {}
+    FromMVCCTables(unsigned int keyRange, SCtxType& sCtx)
+      : mTables{sCtx.registeredStates[0], sCtx.registeredStates[1]}, dis{0, keyRange}, mSCtx{sCtx} {}
 
     /**
      * Deallocates all resources.
@@ -68,26 +70,30 @@ namespace pfabric {
     ~FromMVCCTables() {}
 
     unsigned long start() {
-      auto mTxnID = mSCtx.newTx(mTables);
-      std::cout << "MyTxnID: " << mTxnID << '\n';
+      auto mTxnID = mSCtx.newTx();
+//      std::cout << "MyTxnID: " << mTxnID << '\n';
+      std::random_device rd;
+      std::mt19937 gen(rd());
+      const KeyType mKeys[2] = {dis(gen), dis(gen)};
+      //std::cout << "Keys: " << mKeys[0] << ", " << mKeys[1] << '\n';
 
       assert(mTables[0].get() != nullptr);
       assert(mTables[1].get() != nullptr);
 
       SmartPtr<RecordType> tpls[2][2];
 
-      while (true) {
-        for (auto i = 0u; i < 2; i++) {
-          for (auto j = 0u; j < 2; j++) {
-            if (mTables[i]->getByKey(mTxnID, mKeys[j], tpls[i][j]) != 0) {
-              /* restart, caused by inconsistency */
-              std::cout << "Restart read\n";
-              mTxnID = mSCtx.newTx(mTables);
-              break; break; continue;
-            }
+      restart:;
+      for (auto i = 0u; i < 2; i++) {
+        for (auto j = 0u; j < 2; j++) {
+          if (mTables[i]->getByKey(mTxnID, mKeys[j], tpls[i][j]) != 0) {
+            /* restart, caused by inconsistency */
+            mSCtx.restarts++;
+            mTxnID = mSCtx.newTx();
+            boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
+            //goto restart;
+            return 0;
           }
         }
-        break;
       }
       // when everything consistent, publish the tuples
       //TODO: check if same for correctness criteria
@@ -103,8 +109,9 @@ namespace pfabric {
 
   private:
     const TablePtr mTables[2];      //< the table from which the tuples are fetched
-    const KeyType mKeys[2];
+    std::uniform_int_distribution<KeyType> dis;
     SCtxType& mSCtx;
+
   };
 
 }
