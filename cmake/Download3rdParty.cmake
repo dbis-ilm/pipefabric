@@ -15,7 +15,7 @@ download_project(PROJ               Catch
 add_custom_command(
         OUTPUT ${THIRD_PARTY_DIR}/catch
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                ${Catch_SOURCE_DIR}/single_include/catch.hpp
+                ${Catch_SOURCE_DIR}/single_include/catch2/catch.hpp
                 ${PROJECT_SOURCE_DIR}/test)
 
 #--------------------------------------------------------------------------------
