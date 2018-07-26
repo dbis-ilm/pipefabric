@@ -6,6 +6,7 @@ add_definitions( -DTEST_DATA_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/test_data/")
 
 if (BUILD_TEST_CASES)
   add_library(TestMain OBJECT TestMain.cpp)
+  add_dependencies(TestMain pfabric_core)
   do_test(FlowTest)
   do_test(TupleTest)
   do_test(TimestampHelperTest)
