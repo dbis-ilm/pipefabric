@@ -664,24 +664,61 @@ class Pipe {
   }
 
   /**
-   * TODO
+   * @brief Creates a batching operator for batching up tuples.
+   *
+   * Creates a batch operator which gathers tuples until the batch is full, forwarding them
+   * at once, as the next operator on the pipe.
+   *
+   * @tparam BatchPtr<T>
+   *      the batch pointer on tuple T for the operator.
+   * @param[in] bsize
+   *      the size of how many tuples a batch should contain
+   * @return a new pipe
    */
-  Pipe<BatchPtr<T>> batch(std::size_t bsize = SIZE_MAX) noexcept(false) {
-    auto op = std::make_shared<Batcher<T>>(bsize);
-    auto iter = addPublisher<Batcher<T>, DataSource<T>>(op);
-    return Pipe<BatchPtr<T>>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
-                             partitioningState, numPartitions);
+  Pipe<BatchPtr<T>> batch(size_t bsize = SIZE_MAX) noexcept(false) {
+    if (partitioningState == NoPartitioning) {
+      auto op = std::make_shared<Batcher<T>>(bsize);
+      auto iter = addPublisher<Batcher<T>, DataSource<T>>(op);
+      return Pipe<BatchPtr<T>>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
+                               partitioningState, numPartitions);
+    } else {
+      std::vector<std::shared_ptr<Batcher<T>>> ops;
+      for (auto i = 0u; i < numPartitions; i++) {
+        ops.push_back(std::make_shared<Batcher<T>>(bsize));
+      }
+      auto iter = addPartitionedPublisher<Batcher<T>, T>(ops);
+      return Pipe<BatchPtr<T>>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
+                               partitioningState, numPartitions);
+    }
   }
 
-  /*
-   * TODO: This doesn't work. Find a better way!
-   * Pipe<T::element_type> unbatch() throw(TopologyException) {
-   *  auto op = std::make_shared<UnBatcher<T::element_type>>();
-   *   auto iter = addPublisher<UnBatcher<T::element_type>, DataSource<T::element_type>>(op);
-   *   return Pipe<T::element_type>(dataflow, iter, keyExtractor, timestampExtractor,
-   *                  partitioningState, numPartitions);
-   *  }
+  /**
+   * @brief Creates an unbatching operator for extracting tuples from a batch.
+   *
+   * Creates an unbatch operator which extracts tuples from a batch, forwarding them
+   * tuplewise, as the next operator on the pipe.
+   *
+   * @tparam Tout
+   *      the tuple format after extracting tuples from the batch
+   * @return a new pipe
    */
+  template <class Tout>
+  Pipe<Tout> unbatch() noexcept(false) {
+    if (partitioningState == NoPartitioning) {
+      auto op = std::make_shared<UnBatcher<Tout>>();
+      auto iter = addPublisher<UnBatcher<Tout>, DataSource<BatchPtr<Tout>>>(op);
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
+                        partitioningState, numPartitions);
+    } else {
+      std::vector<std::shared_ptr<UnBatcher<Tout>>> ops;
+      for (auto i = 0u; i < numPartitions; i++) {
+        ops.push_back(std::make_shared<UnBatcher<Tout>>());
+      }
+      auto iter = addPartitionedPublisher<UnBatcher<Tout>, BatchPtr<Tout>>(ops);
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
+                        partitioningState, numPartitions);
+    }
+  }
 
   /**
    * @brief
@@ -765,12 +802,20 @@ class Pipe {
   Pipe<T> notify(typename Notify<T>::CallbackFunc func,
                  typename Notify<T>::PunctuationCallbackFunc pfunc =
                      nullptr) noexcept(false) {
-    assert(partitioningState == NoPartitioning);
-
-    auto op = std::make_shared<Notify<T>>(func, pfunc);
-    auto iter = addPublisher<Notify<T>, DataSource<T>>(op);
-    return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
-                   partitioningState, numPartitions);
+    if (partitioningState == NoPartitioning) {
+      auto op = std::make_shared<Notify<T>>(func, pfunc);
+      auto iter = addPublisher<Notify<T>, DataSource<T>>(op);
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
+                     partitioningState, numPartitions);
+    } else {
+      std::vector<std::shared_ptr<Notify<T>>> ops;
+      for (auto i = 0u; i < numPartitions; i++) {
+        ops.push_back(std::make_shared<Notify<T>>(func, pfunc));
+      }
+      auto iter = addPartitionedPublisher<Notify<T>, T>(ops);
+      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
+                     partitioningState, numPartitions);
+    }
   }
 
   /**
