@@ -39,7 +39,7 @@
 #include "qop/MemorySource.hpp"
 #include "qop/ToTable.hpp"
 #include "qop/FromTable.hpp"
-#include "qop/FromMVCCTables.hpp"
+#include "qop/FromTxTables.hpp"
 #include "qop/SelectFromTable.hpp"
 #include "qop/SelectFromTxTable.hpp"
 #include "qop/SelectFromMVCCTable.hpp"
@@ -399,11 +399,11 @@ namespace pfabric {
       return Pipe<T>(dataflow, dataflow->addPublisher(op));
     }
 
-    template<typename T, typename KeyType = DefaultKeyType>
-    Pipe<T> fromMVCCTables(
+    template<typename TableType, typename T, size_t TxSize>
+    Pipe<T> fromTxTables(
       unsigned int keyRange,
-      StateContext<typename T::element_type, KeyType>& sCtx) {
-      auto op = std::make_shared<FromMVCCTables<T, KeyType>>(keyRange, sCtx);
+      StateContext<TableType>& sCtx) {
+      auto op = std::make_shared<FromTxTables<TableType, T, TxSize>>(keyRange, sCtx);
       registerStartupFunction([=]() -> unsigned long { return op->start(); });
       return Pipe<T>(dataflow, dataflow->addPublisher(op));
     }

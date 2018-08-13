@@ -17,8 +17,8 @@
  * along with PipeFabric. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef FromMVCCTable_hpp_
-#define FromMVCCTable_hpp_
+#ifndef FromTxTable_hpp_
+#define FromTxTable_hpp_
 
 #include <random>
 
@@ -28,11 +28,11 @@
 #include "pubsub/channels/ConnectChannels.hpp"
 #include "qop/BaseOp.hpp"
 #include "qop/OperatorMacros.hpp"
-#include "table/MVCCTable.hpp"
+#include "table/Table.hpp"
 
 namespace pfabric {
 
-  /**
+ /**
    * @brief A SelectFromTable operator creates a stream from the tuples
    * of a relational table.
    *
@@ -44,15 +44,15 @@ namespace pfabric {
    * @tparam KeyType
    *    the data type of the key for identifying tuples in the table
    */
-  template<typename StreamElement, typename KeyType = DefaultKeyType>
-  class FromMVCCTables : public DataSource<StreamElement> {
+  template<typename TableType, typename StreamElement, size_t TxSize>
+  class FromTxTables : public DataSource<StreamElement> {
   public:
     PFABRIC_SOURCE_TYPEDEFS(StreamElement);
-    using RecordType = typename StreamElement::element_type;
-    using TablePtr = std::shared_ptr<MVCCTable<RecordType, KeyType>>;
-    using SCtxType = StateContext<RecordType, KeyType>;
-    using Predicate = typename MVCCTable<RecordType, KeyType>::Predicate;
-
+    using RecordType = typename TableType::RType;
+    using KeyType = typename TableType::KType;
+    using TablePtr = std::shared_ptr<TableType>;
+    using SCtxType = StateContext<TableType>;
+    using Predicate = typename TableType::Predicate;
 
     /**
      * Create a new SelectFromTable operator that produces a stream of tuples
@@ -61,50 +61,61 @@ namespace pfabric {
      * @param tbl the table that is read
      * @param pred an optional filter predicate
      */
-    FromMVCCTables(unsigned int keyRange, SCtxType& sCtx)
-      : mTables{sCtx.registeredStates[0], sCtx.registeredStates[1]}, dis{0, keyRange}, mSCtx{sCtx} {}
+    FromTxTables(unsigned int keyRange, SCtxType& sCtx)
+      : mTables{sCtx.regStates[0], sCtx.regStates[1]}, dis{0, keyRange}, mSCtx{sCtx} {}
 
     /**
      * Deallocates all resources.
      */
-    ~FromMVCCTables() {}
+    ~FromTxTables() {}
 
     unsigned long start() {
       auto mTxnID = mSCtx.newTx();
-//      std::cout << "MyTxnID: " << mTxnID << '\n';
-      std::random_device rd;
-      std::mt19937 gen(rd());
-      const KeyType mKeys[2] = {dis(gen), dis(gen)};
-      //std::cout << "Keys: " << mKeys[0] << ", " << mKeys[1] << '\n';
+      KeyType mKeys[TxSize];
+      for(auto i = 0u; i < TxSize; i++) {
+        mKeys[i] = dis(mSCtx.rndGen);
+      }
 
       assert(mTables[0].get() != nullptr);
       assert(mTables[1].get() != nullptr);
 
-      SmartPtr<RecordType> tpls[2][2];
+      SmartPtr<RecordType> tpls[2][TxSize];
 
       restart:;
-      for (auto i = 0u; i < 2; i++) {
-        for (auto j = 0u; j < 2; j++) {
-          if (mTables[i]->getByKey(mTxnID, mKeys[j], tpls[i][j]) != 0) {
-            /* restart, caused by inconsistency */
+      for (auto j = 0u; j < TxSize; j++) {
+        for (auto i = 0u; i < 2; i++) {
+          if (mTables[i]->getByKey(mTxnID, mKeys[j], tpls[i][j]) != Errc::SUCCESS) {
+            /* restart, caused by inconsistency or other erros */
+//            std::cout << "Key: " << mKeys[j] << std::endl;
             mSCtx.restarts++;
-            mTxnID = mSCtx.newTx();
-            boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
-            //goto restart;
+            mTables[0]->cleanUpReads(mKeys, i?j+1:j);
+            mTables[1]->cleanUpReads(mKeys, j);
+//            boost::this_thread::sleep_for(boost::chrono::microseconds(5*TxSize));
+            boost::this_thread::interruption_point();
+            goto restart;
             return 0;
           }
         }
       }
-      // when everything consistent, publish the tuples
-      //TODO: check if same for correctness criteria
+
+      /* check if same for correctness criteria */
+//      for (auto j = 0u; j < TxSize; j++) {
+//        if (std::get<2>(*tpls[0][j]) != std::get<2>(*tpls[1][j]))
+//          std::cout << "ERROR: INCONSISTENT READ\n";
+//      }
+
+      /* when everything consistent, publish the tuples */
       for (auto i = 0u; i < 2; i++) {
-        for (auto j = 0u; j < 2; j++) {
+        for (auto j = 0u; j < TxSize; j++) {
           this->getOutputDataChannel().publish(tpls[i][j], false);
         }
       }
 
       this->getOutputPunctuationChannel().publish(PunctuationPtr(new Punctuation(Punctuation::EndOfStream)));
-      return 4;
+      mTables[0]->cleanUpReads(mKeys, TxSize);
+      mTables[1]->cleanUpReads(mKeys, TxSize);
+      mSCtx.removeTx(mTxnID);
+      return 2*TxSize;
     }
 
   private:

@@ -51,7 +51,6 @@
 #include "qop/TextFileSource.hpp"
 #include "qop/ToTable.hpp"
 #include "qop/ToTxTable.hpp"
-#include "qop/ToMVCCTable.hpp"
 #include "qop/TumblingWindow.hpp"
 #include "qop/TupleDeserializer.hpp"
 #include "qop/TupleExtractor.hpp"
@@ -1463,43 +1462,20 @@ class Pipe {
    *    the input tuple type (usually a TuplePtr) for the operator which is
    * also
    *    used as the record type of the table.
-   * @tparam KeyType
-   *    the data type representing keys in the table
+   * @tparam TableType
+   *    the type of the table to insert into
    * @param[in] tbl
    *    a pointer to the table object where the tuples are stored
    * @param[in] autoCommit
    *    @c true if each tuple is handled within its own transaction context
    * @return a new pipe
    */
-  template <typename KeyType = DefaultKeyType>
-  Pipe<T> toTxTable(std::shared_ptr<TxTable<typename T::element_type, KeyType>> tbl,
+  template <typename TableType>
+  Pipe<T> toTxTable(std::shared_ptr<TableType> tbl,
                   bool autoCommit = false) throw(TopologyException) {
-    typedef std::function<KeyType(const T&)> KeyExtractorFunc;
-    typedef std::function<TransactionID(const T&)> TxIDExtractorFunc;
-
-    assert(partitioningState == NoPartitioning);
-
-    try {
-      KeyExtractorFunc keyFunc =
-          boost::any_cast<KeyExtractorFunc>(keyExtractor);
-
-      TxIDExtractorFunc txFunc =
-        boost::any_cast<TxIDExtractorFunc>(transactionIDExtractor);
-
-      auto op = std::make_shared<ToTxTable<T, KeyType>>(tbl, keyFunc, txFunc, autoCommit);
-      auto iter = addPublisher<ToTxTable<T, KeyType>, DataSource<T>>(op);
-      return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
-                     partitioningState, numPartitions);
-    } catch (boost::bad_any_cast& e) {
-      throw TopologyException("No KeyExtractor or TransactionIDExtractor defined for toTxTable.");
-    }
-  }
-
-  template <typename KeyType = DefaultKeyType>
-  Pipe<T> toMVCCTable(std::shared_ptr<MVCCTable<typename T::element_type, KeyType>> tbl,
-                    bool autoCommit = false) throw(TopologyException) {
-    typedef std::function<KeyType(const T&)> KeyExtractorFunc;
-    typedef std::function<TransactionID(const T&)> TxIDExtractorFunc;
+    using KeyType = typename TableType::KType;
+    using KeyExtractorFunc = std::function<KeyType(const T&)>;
+    using TxIDExtractorFunc = std::function<TransactionID(const T&)>;
 
     assert(partitioningState == NoPartitioning);
 
@@ -1510,12 +1486,12 @@ class Pipe {
       TxIDExtractorFunc txFunc =
         boost::any_cast<TxIDExtractorFunc>(transactionIDExtractor);
 
-      auto op = std::make_shared<ToMVCCTable<T, KeyType>>(tbl, keyFunc, txFunc, autoCommit);
-      auto iter = addPublisher<ToMVCCTable<T, KeyType>, DataSource<T>>(op);
+      auto op = std::make_shared<ToTxTable<TableType, T>>(tbl, keyFunc, txFunc, autoCommit);
+      auto iter = addPublisher<ToTxTable<TableType, T>, DataSource<T>>(op);
       return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                      partitioningState, numPartitions);
     } catch (boost::bad_any_cast& e) {
-      throw TopologyException("No KeyExtractor or TransactionIDExtractor defined for toMVCCTable.");
+      throw TopologyException("No KeyExtractor or TransactionIDExtractor defined for toTxTable.");
     }
   }
 

@@ -91,7 +91,7 @@ public:
          a pointer to the newly created table
    */
   template <typename RecordType, typename KeyType = DefaultKeyType>
-  std::shared_ptr<Table<RecordType, KeyType>> createTable(const std::string& tblName) noexcept(false) {
+  std::shared_ptr<Table<RecordType, KeyType>> createTable(const std::string& tblName) {
     // first we check whether the table exists already
     auto it = mTableSet.find(tblName);
     if (it != mTableSet.end())
@@ -104,7 +104,7 @@ public:
   }
 
   template <typename RecordType, typename KeyType = DefaultKeyType>
-  std::shared_ptr<Table<RecordType, KeyType>> createTable(const TableInfo& tblInfo) noexcept(false) {
+  std::shared_ptr<Table<RecordType, KeyType>> createTable(const TableInfo& tblInfo) {
     // first we check whether the table exists already
     auto it = mTableSet.find(tblInfo.tableName());
     if (it != mTableSet.end())
@@ -117,7 +117,7 @@ public:
   }
 
   template <typename RecordType, typename KeyType = DefaultKeyType>
-  std::shared_ptr<TxTable<RecordType, KeyType>> createTxTable(const TableInfo& tblInfo) throw (TableException) {
+  std::shared_ptr<TxTable<RecordType, KeyType>> createTxTable(const TableInfo& tblInfo) {
     // first we check whether the table exists already
     auto it = mTableSet.find(tblInfo.tableName());
     if (it != mTableSet.end())
@@ -130,10 +130,9 @@ public:
   }
 
   template <typename RecordType, typename KeyType = DefaultKeyType>
-  std::shared_ptr<MVCCTable<RecordType,
-                            KeyType>> createMVCCTable(const TableInfo &tblInfo,
-                                                      StateContext<RecordType,
-                                                        KeyType> &sCtx) {
+  std::shared_ptr<MVCCTable<RecordType, KeyType>> createMVCCTable(
+      const TableInfo &tblInfo,
+      StateContext<MVCCTable<RecordType, KeyType>> &sCtx) {
     // first we check whether the table exists already
     auto it = mTableSet.find(tblInfo.tableName());
     if (it != mTableSet.end())
@@ -141,6 +140,22 @@ public:
 
     // create a new table and register it
     auto tbl = std::make_shared<MVCCTable<RecordType, KeyType>>(tblInfo, sCtx);
+    tbl->registerState();
+    mTableSet[tblInfo.tableName()] = tbl;
+    return tbl;
+  }
+
+  template <typename RecordType, typename KeyType = DefaultKeyType>
+  std::shared_ptr<S2PLTable<RecordType, KeyType>> createS2PLTable(
+      const TableInfo &tblInfo,
+      StateContext<S2PLTable<RecordType, KeyType>> &sCtx) {
+    // first we check whether the table exists already
+    auto it = mTableSet.find(tblInfo.tableName());
+    if (it != mTableSet.end())
+      throw TableException("table already exists");
+
+    // create a new table and register it
+    auto tbl = std::make_shared<S2PLTable<RecordType, KeyType>>(tblInfo, sCtx);
     tbl->registerState();
     mTableSet[tblInfo.tableName()] = tbl;
     return tbl;

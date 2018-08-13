@@ -8,7 +8,7 @@ void generateWorkload(const std::string &name) {
 
   workload_file.open(name);
 
-  for (auto t = 1u; t <= workloadNumTxs; ++t) {
+  for (auto t = 2u; t <= workloadNumTxs+1; ++t) {
     for(auto k = 0u; k < txSize; ++k) {
       auto key = dis(gen);
       wl.addEntry(t, {key, key * 100, t * 1.23});

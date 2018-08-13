@@ -17,8 +17,8 @@
  * along with PipeFabric. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TxTable_hpp_
-#define TxTable_hpp_
+#ifndef S2PLTable_hpp_
+#define S2PLTable_hpp_
 
 #include <exception>
 #include <functional>
@@ -45,9 +45,62 @@
 #include "table/BaseTable.hpp"
 #include "table/TableException.hpp"
 #include "table/TableInfo.hpp"
-#include "table/LogBuffer.hpp"
 
 namespace pfabric {
+
+
+template <typename KeyType>
+class S2PLLocks {
+  //cf. https://stackoverflow.com/a/28121513
+  public:
+    int lockShared(KeyType key) {
+      auto &rl = locks[key];
+      std::unique_lock<std::mutex> lk(rl.shared);
+      if(rl.active_writer) {
+        lk.unlock();
+        return -1;
+      }
+      ++rl.active_readers;
+      lk.unlock();
+      return 0;
+    }
+
+    void lockExclusive(KeyType key) {
+      auto &rl = locks[key];
+      std::unique_lock<std::mutex> lk(rl.shared);
+      while(rl.active_readers != 0)
+        rl.writerQ.wait(lk);
+      rl.active_writer = true;
+      lk.unlock();
+    }
+
+    void unlockShared(KeyType key) {
+      auto &rl = locks[key];
+      std::unique_lock<std::mutex> lk(rl.shared);
+      --rl.active_readers;
+      lk.unlock();
+      rl.writerQ.notify_one();
+    }
+
+    void unlockExclusive(KeyType key) {
+      auto &rl = locks[key];
+      std::unique_lock<std::mutex> lk(rl.shared);
+      rl.active_writer = false;
+      //rl.readerQ.notify_all();
+      lk.unlock();
+    }
+
+  private:
+    struct RowLock {
+      std::mutex              shared{};
+      //std::condition_variable readerQ;
+      std::condition_variable writerQ{};
+      int                     active_readers{0};
+      bool                    active_writer{false};
+    };
+    std::unordered_map<KeyType, RowLock> locks;
+};
+
 
 /**
  * @brief Table is a class for storing a relation of tuples of the same type.
@@ -63,85 +116,110 @@ namespace pfabric {
  *         the data type of the key column (default = int)
  */
 template <typename RecordType, typename KeyType = DefaultKeyType>
-class TxTable : public BaseTable {
- public:
+class S2PLTable : public BaseTable,
+                  public std::enable_shared_from_this<S2PLTable<RecordType,
+                                                                KeyType>> {
+  using SCtxType = StateContext<S2PLTable<RecordType, KeyType>>;
 
+ public:
 #ifdef USE_ROCKSDB_TABLE
-  typedef RDBTable<RecordType, KeyType> Table;
+  using Table = RDBTable<RecordType, KeyType>;
 #else
-  typedef HashMapTable<RecordType, KeyType> Table;
+  using Table = HashMapTable<RecordType, KeyType>;
 #endif
 
+  /** For external access to template parameters */
   using RType = RecordType;
   using KType = KeyType;
 
-  //< typedef for a predicate evaluated using a scan
-  // typedef std::function<bool(const RecordType&)> Predicate;
+  /** alias for a predicate evaluated using a scan */
+  //using Predicate = std::function<bool(const RecordType&)>;
 
-  //< typedef for a updater function which returns a modification of the
-  // parameter tuple
-  typedef typename Table::UpdaterFunc UpdaterFunc;
+  /** alias for a updater function which returns a modification of the
+   * parameter tuple */
+  using UpdaterFunc = typename Table::UpdaterFunc;
 
-  //< typedefs for a function performing updates + deletes. Similar to
-  // UpdaterFunc
-  //< it allows to update the tuple, but also to delete it (indictated by the
-  //< setting the bool component of @c UpdateResult to false)
-  typedef typename Table::UpdelFunc UpdelFunc;
+  /** aliases for a function performing updates + deletes. Similar to
+   * UpdaterFunc, it allows to update the tuple, but also to delete it
+   * (indictated by the setting the bool component of @c UpdateResult to false)
+   */
+  using UpdelFunc = typename Table::UpdelFunc;
+  using InsertFunc = typename Table::InsertFunc;
 
-  typedef typename Table::InsertFunc InsertFunc;
+  /** alias for an iterator to scan the table */
+  using TableIterator = typename Table::TableIterator;
 
-  //< typedef for an iterator to scan the table
-  typedef typename Table::TableIterator TableIterator;
+  /** alias for a predicate evaluated using a scan: see @TableIterator for
+   * details */
+  using Predicate = typename Table::Predicate;
 
-  //< typedef for a predicate evaluated using a scan: see @TableIterator for
-  // details
-  typedef typename Table::Predicate Predicate;
-
-  TxTable(const TableInfo& tInfo) throw(TableException)
-      : BaseTable(tInfo), tbl(tInfo) {
-  }
+  S2PLTable(const TableInfo& tInfo, SCtxType& sCtx) noexcept(noexcept(Table(tInfo)))
+      : BaseTable(tInfo), tbl(tInfo), sCtx{sCtx} {}
+  
+  S2PLTable(const std::string& tableName, SCtxType& sCtx) noexcept(noexcept(Table(tableName)))
+      : tbl(tableName), sCtx{sCtx} {}
 
   /**
    * Constructor for creating an empty table.
    */
-  TxTable(const std::string& tableName) throw(TableException)
+  S2PLTable(const std::string& tableName) throw(TableException)
   : tbl(tableName) {
   }
 
   /**
     * Destructor for table.
     */
-  ~TxTable() {}
+  ~S2PLTable() {}
 
-  void transactionBegin(const TransactionID& txID) {}
-
-  void transactionPreCommit(const TransactionID& txID) {
-    transactionCommit(txID);
+  /*==========================================================================*
+   * Transactional Operations                                                 *
+   *==========================================================================*/
+  void registerState() {
+    tblID = sCtx.registerState(this->shared_from_this());
   }
 
-  void transactionCommit(const TransactionID& txID) {
-    // TODO: use a more efficient way (lock per transaction)
-    std::lock_guard<std::mutex> guard(tblMtx);
+  void transactionBegin(const TransactionID& txnID) {}
 
-    for (auto iter = logBuffer.begin(txID); iter != logBuffer.end(txID); iter++) {
-      switch (iter->logOp) {
-        case LogOp::Insert:
-          tbl.insert(iter->key, *(iter->recordPtr));
-          break;
-        case LogOp::Update:
-          // TODO
-          break;
-        case LogOp::Delete:
-          tbl.deleteByKey(iter->key);
-          break;
-      }
+  Errc transactionPreCommit(const TransactionID& txnID) {
+    TableID otherID = (tblID == 0) ? 1 : 0;
+
+    auto& thisState = sCtx.getWriteStatus(txnID, tblID);
+    auto& otherState = sCtx.getWriteStatus(txnID, otherID);;
+    auto s = Errc::SUCCESS;
+    thisState = Status::Commit;
+
+    if(otherState == Status::Commit) {
+      s = this->transactionCommit(txnID);
+      if (s != Errc::SUCCESS) return s;
+      s = sCtx.regStates[otherID]->transactionCommit(txnID);
+      sCtx.removeTx(txnID);
     }
-    logBuffer.cleanup(txID);
+    return s;
+  }
+  
+  Errc transactionCommit(const TransactionID& txnID) {
+    for (const auto &k : wKeysLocked) {
+      locks.unlockExclusive(k);
+    }
+    wKeysLocked.clear();
+    return Errc::SUCCESS;
   }
 
-  void transactionAbort(const TransactionID& txID) {
-    logBuffer.cleanup(txID);
+  void transactionAbort(const TransactionID& txnID) {
+    // theoretically undo
+    for (const auto &k : wKeysLocked)
+      locks.unlockExclusive(k);
+    wKeysLocked.clear();
   }
+
+  void cleanUpReads(const KeyType* keys, const size_t until) {
+    for(auto i = 0u; i < until; i++)
+      locks.unlockShared(keys[i]);
+  }
+
+  /*==========================================================================*
+   * Table Operations                                                         *
+   *==========================================================================*/
 
   /**
    * @brief Insert or update a tuple.
@@ -154,9 +232,12 @@ class TxTable : public BaseTable {
    * @param key the key value of the tuple
    * @param rec the actual tuple
    */
-  void insert(const TransactionID& txID, KeyType key, const RecordType& rec) throw(TableException) {
-    // Tx support
-    logBuffer.append(txID, LogOp::Insert, key, rec);
+  void insert(const TransactionID& txnID, KeyType key, const RecordType& rec) {
+    //lockKey - wait
+    locks.lockExclusive(key);
+    wKeysLocked.push_back(key);
+    // insert
+    tbl.insert(key, rec);
   }
 
   /**
@@ -168,10 +249,10 @@ class TxTable : public BaseTable {
    * @param key the key for which the tuples are deleted from the table
    * @return the number of deleted tuples
    */
-  unsigned long deleteByKey(const TransactionID& txID, KeyType key) {
-    // Tx support
-    logBuffer.append(txID, LogOp::Delete, key);
-    return 1;
+  unsigned long deleteByKey(const TransactionID& txnID, KeyType key) {
+    locks.lockExclusive(key);
+    wKeysLocked.push_back(key);
+    return tbl.deleteByKey(key);
   }
 
   /**
@@ -252,7 +333,20 @@ class TxTable : public BaseTable {
    * @param key the key value
    * @return the tuple associated with the given key
    */
-  SmartPtr<RecordType> getByKey(KeyType key) throw(TableException) { return tbl.getByKey(key); }
+  Errc getByKey(const TransactionID txnID, const KeyType key, SmartPtr<RecordType> &outValue) { 
+    if (locks.lockShared(key)) {
+      return Errc::ABORT;
+    }
+    SmartPtr<RecordType> tplPtr;
+    try {
+      tplPtr = tbl.getByKey(key);
+    } catch (TableException exc) {
+      locks.unlockShared(key);
+      return Errc::NOT_FOUND;
+    }
+    outValue = tplPtr;
+    return Errc::SUCCESS;
+  }
 
   /**
    * @brief Return a pair of iterators for scanning the table with a
@@ -299,9 +393,11 @@ class TxTable : public BaseTable {
   void drop() { tbl.drop(); }
 
  private:
-  std::mutex tblMtx;
+  S2PLLocks<KeyType> locks;
+  std::vector<KeyType> wKeysLocked;
   Table tbl;
-  LogBuffer<KeyType, RecordType> logBuffer;
+  TableID tblID;
+  SCtxType& sCtx;
 };
 }
 

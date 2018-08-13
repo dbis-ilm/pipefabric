@@ -35,27 +35,28 @@
 
 using namespace pfabric;
 
+using TableType = MVCCTable<AccountPtr::element_type, uint_t>;
+
 // A state class for chopping the data stream into transactions
 struct TxState {
   TxState() : lastTx(0) {}
-
   TransactionID lastTx;
 };
 
-static StateContext<AccountPtr::element_type, uint_t> sCtx{};
+static StateContext<TableType> sCtx{};
 
 int main() {
   PFabricContext ctx;
   /* --- Create the table for storing account information --- */
-  TableInfo tblInfo("accounts",
-                    {ColumnInfo("LastTxID", ColumnInfo::UInt_Type),
+  TableInfo tblInfo("accounts", {
+                     ColumnInfo("LastTxID", ColumnInfo::UInt_Type),
                      ColumnInfo("AccountID", ColumnInfo::UInt_Type),
                      ColumnInfo("CustomerName", ColumnInfo::UInt_Type),
                      ColumnInfo("Balance", ColumnInfo::Double_Type)},
                     ColumnInfo::UInt_Type);
 
-  TableInfo tblInfo2("replica",
-                     {ColumnInfo("LastTxID", ColumnInfo::UInt_Type),
+  TableInfo tblInfo2("replica", {
+                      ColumnInfo("LastTxID", ColumnInfo::UInt_Type),
                       ColumnInfo("AccountID", ColumnInfo::UInt_Type),
                       ColumnInfo("CustomerName", ColumnInfo::UInt_Type),
                       ColumnInfo("Balance", ColumnInfo::Double_Type)},
@@ -66,27 +67,26 @@ int main() {
   auto replicaTable =
     ctx.createMVCCTable<AccountPtr::element_type, uint_t>(tblInfo2, sCtx);
 
-  /* --- The function for chopping the stream into transactions --- */
+  /*==========================================================================*
+   * The function for chopping the stream into transactions                   *
+   *==========================================================================*/
   auto txChopping =
     [&](const AccountPtr &tp, bool,
         StatefulMap<AccountPtr, AccountPtr, TxState> &self) -> AccountPtr {
       if (self.state()->lastTx == 0) {
-        // we received the first tuple - let's begin a new transaction
+        /* we received the first tuple - let's begin a new transaction */
         const auto txID = sCtx.newTx();
         sCtx.tToTX[get<0>(tp)] = txID;
         self.publishPunctuation(
           std::make_shared<Punctuation>(Punctuation::TxBegin, txID, 0));
       } else if (self.state()->lastTx != get<0>(tp)) {
-        // we start a new transaction but first commit the previous one
+        /* we start a new transaction but first commit the previous one */
 //      std::cout << "Commit of tx #" << self.state()->lastTx
 //                << "(" << sCtx.tToTX[self.state()->lastTx] << ")\n";
         self.publishPunctuation(std::make_shared<Punctuation>(
           Punctuation::TxCommit, sCtx.tToTX[self.state()->lastTx], 0));
         self.state()->lastTx = get<0>(tp);
 
-        // we wait 10 seconds to run another query concurrently
-//        using namespace std::chrono_literals;
-//        std::this_thread::sleep_for(1ms);
         const auto txID = sCtx.newTx();
         sCtx.tToTX[get<0>(tp)] = txID;
         self.publishPunctuation(
@@ -96,33 +96,42 @@ int main() {
       return tp;
     };
 
-  /* --- Topology #1: Process a transactional data stream --- */
+  /*==========================================================================*
+   * Topology #1: Writer transactional data stream                            *
+   *==========================================================================*/
+  sCtx.registerTopo({accountTable, replicaTable});
   auto tWriter = ctx.createTopology();
-  auto s = tWriter->newStreamFromFile("wl_writes.csv")
-    .extract<AccountPtr>(',')
+  auto s = tWriter->newStreamFromMemory<AccountPtr>("wl_writes.csv")
     .statefulMap<AccountPtr, TxState>(txChopping)
     .assignTransactionID([&](auto tp) { return sCtx.tToTX[get<0>(tp)]; })
     .keyBy<1, uint_t>()
-    .toMVCCTable<uint_t>(accountTable)
-    .toMVCCTable<uint_t>(replicaTable);
+    .toTxTable<TableType>(accountTable)
+    .toTxTable<TableType>(replicaTable)
+    //.print(std::cout)
+    ;
 
-  /* --- Topology #2: Every 5 seconds print out the accounts table --- */
+  /*==========================================================================*
+   * Topology #2: Readers concurrently/consistent access to both tables       *
+   *==========================================================================*/
   PFabricContext::TopologyPtr tReaders[simReaders];
   for(auto i = 0u; i < simReaders; i++) {
     tReaders[i] = ctx.createTopology();
-    auto d = tReaders[i]->fromMVCCTables<AccountPtr, uint_t>(keyRange-1, sCtx)
+    auto d = tReaders[i]->fromTxTables<TableType, AccountPtr, txSize>(keyRange-1, sCtx)
       .map<ResultPtr>([](auto tp, bool) -> ResultPtr {
         return makeTuplePtr(get < 1 > (tp), get < 2 > (tp), get < 3 > (tp));
-      });
-//    .print(std::cout);
+      })
+    //.print(std::cout)
+    ;
   }
 
-  /* Prepare Tables */
+  /*==========================================================================*
+   * Prepare Tables                                                           *
+   *==========================================================================*/
   {
     auto start = std::chrono::high_resolution_clock::now();
     for (auto i = 0u; i < keyRange; i++) {
-      accountTable->insert(0, i, {0, i, i * 100, i * 1.0});
-      replicaTable->insert(0, i, {0, i, i * 100, i * 1.0});
+      accountTable->insert(1, i, {1, i, i * 100, i * 1.0});
+      replicaTable->insert(1, i, {1, i, i * 100, i * 1.0});
     }
     auto end = std::chrono::high_resolution_clock::now();
     auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -130,8 +139,8 @@ int main() {
     std::cout << "Insert time: " << diff << "ms\n";
 
     start = std::chrono::high_resolution_clock::now();
-    accountTable->transactionCommit(0);
-    replicaTable->transactionCommit(0);
+    accountTable->transactionCommit(1);
+    replicaTable->transactionCommit(1);
     end = std::chrono::high_resolution_clock::now();
     diff = std::chrono::duration_cast<std::chrono::milliseconds>(
       end - start).count();
@@ -140,8 +149,12 @@ int main() {
 
   std::vector<typename std::chrono::duration<int64_t, std::milli>::rep> measures;
 
+  /*==========================================================================*
+   * Run Topologies                                                           *
+   *==========================================================================*/
   for (auto j = 0u; j < repetitions; j++) {
-    sCtx.running = true;
+    tWriter->prepare();
+
     auto start = std::chrono::high_resolution_clock::now();
 
     tWriter->start(true);
@@ -156,13 +169,14 @@ int main() {
     tWriter->cleanStartupFunctions();
     for (const auto &t : tReaders) t->stopThreads();
 
-    sCtx.running = false;
-    using namespace std::chrono_literals;
-    std::this_thread::sleep_for(3s);
+//    using namespace std::chrono_literals;
+//    std::this_thread::sleep_for(3s);
   }
 
 
-
+  /*==========================================================================*
+   * Accumulate Measures                                                      *
+   *==========================================================================*/
   const auto avg = std::accumulate(measures.begin(), measures.end(), 0) / measures.size();
   const auto throughput = sCtx.nextTxID.load() *1000 / std::accumulate(measures.begin(), measures.end(), 0);
   const auto errors = sCtx.restarts.load() * 100.0 / sCtx.nextTxID.load();

@@ -11,11 +11,20 @@ target_link_libraries(txproc
      ${Boost_THREAD_LIBRARY}
 )
 
-add_executable(txproc2 TxProcessing2.cpp)
-target_link_libraries(txproc2
+add_executable(mvcc MVCCExample.cpp)
+target_link_libraries(mvcc
   pfabric_core
+  ${ROCKSDB_LIB}
   ${Boost_SYSTEM_LIBRARY}
   #${BENCHMARK_LIB}
+  ${MALLOC_LIB}
+  )
+
+add_executable(s2pl S2PLExample.cpp)
+target_link_libraries(s2pl
+  pfabric_core
+  ${ROCKSDB_LIB}
+  ${Boost_SYSTEM_LIBRARY}
   ${MALLOC_LIB}
   )
 

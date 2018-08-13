@@ -47,6 +47,8 @@ typedef TuplePtr<TransactionID, uint_t, std::string, double> AccountPtr;
 // AccountID, CustomerName, Balance
 typedef TuplePtr<uint_t, std::string, double> ResultPtr;
 
+using TableType = TxTable<AccountPtr::element_type, uint_t>;
+
 // A state class for chopping the data stream into transactions
 struct TxState {
   TxState() : lastTx(0) {}
@@ -105,7 +107,7 @@ int main(int argc, char **argv) {
                .statefulMap<AccountPtr, TxState>(txChopping)
                .assignTransactionID([](auto tp) { return get<0>(tp); })
                .keyBy<1, uint_t>()
-               .toTxTable<uint_t>(accountTable);
+               .toTxTable<TableType>(accountTable);
   t1->start();
 
   /* --- Topology #2: Every 5 seconds print out the accounts table --- */

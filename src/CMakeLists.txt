@@ -38,7 +38,7 @@ option(BUILD_PYTHON            "build python interface for pipefabric"          
 
 # Use cases require matrix support (image and graph processing)
 if(BUILD_USE_CASES)
-  set(SUPPORT_MATRICES ON)
+    set(SUPPORT_MATRICES OFF)
 endif()
 
 # Benchmark test requires benchmark library
@@ -52,7 +52,7 @@ endif()
 #CMAKE_FORCE_CXX_COMPILER(icpc "Intel C++ Compiler")
 
 # C++ compiler flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated -O3 -Wsign-compare")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated -g -O3 -Wsign-compare")
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedefs -Wno-#pragma-messages")
 elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
@@ -321,6 +321,13 @@ if(SUPPORT_MATRICES)
   else()
     message(STATUS "Eigen3 not found")
   endif()
+  find_package(OpenCV REQUIRED)
+  if(OpenCV_FOUND)
+    message(STATUS "using OpenCV library for image processing")
+    include_directories(${OpenCV_INCLUDE_DIR})
+  else()
+    message(STATUS "OpenCV not found")
+  endif()
   add_definitions(-DSUPPORT_MATRICES)
 endif()
 
@@ -404,6 +411,7 @@ set(core_sources
   dsl/Dataflow.cpp
   dsl/PFabricContext.cpp
   table/TableInfo.cpp
+  table/StateContext.cpp
 )
 
 add_library(pfabric_core SHARED
@@ -503,13 +511,6 @@ add_subdirectory(test)
 #
 
 if(BUILD_USE_CASES)
-  find_package(OpenCV REQUIRED)
-  if(OpenCV_FOUND)
-    message(STATUS "using OpenCV library for image processing")
-    include_directories(${OpenCV_INCLUDE_DIR})
-  else()
-    message(STATUS "OpenCV not found")
-  endif()
   add_subdirectory(usecases)
 endif()
 

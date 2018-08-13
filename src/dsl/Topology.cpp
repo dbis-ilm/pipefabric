@@ -87,7 +87,7 @@ void Topology::wait() {
 void Topology::runEvery(unsigned long secs) {
   wakeupTimers.push_back(boost::thread([this, secs](){
         while(true) {
-          boost::this_thread::sleep_for(boost::chrono::milliseconds(secs));
+          boost::this_thread::sleep_for(boost::chrono::nanoseconds(secs));
           this->start(false);
         }
   }));
