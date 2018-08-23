@@ -15,7 +15,7 @@ download_project(PROJ               Catch
 add_custom_command(
         OUTPUT ${THIRD_PARTY_DIR}/catch
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                ${Catch_SOURCE_DIR}/single_include/catch.hpp
+                ${Catch_SOURCE_DIR}/single_include/catch2/catch.hpp
                 ${PROJECT_SOURCE_DIR}/test)
 
 #--------------------------------------------------------------------------------
@@ -160,3 +160,20 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E chdir ${ptable_SOURCE_DIR} $(MAKE) install
 )
 endif()
+
+#--------------------------------------------------------------------------------
+# Concurrent hash table
+download_project(PROJ               libcuckoo
+                GIT_REPOSITORY      https://github.com/efficient/libcuckoo
+                GIT_TAG             master
+                UPDATE_DISCONNECTED 1
+                QUIET
+)
+add_custom_command(
+        OUTPUT ${THIRD_PARTY_DIR}/libcuckoo
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/libcuckoo
+        COMMAND ${CMAKE_COMMAND} -E chdir ${libcuckoo_SOURCE_DIR} cmake -DBUILD_EXAMPLES=0 -DBUILD_TESTS=0
+		    COMMAND ${CMAKE_COMMAND} -E chdir ${libcuckoo_SOURCE_DIR} $(MAKE) all
+        COMMAND ${CMAKE_COMMAND} -E copy
+                ${libcuckoo_SOURCE_DIR}/libcuckoo/*.hh
+                ${THIRD_PARTY_DIR}/libcuckoo/)

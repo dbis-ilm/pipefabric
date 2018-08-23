@@ -18,6 +18,7 @@
  */
 
 #include "table/StateContext.hpp"
+#include <iostream>
 
 namespace pfabric {
 
@@ -49,23 +50,64 @@ uint8_t getFreePos(const uint64_t v) {
  *         from right to left). */
 uint8_t getSetFreePos(std::atomic<std::uint64_t> &v) {
   uint8_t pos;
-  uint64_t expected = v.load(std::memory_order_relaxed);
+  uint64_t expected = v.load();
   do {
     pos = getFreePos(expected); //TODO: catch if no free position
   } while(!v.compare_exchange_weak(expected, 
-        expected | (1ULL << pos), //< set bit at pos
-        std::memory_order_release, std::memory_order_relaxed));
+        expected | (1ULL << pos))); //< set bit at pos
   return pos;
 }
 
 /** @brief Atomically unsets the bit at position pos in v */
 void unsetPos(std::atomic<std::uint64_t> &v, const uint8_t pos) {
-  uint64_t expected;
-  uint64_t desired;
-  do {
-    expected = v.load();
-    desired = expected &  ~(1ULL << pos); //< unset bit at pos
-  } while(!v.compare_exchange_weak(expected, desired));
+  uint64_t expected = v.load();
+  while(!v.compare_exchange_weak(expected,
+        expected & ~(1ULL <<pos)));//< unset bit at pos
+}
+
+/* taken from https://stackoverflow.com/a/12996028 */
+unsigned int hashMe(unsigned int x) {
+  ++x;
+  x = ((x >> 16) ^ x) * 0x45d9f3b;
+  x = ((x >> 16) ^ x) * 0x45d9f3b;
+  x = (x >> 16) ^ x;
+  return x;
+}
+
+
+ZipfianGenerator::ZipfianGenerator(unsigned int min, unsigned int max, double zipfianconstant = ZIPFIAN_CONSTANT)
+      : items{max - min + 1}, base{min}, zipfianconstant{zipfianconstant}, theta{zipfianconstant} {
+
+        for(auto i = 0Lu; i < items; i++)
+          zetan += 1 / (std::pow(i + 1, theta));
+
+        for(auto i = 0Lu; i < 2; i++)
+          zeta2theta += 1 / (std::pow(i + 1, theta));
+
+        alpha = 1.0 / (1.0 - theta);
+        eta = (1 - std::pow(2.0 / items, 1 - theta)) / (1 - zeta2theta / zetan);
+
+        nextValue();
+}
+
+//unsigned int ZipfianGenerator::nextValue() { return nextInt(items); }
+
+/* Scrambled version */
+unsigned int ZipfianGenerator::nextValue() { 
+  auto ret = nextInt(items);
+  return base + hashMe(ret) % items;
+}
+
+unsigned int ZipfianGenerator::nextInt(unsigned int itemcount) {
+      double u = dist(gen);
+
+      double uz = u * zetan;
+
+      if (uz < 1.0) { return base;}
+      if (uz < 1.0 + std::pow(0.5, theta)) { return base + 1; }
+      unsigned int ret = base + (int) ((itemcount) * std::pow(eta * u - eta + 1, alpha));
+
+      return ret;
 }
 
 } /* end namespace pfabric */

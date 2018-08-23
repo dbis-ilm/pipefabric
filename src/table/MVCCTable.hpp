@@ -38,7 +38,7 @@
 #include "rocksdb/db.h"
 #include "table/RDBTable.hpp"
 #else
-#include "table/HashMapTable.hpp"
+#include "table/CuckooTable.hpp"
 #endif
 
 #include "core/serialize.hpp"
@@ -195,7 +195,7 @@ class MVCCTable : public BaseTable,
 #ifdef USE_ROCKSDB_TABLE
   using Table = RDBTable<pfabric::Tuple<MVCCObject<TupleType>>, KeyType>;
 #else
-  using Table = HashMapTable<pfabric::Tuple<MVCCObject<TupleType>>, KeyType>;
+  using Table = CuckooTable<pfabric::Tuple<MVCCObject<TupleType>>, KeyType>;
 #endif
  
   /** For external access to template parameters */
@@ -258,9 +258,8 @@ class MVCCTable : public BaseTable,
       s = this->transactionCommit(txnID);
       if (s != Errc::SUCCESS) return s;
       s = sCtx.regStates[otherID]->transactionCommit(txnID);
-      sCtx.setLastCTS(0, txnID);
+      sCtx.setLastCTS(0, txnID); //< this has actually to be persistent
       sCtx.removeTx(txnID);
-      //TODO: failure atomic!
     }
     return s;
   }
@@ -310,9 +309,9 @@ class MVCCTable : public BaseTable,
     /* Write new Entries */
     /* Unlock all*/
     for (auto e = 0u; e < numEntries; e++) {
-      locks.lockExclusive(newEntries[e].key);
+//      locks.lockExclusive(newEntries[e].key);
       tbl.insert(newEntries[e].key, newEntries[e].mvcc);
-      locks.unlockExclusive(newEntries[e].key);
+//      locks.unlockExclusive(newEntries[e].key);
     }
 
     /* Clean up */
@@ -458,16 +457,16 @@ class MVCCTable : public BaseTable,
       }
     }
     /* Get MVCC Object */
-    locks.lockShared(key);
+//    locks.lockShared(key);
     SmartPtr<pfabric::Tuple<MVCCObject<TupleType>>> tplPtr;
     try {
       tplPtr = tbl.getByKey(key);
     } catch (TableException exc) {
-      locks.unlockShared(key);
+//      locks.unlockShared(key);
       return Errc::NOT_FOUND;
     }
     const auto mvcc = get<0>(*tplPtr);
-    locks.unlockShared(key);
+//    locks.unlockShared(key);
    
     /* Get read CTS (version that was read first) for consistency */
     auto readCTS = sCtx.getReadCTS(txnID, 0);
@@ -538,7 +537,7 @@ class MVCCTable : public BaseTable,
   /*==========================================================================*
    * Members                                                                  *
    *==========================================================================*/
-  RWLocks<KeyType> locks;
+//  RWLocks<KeyType> locks;
   WriteSet<KeyType, RecordType> writeSet;
   Table tbl;
   TableID tblID;

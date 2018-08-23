@@ -84,6 +84,7 @@ set(core_sources
   # we need this as dependency to download the sources from github
   ${THIRD_PARTY_DIR}/json
   ${THIRD_PARTY_DIR}/fmt
+  ${THIRD_PARTY_DIR}/libcuckoo
   ${THIRD_PARTY_DIR}/SimpleWeb
   ${THIRD_PARTY_DIR}/catch
 )

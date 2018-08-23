@@ -46,6 +46,10 @@ struct TxState {
 static StateContext<TableType> sCtx{};
 
 int main() {
+  sCtx.keyRange = keyRange;
+  sCtx.uniMax = uniMax;
+  if(zipf) sCtx.zipfConst = zipfTheta;
+
   PFabricContext ctx;
   /* --- Create the table for storing account information --- */
   TableInfo tblInfo("accounts", {
@@ -73,16 +77,15 @@ int main() {
   auto txChopping =
     [&](const AccountPtr &tp, bool,
         StatefulMap<AccountPtr, AccountPtr, TxState> &self) -> AccountPtr {
-      if (self.state()->lastTx == 0) {
+      if (self.state()->lastTx == 0 || sCtx.tToTX.empty()) {
         /* we received the first tuple - let's begin a new transaction */
+        self.state()->lastTx = 0;
         const auto txID = sCtx.newTx();
         sCtx.tToTX[get<0>(tp)] = txID;
         self.publishPunctuation(
           std::make_shared<Punctuation>(Punctuation::TxBegin, txID, 0));
       } else if (self.state()->lastTx != get<0>(tp)) {
         /* we start a new transaction but first commit the previous one */
-//      std::cout << "Commit of tx #" << self.state()->lastTx
-//                << "(" << sCtx.tToTX[self.state()->lastTx] << ")\n";
         self.publishPunctuation(std::make_shared<Punctuation>(
           Punctuation::TxCommit, sCtx.tToTX[self.state()->lastTx], 0));
         self.state()->lastTx = get<0>(tp);
@@ -101,7 +104,7 @@ int main() {
    *==========================================================================*/
   sCtx.registerTopo({accountTable, replicaTable});
   auto tWriter = ctx.createTopology();
-  auto s = tWriter->newStreamFromMemory<AccountPtr>("wl_writes.csv")
+  auto s = tWriter->newStreamFromMemory<AccountPtr>(zipf? "wl_writes_zipf.csv" : "wl_writes_uni.csv")
     .statefulMap<AccountPtr, TxState>(txChopping)
     .assignTransactionID([&](auto tp) { return sCtx.tToTX[get<0>(tp)]; })
     .keyBy<1, uint_t>()
@@ -116,7 +119,7 @@ int main() {
   PFabricContext::TopologyPtr tReaders[simReaders];
   for(auto i = 0u; i < simReaders; i++) {
     tReaders[i] = ctx.createTopology();
-    auto d = tReaders[i]->fromTxTables<TableType, AccountPtr, txSize>(keyRange-1, sCtx)
+    auto d = tReaders[i]->fromTxTables<TableType, AccountPtr, txSize>(sCtx)
       .map<ResultPtr>([](auto tp, bool) -> ResultPtr {
         return makeTuplePtr(get < 1 > (tp), get < 2 > (tp), get < 3 > (tp));
       })
@@ -127,11 +130,12 @@ int main() {
   /*==========================================================================*
    * Prepare Tables                                                           *
    *==========================================================================*/
-  {
+  auto prepareTables = [&](){
     auto start = std::chrono::high_resolution_clock::now();
+    const auto txID = sCtx.newTx();
     for (auto i = 0u; i < keyRange; i++) {
-      accountTable->insert(1, i, {1, i, i * 100, i * 1.0});
-      replicaTable->insert(1, i, {1, i, i * 100, i * 1.0});
+      accountTable->insert(txID, i, {txID, i, i * 100, i * 1.0});
+      replicaTable->insert(txID, i, {txID, i, i * 100, i * 1.0});
     }
     auto end = std::chrono::high_resolution_clock::now();
     auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -139,20 +143,28 @@ int main() {
     std::cout << "Insert time: " << diff << "ms\n";
 
     start = std::chrono::high_resolution_clock::now();
-    accountTable->transactionCommit(1);
-    replicaTable->transactionCommit(1);
+    accountTable->transactionPreCommit(txID);
+    replicaTable->transactionPreCommit(txID);
     end = std::chrono::high_resolution_clock::now();
     diff = std::chrono::duration_cast<std::chrono::milliseconds>(
       end - start).count();
-    std::cout << "Commit time: " << diff << "ms\n\n";
-  }
+    std::cout << "Commit time: " << diff << "ms\n";
+
+
+    std::cout << "Created Tables with " << accountTable->size() << " elements each.\n\n";
+  };
 
   std::vector<typename std::chrono::duration<int64_t, std::milli>::rep> measures;
+  std::vector<TransactionID> txnCnt;
+  std::vector<unsigned int> restarts;
+
 
   /*==========================================================================*
    * Run Topologies                                                           *
    *==========================================================================*/
   for (auto j = 0u; j < repetitions; j++) {
+    std::cout << "Run " << j+1 << "/" << repetitions << '\n';
+    prepareTables();
     tWriter->prepare();
 
     auto start = std::chrono::high_resolution_clock::now();
@@ -164,13 +176,14 @@ int main() {
     auto end = std::chrono::high_resolution_clock::now();
     auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     measures.push_back(diff);
-
-    /* Wait for active threads */
+    txnCnt.push_back(sCtx.nextTxID.load(memory_order_relaxed));
+    restarts.push_back(sCtx.restarts.load(memory_order_relaxed));
+   
     tWriter->cleanStartupFunctions();
     for (const auto &t : tReaders) t->stopThreads();
-
-//    using namespace std::chrono_literals;
-//    std::this_thread::sleep_for(3s);
+    sCtx.reset();
+    accountTable->drop();
+    replicaTable->drop();
   }
 
 
@@ -178,25 +191,10 @@ int main() {
    * Accumulate Measures                                                      *
    *==========================================================================*/
   const auto avg = std::accumulate(measures.begin(), measures.end(), 0) / measures.size();
-  const auto throughput = sCtx.nextTxID.load() *1000 / std::accumulate(measures.begin(), measures.end(), 0);
-  const auto errors = sCtx.restarts.load() * 100.0 / sCtx.nextTxID.load();
-  std::cout << "Results:"
+  const auto throughput = std::accumulate(txnCnt.begin(), txnCnt.end(), 0) * 1000ULL / std::accumulate(measures.begin(), measures.end(), 0);
+  const auto errors = std::accumulate(restarts.begin(), restarts.end(), 0) * 100.0 / std::accumulate(txnCnt.begin(), txnCnt.end(), 0);
+  std::cout << "\nResults:"
             << "\n\tTime: " << avg << "ms"
             << "\n\tThroughput: " << throughput << "tx/s"
             << "\n\tError Rate: " << errors << "%\n";
-
-
-
-
-  /*std::cout << "Resetting\n";
-//      sCtx.registeredStates[0]->drop();
-//      sCtx.registeredStates[1]->drop();
-  std::this_thread::sleep_for(10s);
-  sCtx.reset();
-  if (tWriter != nullptr) tWriter = nullptr;
-  for (auto i = 0u; i < simReaders; i++) {
-    if(tReaders[i] != nullptr) tReaders[i] = nullptr;
-  }
-  std::cout << "Reset. TxnID: "<< sCtx.nextTxID.load() <<'\n';
-  */
 }

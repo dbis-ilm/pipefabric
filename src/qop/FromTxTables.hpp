@@ -29,6 +29,7 @@
 #include "qop/BaseOp.hpp"
 #include "qop/OperatorMacros.hpp"
 #include "table/Table.hpp"
+#include "table/StateContext.hpp"
 
 namespace pfabric {
 
@@ -61,8 +62,8 @@ namespace pfabric {
      * @param tbl the table that is read
      * @param pred an optional filter predicate
      */
-    FromTxTables(unsigned int keyRange, SCtxType& sCtx)
-      : mTables{sCtx.regStates[0], sCtx.regStates[1]}, dis{0, keyRange}, mSCtx{sCtx} {}
+    FromTxTables(SCtxType& sCtx)
+      : mTables{sCtx.regStates[0], sCtx.regStates[1]}, mSCtx{sCtx}, dis{0, sCtx.uniMax}, zipfGen{0,sCtx. keyRange-1, sCtx.zipfConst} {}
 
     /**
      * Deallocates all resources.
@@ -72,15 +73,21 @@ namespace pfabric {
     unsigned long start() {
       auto mTxnID = mSCtx.newTx();
       KeyType mKeys[TxSize];
-      for(auto i = 0u; i < TxSize; i++) {
-        mKeys[i] = dis(mSCtx.rndGen);
+
+      if (mSCtx.zipfConst) {
+        for(auto i = 0u; i < TxSize; i++) 
+          mKeys[i] = zipfGen.nextValue();
+      } else {
+        for(auto i = 0u; i < TxSize; i++)
+          mKeys[i] = dis(mSCtx.rndGen);
       }
 
       assert(mTables[0].get() != nullptr);
       assert(mTables[1].get() != nullptr);
 
       SmartPtr<RecordType> tpls[2][TxSize];
-
+      
+      auto waitTime = 1u;
       restart:;
       for (auto j = 0u; j < TxSize; j++) {
         for (auto i = 0u; i < 2; i++) {
@@ -90,8 +97,9 @@ namespace pfabric {
             mSCtx.restarts++;
             mTables[0]->cleanUpReads(mKeys, i?j+1:j);
             mTables[1]->cleanUpReads(mKeys, j);
-//            boost::this_thread::sleep_for(boost::chrono::microseconds(5*TxSize));
-            boost::this_thread::interruption_point();
+            boost::this_thread::sleep_for(boost::chrono::nanoseconds(100*TxSize*waitTime));
+            waitTime *= 2;
+//            boost::this_thread::interruption_point();
             goto restart;
             return 0;
           }
@@ -120,8 +128,9 @@ namespace pfabric {
 
   private:
     const TablePtr mTables[2];      //< the table from which the tuples are fetched
-    std::uniform_int_distribution<KeyType> dis;
     SCtxType& mSCtx;
+    std::uniform_int_distribution<KeyType> dis;
+    ZipfianGenerator zipfGen;
 
   };
 

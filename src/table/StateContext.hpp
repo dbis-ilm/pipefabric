@@ -42,10 +42,39 @@ enum class Errc {SUCCESS, ABORT, NOT_FOUND, INCONSISTENT};
 /** Possible Transaction states */
 enum class Status {Active, Commit, Abort};
 
-/** Helper */
+/** Forward declarations */
 uint8_t getFreePos(const uint64_t v);
 uint8_t getSetFreePos(std::atomic<std::uint64_t> &v);
 void unsetPos(std::atomic<std::uint64_t> &v, const uint8_t pos);
+unsigned int hashMe(unsigned int x);
+
+/** Derived from YCSB.
+ *  see: https://github.com/brianfrankcooper/YCSB/blob/master/core/src/main/java/com/yahoo/ycsb/generator/ZipfianGenerator.java
+ */
+class ZipfianGenerator {
+  public:
+    static constexpr double ZIPFIAN_CONSTANT = 0.99;
+    ZipfianGenerator(unsigned int min, unsigned int max, double zipfianconstant);
+    unsigned int nextValue();
+  
+	private:
+    unsigned int nextInt(unsigned int itemcount);
+    
+    /** Number of items. */
+    const unsigned int items;
+
+    /** Min item to generate. */
+    const unsigned int base;
+
+    /** The zipfian constant to use. */
+    const double zipfianconstant;
+
+    /** Computed parameters for generating the distribution. */
+    double alpha, zetan{0}, eta, theta, zeta2theta{0};
+
+    std::mt19937 gen{std::random_device{}()};    
+    std::uniform_real_distribution<> dist{0.0 ,1.0};
+};
 
 /*******************************************************************************
  * @brief State Context to track the status of the states and provide
@@ -77,6 +106,10 @@ class StateContext {
   std::atomic_uint restarts{0};
   /** Generating random keys */
   std::mt19937 rndGen{std::random_device{}()};
+  /** Distribution settings */
+  double zipfConst{0};
+  unsigned int keyRange;
+  unsigned int uniMax;
   /*--------------------------------------------------------------------------*/
 
   /** Get status of a writing transaction; either active, commit or abort */
@@ -113,13 +146,13 @@ class StateContext {
   /** Removes a transaction from the context; possibly has to recalculate the
    *  oldest visible version*/
   void removeTx(const TransactionID txnID) {
-    unsetPos(usedSlots, getPosFromTxnID(txnID)); //< release slot
-    
     const auto readCTS = getReadCTS(txnID, 0);
+    setReadCTS(txnID, 0, 0);
+    unsetPos(usedSlots, getPosFromTxnID(txnID)); //< release slot
     TransactionID min = oldestVisibleVersion.load();
 
     /* find new minimum */
-    if (readCTS != 0 && min >= readCTS) {
+    if(readCTS != 0 && min != 0) {
       auto newMin = DTS_INF;
       const auto slots = usedSlots.load();
       for(int pos = 0; pos < 64; pos++) {
@@ -130,6 +163,9 @@ class StateContext {
       /* no other active Tx, use last Snapshot */
       if (newMin == DTS_INF) newMin = getLastCTS(0); 
       while(min < newMin && !oldestVisibleVersion.compare_exchange_weak(min, newMin));
+    } else if(min == 0) {
+      const auto newMin = getLastCTS(0); 
+      while(!oldestVisibleVersion.compare_exchange_weak(min, newMin));
     }
   }
 
@@ -156,7 +192,7 @@ class StateContext {
 
   /** Register a new topology/continuous query to the context */
   const GroupID registerTopo(const std::array<TablePtr,2> &tbls) {
-    topoGrps[numGroups] = std::make_pair(tbls, 1);
+    topoGrps[numGroups] = std::make_pair(tbls, 0);
     return numGroups++;
   }
 
@@ -165,12 +201,9 @@ class StateContext {
     nextTxID.store(1);
     restarts.store(0);
     usedSlots.store(0);
+    oldestVisibleVersion.store(1);
+    topoGrps[0].second.store(0);
     tToTX.clear();
-    regStates[0] = nullptr;
-    regStates[1] = nullptr;
-    numStates = 0u;
-    topoGrps[0] = nullptr;
-    numGroups = 0u;
   }
 
  private:
@@ -190,7 +223,7 @@ class StateContext {
   std::array<ActiveTx, 64> activeTxs;
   /** oldest considered version by active reading transactions,
    *  used for cleaning up version arrays */
-  std::atomic<TransactionID> oldestVisibleVersion{1};
+  std::atomic<TransactionID> oldestVisibleVersion{0};
   TableID numStates{0u};
   GroupID numGroups{0u};
 };
