@@ -83,6 +83,7 @@ class ZipfianGenerator {
  ******************************************************************************/
 template <typename TableType>
 class StateContext {
+  using KeyType   = typename TableType::KType;
   using ReadCTS   = TransactionID;
   using LastCTS   = TransactionID;
   using GroupID   = unsigned short;
@@ -103,13 +104,23 @@ class StateContext {
 
   /*---- Only for evaluation -------------------------------------------------*/
   /** Counting necessary restarts of txs */
-  std::atomic_uint restarts{0};
+  std::atomic_ullong restarts{0};
+  std::atomic_ullong txCntR{0};
+  std::atomic_ullong txCntW{0};
   /** Generating random keys */
   std::mt19937 rndGen{std::random_device{}()};
   /** Distribution settings */
-  double zipfConst{0};
-  unsigned int keyRange;
-  unsigned int uniMax;
+  bool usingZipf = false;
+  std::unique_ptr<ZipfianGenerator> zipfGen;
+  std::unique_ptr<std::uniform_int_distribution<KeyType>> dis;
+
+  void setDistribution(bool zipf, KeyType min, KeyType max, double zipfConst = 0.0) {
+    usingZipf = zipf;
+    dis.reset(new std::uniform_int_distribution<KeyType>{min, max});
+    if(zipf) {
+      zipfGen.reset(new ZipfianGenerator{min, max, zipfConst});
+    }
+  }
   /*--------------------------------------------------------------------------*/
 
   /** Get status of a writing transaction; either active, commit or abort */
@@ -132,6 +143,17 @@ class StateContext {
   void setReadCTS(const TransactionID txnID, const GroupID topoID, const ReadCTS read) {
     std::get<2>(activeTxs[getPosFromTxnID(txnID)])[topoID] = read;
   }
+
+  const TransactionID getOldestActiveTx() const {
+      auto oldest = DTS_INF;
+      const auto slots = usedSlots.load(std::memory_order_relaxed);
+      for(int pos = 0; pos < 64; ++pos) {
+        const auto bTS = std::get<0>(activeTxs[pos]);
+        if((slots & (1ULL << pos)) && bTS < oldest)
+          oldest = bTS;
+      }
+      return oldest;
+  }
   
   /** Registers a new transaction to the context */
   const TransactionID newTx() {
@@ -143,45 +165,49 @@ class StateContext {
     return txnID;
   }
 
+  const TransactionID getNewTS() {
+    return nextTxID.fetch_add(1);
+  }
+
   /** Removes a transaction from the context; possibly has to recalculate the
    *  oldest visible version*/
   void removeTx(const TransactionID txnID) {
     const auto readCTS = getReadCTS(txnID, 0);
     setReadCTS(txnID, 0, 0);
     unsetPos(usedSlots, getPosFromTxnID(txnID)); //< release slot
-    TransactionID min = oldestVisibleVersion.load();
+    TransactionID min = oldestVisibleVersion.load(std::memory_order_relaxed);
 
     /* find new minimum */
-    if(readCTS != 0 && min != 0) {
+    if(min != 0) {
       auto newMin = DTS_INF;
-      const auto slots = usedSlots.load();
-      for(int pos = 0; pos < 64; pos++) {
+      const auto slots = usedSlots.load(std::memory_order_relaxed);
+      for(int pos = 0; pos < 64; ++pos) {
         const auto rCTS = std::get<2>(activeTxs[pos])[0];
         if((slots & (1ULL << pos)) && rCTS != 0 && rCTS < newMin)
           newMin = rCTS;
       }
       /* no other active Tx, use last Snapshot */
       if (newMin == DTS_INF) newMin = getLastCTS(0); 
-      while(min < newMin && !oldestVisibleVersion.compare_exchange_weak(min, newMin));
+      while(min < newMin && !oldestVisibleVersion.compare_exchange_weak(min, newMin, std::memory_order_relaxed));
     } else if(min == 0) {
       const auto newMin = getLastCTS(0); 
-      while(!oldestVisibleVersion.compare_exchange_weak(min, newMin));
+      while(!oldestVisibleVersion.compare_exchange_weak(min, newMin, std::memory_order_relaxed));
     }
   }
 
   /** Get last committed transaction ID (snapshot version) */
   const TransactionID getLastCTS(const GroupID topoID) {
-    return topoGrps[topoID].second.load();
+    return topoGrps[topoID].second.load(std::memory_order_relaxed);
   }
 
   /** Set last committed transaction ID (snapshot version) */
   void setLastCTS(const GroupID topoID, const TransactionID txnID) {
-    topoGrps[topoID].second.store(txnID);
+    topoGrps[topoID].second.store(txnID, std::memory_order_relaxed);
   }
 
   /** Get oldest currently visible version; used for garbage collection */
   const TransactionID getOldestVisible() const{
-    return oldestVisibleVersion.load();
+    return oldestVisibleVersion.load(std::memory_order_relaxed);
   }
 
   /** Register a new state/table to the context */
@@ -200,6 +226,8 @@ class StateContext {
     /* Make sure no thread is using the context anymore! */
     nextTxID.store(1);
     restarts.store(0);
+    txCntR.store(0);
+    txCntW.store(0);
     usedSlots.store(0);
     oldestVisibleVersion.store(1);
     topoGrps[0].second.store(0);
@@ -211,8 +239,8 @@ class StateContext {
   /** calculate and return the position in the activeTxs array for the given
    *  transaction ID; TODO: can this be more efficient? */
   const uint8_t getPosFromTxnID(const TransactionID txnID) const {
-    const auto slots = usedSlots.load();
-    for(int pos = 0; pos < 64; pos++) {
+    const auto slots = usedSlots.load(std::memory_order_relaxed);
+    for(int pos = 0; pos < 64; ++pos) {
       if(slots & (1ULL << pos) && std::get<0>(activeTxs[pos]) == txnID)
         return pos;
     }

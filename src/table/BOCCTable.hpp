@@ -17,12 +17,13 @@
  * along with PipeFabric. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef MVCCTable_hpp_
-#define MVCCTable_hpp_
+#ifndef BOCCTable_hpp_
+#define BOCCTable_hpp_
 
 #include <atomic>
 #include <algorithm>
 #include <cstdint>
+#include <deque>
 #include <exception>
 #include <functional>
 #include <iostream>
@@ -30,6 +31,7 @@
 #include <mutex>
 #include <random>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "fmt/format.h"
@@ -52,127 +54,6 @@
 namespace pfabric {
 
 /*******************************************************************************
- * @brief MVCC wrapper for a given RecordType
- ******************************************************************************/
-template <typename RecordType, std::size_t VERSIONS = 2>
-class MVCCObject {
- public:
-  std::uint64_t usedSlots;
-
-  struct header {
-    TransactionID cts;
-    TransactionID dts;
-  };
-
-  static const std::size_t Versions = VERSIONS;
-  std::array<header, VERSIONS> headers;
-  std::array<RecordType, VERSIONS> values;
-
-  int getCurrent(const TransactionID txnID) const {
-    for (auto i = 0u; i < VERSIONS; ++i) {
-      if (usedSlots & (1 << i) &&
-        headers[i].cts <= txnID && headers[i].dts > txnID)
-        return i;
-    }
-    return -1;
-  }
-
-  void cleanUpVersions(const TransactionID oldestReadVersion) {
-   for(auto i = 0u; i < VERSIONS; ++i) {
-    if (headers[i].dts <= oldestReadVersion)
-     usedSlots &= ~(1 << i);
-   }
-  }
-};
-
-/*******************************************************************************
- * @brief Write set for collecting uncommitted operations
- ******************************************************************************/
-template <typename KeyType, typename RecordType>
-struct WriteSet {
-  TransactionID txnID;
-  using Set = std::vector<std::pair<KeyType, RecordType>>;
-  Set set;
-
-  void insert(const KeyType& k, const RecordType& r) {
-    set.emplace_back(k, r);
-  }
-
-  void insert(KeyType&& k, RecordType&& r) {
-    set.emplace_back(std::move(k), std::move(r));
-  }
-
-  const RecordType& operator[](const KeyType& k) const {
-    return set.at(k);
-  }
-
-  RecordType& operator[](const KeyType& k) {
-    return set[k];
-  }
-
-  void clean() {
-    txnID = 0;
-    set.clear();
-  }
-};
-
-
-
-/*******************************************************************************
- * @brief Shared lock for handling one writer + multiple readers
- ******************************************************************************/
-template <typename KeyType>
-class RWLocks {
-  //cf. https://stackoverflow.com/a/28121513
-  public:
-    void lockShared(KeyType key) {
-      auto &rl = locks[key];
-      std::unique_lock<std::mutex> lk(rl.shared);
-      while(rl.active_writer)
-        rl.readerQ.wait(lk);
-      ++rl.active_readers;
-      lk.unlock();
-    }
-
-    void lockExclusive(KeyType key) {
-      auto &rl = locks[key];
-      std::unique_lock<std::mutex> lk(rl.shared);
-      while(rl.active_readers != 0)
-        rl.writerQ.wait(lk);
-      rl.active_writer = true;
-      lk.unlock();
-    }
-
-    void unlockShared(KeyType key) {
-      auto &rl = locks[key];
-      std::unique_lock<std::mutex> lk(rl.shared);
-      --rl.active_readers;
-      lk.unlock();
-      rl.writerQ.notify_one();
-    }
-
-    void unlockExclusive(KeyType key) {
-      auto &rl = locks[key];
-      std::unique_lock<std::mutex> lk(rl.shared);
-      rl.active_writer = false;
-      rl.readerQ.notify_all();
-      lk.unlock();
-    }
-
-  private:
-    struct RowLock {
-      std::mutex              shared;
-      std::condition_variable readerQ;
-      std::condition_variable writerQ;
-      int                     active_readers;
-      bool                    active_writer;
-    };
-    std::unordered_map<KeyType, RowLock> locks;
-};
-
-
-
-/*******************************************************************************
  * @brief Table is a class for storing a relation of tuples of the same type.
  *
  * Table implements a relational table for storing tuples of a given type
@@ -186,17 +67,17 @@ class RWLocks {
  *         the data type of the key column (default = int)
  ******************************************************************************/
 template <typename RecordType, typename KeyType>
-class MVCCTable : public BaseTable,
-                  public std::enable_shared_from_this<MVCCTable<RecordType,
+class BOCCTable : public BaseTable,
+                  public std::enable_shared_from_this<BOCCTable<RecordType,
                                                                 KeyType>> {
   using TupleType = typename RecordType::Base;
-  using SCtxType = StateContext<MVCCTable<RecordType, KeyType>>;
+  using SCtxType = StateContext<BOCCTable<RecordType, KeyType>>;
 
  public:
 #ifdef USE_ROCKSDB_TABLE
-  using Table = RDBTable<pfabric::Tuple<MVCCObject<TupleType>>, KeyType>;
+  using Table = RDBTable<RecordType, KeyType>;
 #else
-  using Table = CuckooTable<pfabric::Tuple<MVCCObject<TupleType>>, KeyType>;
+  using Table = CuckooTable<RecordType, KeyType>;
 #endif
  
   /** For external access to template parameters */
@@ -223,18 +104,105 @@ class MVCCTable : public BaseTable,
     */
   using Predicate = typename Table::Predicate;
 
+  /*******************************************************************************
+   * @brief Write set for collecting uncommitted operations
+   ******************************************************************************/
+  struct ActiveWriteSet {
+    TransactionID txnID;
+    using Set = std::vector<std::pair<KeyType, RecordType>>;
+    Set set;
+
+    void insert(const KeyType& k, const RecordType& r) {
+      set.emplace_back(k, r);
+    }
+
+    void insert(KeyType&& k, RecordType&& r) {
+      set.emplace_back(std::move(k), std::move(r));
+    }
+
+    const RecordType& operator[](const KeyType& k) const {
+      return set.at(k);
+    }
+
+    RecordType& operator[](const KeyType& k) {
+      return set[k];
+    }
+
+    void clean() {
+      txnID = 0;
+      set.clear();
+    }
+  };
+
+  /*******************************************************************************
+   * @brief Write set for storing a set of keys and the period of activity
+   ******************************************************************************/
+  struct WriteSet {
+    std::unordered_set<KeyType> keys; //< Write set
+    TransactionID valTS;              //< Validation timestamp
+    TransactionID endTS;              //< Completion timestamp
+
+    WriteSet(const TransactionID _v, const TransactionID _e, const size_t _reserve = 0)
+      noexcept : valTS{_v}, endTS{_e} { keys.reserve(_reserve); }
+    void insert(const KeyType& k) { keys.emplace(k); }
+    void insert(KeyType&& k) { keys.emplace(std::move(k)); }
+  };
+
+  /*******************************************************************************
+   * @brief A read-write (shared) lock for handling the writeSet deque
+   ******************************************************************************/
+	class RWLock {
+		//cf. https://stackoverflow.com/a/28121513
+		public:
+			void lockShared() {
+				std::unique_lock<std::mutex> lk(shared);
+				while(active_writer)
+					readerQ.wait(lk);
+				++active_readers;
+				lk.unlock();
+			}
+
+			void lockExclusive() {
+				std::unique_lock<std::mutex> lk(shared);
+				while(active_readers)
+					writerQ.wait(lk);
+				active_writer = true;
+				lk.unlock();
+			}
+
+			void unlockShared() {
+				std::unique_lock<std::mutex> lk(shared);
+				--active_readers;
+				lk.unlock();
+				writerQ.notify_one();
+			}
+
+			void unlockExclusive() {
+				std::unique_lock<std::mutex> lk(shared);
+				active_writer = false;
+				readerQ.notify_all();
+				lk.unlock();
+			}
+
+			std::mutex              shared{};
+			std::condition_variable readerQ{};
+			std::condition_variable writerQ{};
+			int                     active_readers{0};
+			bool                    active_writer{0};
+	};
+
   /**
    * Constructors for creating an empty table.
    */
-  MVCCTable(const TableInfo& tInfo, SCtxType& sCtx) noexcept(noexcept(Table(tInfo)))
+  BOCCTable(const TableInfo& tInfo, SCtxType& sCtx) noexcept(noexcept(Table(tInfo)))
     : BaseTable{tInfo}, tbl{tInfo}, sCtx{sCtx} {}
-  MVCCTable(const std::string& tableName, SCtxType& sCtx) noexcept(noexcept(Table(tableName)))
+  BOCCTable(const std::string& tableName, SCtxType& sCtx) noexcept(noexcept(Table(tableName)))
     : tbl{tableName}, sCtx{sCtx} {}
 
   /**
     * Destructor for table.
     */
-  ~MVCCTable() {}
+  ~BOCCTable() {}
 
   /*==========================================================================*
    * Transactional Operations                                                 *
@@ -249,9 +217,8 @@ class MVCCTable : public BaseTable,
   }
 
   Errc transactionPreCommit(const TransactionID& txnID) {
-    /* MVCC + 2PC */
     TableID otherID = (tblID == 0) ? 1 : 0;
-    
+
     auto& thisState = sCtx.getWriteStatus(txnID, tblID);
     const auto& otherState = sCtx.getWriteStatus(txnID, otherID);;
     Errc s = Errc::SUCCESS;
@@ -261,69 +228,39 @@ class MVCCTable : public BaseTable,
       s = this->transactionCommit(txnID);
       if (s != Errc::SUCCESS) return s;
       s = sCtx.regStates[otherID]->transactionCommit(txnID);
-      sCtx.setLastCTS(0, txnID); //< this has actually to be persistent
       sCtx.removeTx(txnID);
     }
-
-    /* MVCC without 2PC *//*
-    Errc s = this->transactionCommit(txnID);
-    if (tblID == 1) sCtx.removeTx(txnID);
-    */
-    
     return s;
   }
 
-  Errc transactionCommit(const TransactionID& txnID) {
-    struct KeyMVCCPair {
-      KeyType key;
-      MVCCObject<TupleType> mvcc;
-    };
-    const auto numEntries = writeSet.set.size();
-    KeyMVCCPair *newEntries = new KeyMVCCPair[numEntries];
-
-    /* Buffer new MVCC entries */
-    int i = 0;
-    for(const auto &e : writeSet.set) {
-      /* if entry exists */
-      try {
-        newEntries[i] = KeyMVCCPair{e.first, get<0>(*tbl.getByKey(e.first))};
-        auto &last = newEntries[i].mvcc;
-        auto iPos = getFreePos(last.usedSlots);
-        while (iPos > last.Versions - 1) {
-          /* If all version slots are occupied, old unused versions must be removed */
-          last.cleanUpVersions(sCtx.getOldestVisible());
-          iPos = getFreePos(last.usedSlots);
-        }
-        const auto dPos = last.getCurrent(txnID);
-       
-        last.headers[dPos].dts = txnID;
-        last.headers[iPos] = {txnID, DTS_INF};
-        last.values[iPos] = e.second.data();
-        last.usedSlots |= (1LL << iPos);
-      }
-      /* Entry does not exist yet */
-      catch (TableException exc) {
-        newEntries[i] = {e.first, MVCCObject<TupleType>()};
-        auto &last = newEntries[i].mvcc;
-        last.headers[0] = {txnID, DTS_INF};
-        last.values[0] = e.second.data();
-        last.usedSlots = 1;
-      }
-      ++i;
+  Errc transactionCommit(const TransactionID& txnID) { 
+    /* Apply changes and save writeSet */
+    const auto valTS = sCtx.getNewTS();
+    dQLock.lockExclusive();
+    committedWSs.emplace_front(valTS, DTS_INF, writeSet.set.size());
+    dQLock.unlockExclusive();
+    auto& ws = committedWSs.front();
+    for (const auto& e : writeSet.set) {
+      tbl.insert(e.first, std::move(e.second));
+      ws.insert(std::move(e.first));
     }
-
-    /* Lock Exclusively for overwriting */
-    /* Write new Entries */
-    /* Unlock all*/
-    for (auto e = 0u; e < numEntries; ++e) {
-//      locks.lockExclusive(newEntries[e].key);
-      tbl.insert(std::move(newEntries[e].key), std::move(newEntries[e].mvcc));
-//      locks.unlockExclusive(newEntries[e].key);
-    }
-
-    /* Clean up */
+    ws.endTS = sCtx.getNewTS();
     writeSet.clean();
-    delete[] newEntries;
+
+    /* Cleanup old write sets [remove all where EndTS < oldest active tx] */
+//    if (committedWSs.size() > 1000) {
+      auto oldestTx = sCtx.getOldestActiveTx();
+      if (oldestTx == txnID) oldestTx = ws.endTS;
+      for(auto it = committedWSs.cbegin(); it != committedWSs.cend(); ++it) {
+        if(it->endTS <= oldestTx) {
+          dQLock.lockExclusive();
+          committedWSs.erase(it, committedWSs.cend());
+          dQLock.unlockExclusive();
+          return Errc::SUCCESS;
+        }
+      }
+//    }
+
     return Errc::SUCCESS;
   }
 
@@ -331,13 +268,29 @@ class MVCCTable : public BaseTable,
     writeSet.clean();
   }
 
-  Errc readCommit(const TransactionID txnID, KeyType* keys, size_t until) {
-    //nothing to do here
-    return Errc::SUCCESS;
-  }
-
   void cleanUpReads(KeyType* keys, size_t until) {
     //nothing to do here
+  }
+
+  /* BackwardValidation */
+  Errc readCommit(const TransactionID txnID, KeyType* keys, size_t until) {
+    /* Just for easier evaluation (--> always three timestamps per TX): */
+    sCtx.getNewTS();
+    const auto valTS = sCtx.getNewTS();
+		dQLock.lockShared();
+    for (const auto& ws: committedWSs) {
+      if(txnID < ws.endTS && valTS > ws.valTS) { //< necessary condition
+        for (auto i = 0u; i < until; ++i) {
+          if(!ws.keys.empty() && ws.keys.find(keys[i]) != ws.keys.end()) { //< sufficient condition
+            dQLock.unlockShared();
+            return Errc::ABORT;
+          }
+        }
+      }
+    }
+		dQLock.unlockShared();
+
+    return Errc::SUCCESS;
   }
 
   /*==========================================================================*
@@ -355,12 +308,12 @@ class MVCCTable : public BaseTable,
    * @param key the key value of the tuple
    * @param rec the actual tuple
    */
-  Errc insert(const TransactionID& txnID, KeyType key, const RecordType& rec) {
+  Errc insert(const TransactionID txnID, const KeyType key, const RecordType& rec) {
     writeSet.insert(key, rec);
     return Errc::SUCCESS;
   }
 
-  Errc insert(const TransactionID& txnID, KeyType key, RecordType&& rec) {
+  Errc insert(const TransactionID txnID, const KeyType key, RecordType&& rec) {
     writeSet.insert(key, std::move(rec));
     return Errc::SUCCESS;
   }
@@ -468,34 +421,14 @@ class MVCCTable : public BaseTable,
         return Errc::SUCCESS;
       }
     }
-    /* Get MVCC Object */
-//    locks.lockShared(key);
-    SmartPtr<pfabric::Tuple<MVCCObject<TupleType>>> tplPtr;
+    
+    SmartPtr<RecordType> tplPtr;
     try {
       tplPtr = tbl.getByKey(key);
     } catch (TableException exc) {
-//      locks.unlockShared(key);
       return Errc::NOT_FOUND;
     }
-    const auto mvcc = get<0>(*tplPtr);
-//    locks.unlockShared(key);
-   
-    /* Get read CTS (version that was read first) for consistency */
-    auto readCTS = sCtx.getReadCTS(txnID, 0);
-    if(readCTS == 0) {
-      /* first read operation by this txnID --> save snapshot version */
-      readCTS = sCtx.getLastCTS(0);
-      sCtx.setReadCTS(txnID, 0, readCTS);
-    }
-
-    /* Read visible tuple,
-     * uses readCTS instead of txnID to avoid reading of delayed writes */
-    const auto pos = mvcc.getCurrent(readCTS);
-    if (pos == -1)
-      return Errc::NOT_FOUND;
-
-    /* Set out and return value */
-    outValue.reset(new RecordType(mvcc.values[pos]));
+    outValue =tplPtr;
     return Errc::SUCCESS;
   }
 
@@ -541,7 +474,7 @@ class MVCCTable : public BaseTable,
    */
   unsigned long size() const { return tbl.size(); }
 
-  void drop() { tbl.drop(); }
+  void drop() { committedWSs.clear(); tbl.drop(); }
 
  private:
 
@@ -549,14 +482,15 @@ class MVCCTable : public BaseTable,
   /*==========================================================================*
    * Members                                                                  *
    *==========================================================================*/
-//  RWLocks<KeyType> locks;
-  WriteSet<KeyType, RecordType> writeSet;
+  ActiveWriteSet writeSet;
+  std::deque<WriteSet> committedWSs{};
+ 	RWLock dQLock;
   Table tbl;
   TableID tblID;
   SCtxType& sCtx;
 
-}; /* end class MVCCTable */
+}; /* end class BOCCTable */
 
 } /* end namespace pfabric */
 
-#endif /* end ifndef MVCCTable_hpp_*/
+#endif /* end ifndef BOCCTable_hpp_*/

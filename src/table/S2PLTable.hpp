@@ -37,6 +37,7 @@
 #include "rocksdb/db.h"
 #include "table/RDBTable.hpp"
 #else
+#include "table/CuckooTable.hpp"
 #include "table/HashMapTable.hpp"
 #endif
 
@@ -68,9 +69,9 @@ class S2PLLocks {
     void lockExclusive(KeyType key) {
       auto &rl = locks[key];
       std::unique_lock<std::mutex> lk(rl.shared);
+      rl.active_writer = true;
       while(rl.active_readers != 0)
         rl.writerQ.wait(lk);
-      rl.active_writer = true;
       lk.unlock();
     }
 
@@ -125,7 +126,7 @@ class S2PLTable : public BaseTable,
 #ifdef USE_ROCKSDB_TABLE
   using Table = RDBTable<RecordType, KeyType>;
 #else
-  using Table = HashMapTable<RecordType, KeyType>;
+  using Table = CuckooTable<RecordType, KeyType>;
 #endif
 
   /** For external access to template parameters */
@@ -178,7 +179,9 @@ class S2PLTable : public BaseTable,
     tblID = sCtx.registerState(this->shared_from_this());
   }
 
-  void transactionBegin(const TransactionID& txnID) {}
+  void transactionBegin(const TransactionID& txnID) {
+    sCtx.txCntW++;
+  }
 
   Errc transactionPreCommit(const TransactionID& txnID) {
     TableID otherID = (tblID == 0) ? 1 : 0;
@@ -212,8 +215,13 @@ class S2PLTable : public BaseTable,
     wKeysLocked.clear();
   }
 
+  Errc readCommit(const TransactionID txnID, KeyType* keys, size_t until) {
+    //nothing to do here
+    return Errc::SUCCESS;
+  }
+
   void cleanUpReads(const KeyType* keys, const size_t until) {
-    for(auto i = 0u; i < until; i++)
+    for(auto i = 0u; i < until; ++i)
       locks.unlockShared(keys[i]);
   }
 

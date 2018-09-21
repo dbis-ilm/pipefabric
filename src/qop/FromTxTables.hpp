@@ -21,6 +21,7 @@
 #define FromTxTable_hpp_
 
 #include <random>
+#include <sstream>
 
 #include "core/Punctuation.hpp"
 #include "core/Tuple.hpp"
@@ -62,8 +63,7 @@ namespace pfabric {
      * @param tbl the table that is read
      * @param pred an optional filter predicate
      */
-    FromTxTables(SCtxType& sCtx)
-      : mTables{sCtx.regStates[0], sCtx.regStates[1]}, mSCtx{sCtx}, dis{0, sCtx.uniMax}, zipfGen{0,sCtx. keyRange-1, sCtx.zipfConst} {}
+    FromTxTables(SCtxType& sCtx): mTables{sCtx.regStates[0], sCtx.regStates[1]}, mSCtx{sCtx} {}
 
     /**
      * Deallocates all resources.
@@ -72,14 +72,15 @@ namespace pfabric {
 
     unsigned long start() {
       auto mTxnID = mSCtx.newTx();
+      mSCtx.txCntR++;
       KeyType mKeys[TxSize];
 
-      if (mSCtx.zipfConst) {
-        for(auto i = 0u; i < TxSize; i++) 
-          mKeys[i] = zipfGen.nextValue();
+      if (mSCtx.usingZipf) {
+        for(auto i = 0u; i < TxSize; i++)
+          mKeys[i] = mSCtx.zipfGen->nextValue();
       } else {
         for(auto i = 0u; i < TxSize; i++)
-          mKeys[i] = dis(mSCtx.rndGen);
+          mKeys[i] = mSCtx.dis->operator()(mSCtx.rndGen);
       }
 
       assert(mTables[0].get() != nullptr);
@@ -97,13 +98,22 @@ namespace pfabric {
             mSCtx.restarts++;
             mTables[0]->cleanUpReads(mKeys, i?j+1:j);
             mTables[1]->cleanUpReads(mKeys, j);
-            boost::this_thread::sleep_for(boost::chrono::nanoseconds(100*TxSize*waitTime));
-            waitTime *= 2;
+            boost::this_thread::sleep_for(boost::chrono::nanoseconds(500*TxSize*waitTime));
+//            waitTime *= 2;
 //            boost::this_thread::interruption_point();
             goto restart;
-            return 0;
           }
         }
+      }
+      
+      /* Only important for BOCC */
+      const auto s1 = mTables[0]->readCommit(mTxnID, mKeys, TxSize);
+      const auto s2 = mTables[1]->readCommit(mTxnID, mKeys, TxSize);
+      if(s1 != Errc::SUCCESS || s2 != Errc::SUCCESS) {
+        mSCtx.restarts++;
+        mSCtx.removeTx(mTxnID);
+        mTxnID = mSCtx.newTx();
+        goto restart;
       }
 
       /* check if same for correctness criteria */
@@ -129,9 +139,6 @@ namespace pfabric {
   private:
     const TablePtr mTables[2];      //< the table from which the tuples are fetched
     SCtxType& mSCtx;
-    std::uniform_int_distribution<KeyType> dis;
-    ZipfianGenerator zipfGen;
-
   };
 
 }

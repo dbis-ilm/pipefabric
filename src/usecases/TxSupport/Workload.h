@@ -5,9 +5,11 @@
 #include <fstream>
 #include <list>
 #include <vector>
+
 #include "common.h"
 
 namespace pfabric {
+
 
 template<typename RecordType>
 class Workload {
@@ -70,6 +72,39 @@ class Workload {
   std::shared_ptr<EntryList> workload;
 
 };
+
+template<bool Z>
+void generateWorkload(const double theta, const std::string &name) {
+  Workload<ResultPtr::element_type> wl;
+  std::ofstream workload_file;
+
+  workload_file.open(name);
+
+  if(Z){
+    ZipfianGenerator zipfGen{0, keyRange-1, theta};
+    std::cout << "Using Zipf with theta = " << theta << '\n';
+    for (auto t = 1u; t < workloadNumTxs+1; ++t) {
+      for(auto k = 0u; k < txSize; ++k) {
+        auto key = zipfGen.nextValue();
+        wl.addEntry(t, {key, dis(gen) * 100, dis(gen) * 1.23});
+      }
+    }
+  } else {
+
+    std::cout << "Using Uni with maximum value = " << uniMax << '\n';
+    for (auto t = 1u; t < workloadNumTxs+1; ++t) {
+      for(auto k = 0u; k < txSize; ++k) {
+        auto key = dis(gen);
+        wl.addEntry(t, {key, dis(gen) * 100, dis(gen) * 1.23});
+      }
+    }
+  }
+
+  //wl.shuffle();
+
+  wl.serialize(workload_file);
+  workload_file.close();
+}
 }
 
 #endif //MVCC_WORKLOADGENERATOR_H

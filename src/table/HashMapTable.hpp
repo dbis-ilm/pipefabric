@@ -140,12 +140,12 @@ public:
    * @param key the key value of the tuple
    * @param rec the actual tuple
    */
-  void insert(KeyType key, const RecordType& rec) throw (TableException) {
+  void insert(const KeyType key, const RecordType& rec) throw (TableException) {
     {
       // make sure we have exclusive access
       //std::lock_guard<std::mutex> lock(mMtx);
-      auto iter = mDataTable.find(key);
-      if (iter != mDataTable.end()) 
+      const auto iter = mDataTable.find(key);
+      if (iter != mDataTable.end())
         // we erase the key/tuple pair first, because of the missing copy assignment
         // operator in Tuple we cannot simply use the operator[]
         mDataTable.erase(key);
@@ -327,11 +327,10 @@ public:
    * @param key the key value
    * @return the tuple associated with the given key
    */
-  const SmartPtr<RecordType> getByKey(KeyType key) throw (TableException) {
+  const SmartPtr<RecordType> getByKey(const KeyType& key) {
     // make sure we have exclusive access
     //std::lock_guard<std::mutex> lock(mMtx);
-
-    auto res = mDataTable.find(key);
+    const auto res = mDataTable.find(key);
     if (res != mDataTable.end()) {
       // if we found the tuple we return a TuplePtr containing a copy of it
       SmartPtr<RecordType> tptr (new RecordType(res->second));

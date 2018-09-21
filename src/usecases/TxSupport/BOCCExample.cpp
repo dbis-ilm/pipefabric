@@ -30,12 +30,12 @@
 
 using namespace pfabric;
 
-using TableType = S2PLTable<AccountPtr::element_type, uint_t>;
+using TableType = BOCCTable<AccountPtr::element_type, uint_t>;
 
-constexpr auto protocol = "S2PL";
-constexpr auto scaling = false;
+constexpr auto protocol = "BOCC";
+constexpr auto scaling = true;
 
 int main() {
-  TxExample<TableType> s2pl{protocol, scaling};
-  s2pl.run();
+  TxExample<TableType> bocc{protocol, scaling};
+  bocc.run();
 }

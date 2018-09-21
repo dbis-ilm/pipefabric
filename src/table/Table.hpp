@@ -69,5 +69,7 @@ using Table = pfabric::HashMapTable<RecordType, KeyType>;
 #include "table/TxTable.hpp"
 #include "table/MVCCTable.hpp"
 #include "table/S2PLTable.hpp"
+#include "table/BOCCTable.hpp"
+#include "table/CuckooTable.hpp"
 
 #endif

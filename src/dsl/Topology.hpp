@@ -431,7 +431,6 @@ namespace pfabric {
     template<typename T>
     Pipe<T> newStreamFromMemory(const std::string& fname, char delim = ',', unsigned long num = 0) {
       auto op = std::make_shared<MemorySource<T>>(fname, delim, num);
-      std::cout << fname << '\n';
       registerStartupFunction([=]() -> unsigned long { return op->start(); });
       registerPrepareFunction([=]() -> unsigned long { return op->prepare(); });
       return Pipe<T>(dataflow, dataflow->addPublisher(op));

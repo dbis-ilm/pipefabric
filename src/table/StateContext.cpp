@@ -50,19 +50,23 @@ uint8_t getFreePos(const uint64_t v) {
  *         from right to left). */
 uint8_t getSetFreePos(std::atomic<std::uint64_t> &v) {
   uint8_t pos;
-  uint64_t expected = v.load();
+  uint64_t expected = v.load(std::memory_order_relaxed);
   do {
     pos = getFreePos(expected); //TODO: catch if no free position
-  } while(!v.compare_exchange_weak(expected, 
-        expected | (1ULL << pos))); //< set bit at pos
+  } while(!v.compare_exchange_weak(
+        expected, 
+        expected | (1ULL << pos), //< set bit at pos
+        std::memory_order_relaxed));
   return pos;
 }
 
 /** @brief Atomically unsets the bit at position pos in v */
 void unsetPos(std::atomic<std::uint64_t> &v, const uint8_t pos) {
-  uint64_t expected = v.load();
-  while(!v.compare_exchange_weak(expected,
-        expected & ~(1ULL <<pos)));//< unset bit at pos
+  uint64_t expected = v.load(std::memory_order_relaxed);
+  while(!v.compare_exchange_weak(
+        expected,
+        expected & ~(1ULL <<pos), //< unset bit at pos
+        std::memory_order_relaxed));
 }
 
 /* taken from https://stackoverflow.com/a/12996028 */

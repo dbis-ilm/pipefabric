@@ -28,6 +28,14 @@ target_link_libraries(s2pl
   ${MALLOC_LIB}
   )
 
+add_executable(bocc BOCCExample.cpp)
+target_link_libraries(bocc
+  pfabric_core
+  ${ROCKSDB_LIB}
+  ${Boost_SYSTEM_LIBRARY}
+  ${MALLOC_LIB}
+  )
+
 add_executable(generateWorkloads generateWorkloads.cpp)
 target_link_libraries(generateWorkloads
   pfabric_core
@@ -39,3 +47,4 @@ target_link_libraries(generateWorkloads
   ${Boost_FILESYSTEM_LIBRARY}
   ${Boost_THREAD_LIBRARY}
   )
+
