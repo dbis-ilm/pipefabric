@@ -36,6 +36,7 @@
 using namespace pfabric;
 using namespace ns_types;
 
+//ScaleJoin usage
 TEST_CASE("Building and running a topology with ScaleJoin (3 instances)", "[ScaleJoin]") {
   typedef TuplePtr<int, std::string, double> tPtr;
 
@@ -63,6 +64,7 @@ TEST_CASE("Building and running a topology with ScaleJoin (3 instances)", "[Scal
   REQUIRE(results == num);
 }
 
+//Symmetric Hash Join without partitioning
 TEST_CASE("Building and running a topology with joins", "[Unpartitioned Join]") {
   typedef TuplePtr<int, std::string, double> T1;
 
@@ -82,12 +84,12 @@ TEST_CASE("Building and running a topology with joins", "[Unpartitioned Join]") 
   Topology t;
   auto s1 = t.newStreamFromFile("file2.csv")
     .extract<T1>(',')
-    .keyBy<int>([](auto tp) { return get<0>(tp); });
+    .keyBy<0>();
 
   auto s2 = t.newStreamFromFile("file1.csv")
     .extract<T1>(',')
-    .keyBy<int>([](auto tp) { return get<0>(tp); })
-    .join<int>(s1, [](auto tp1, auto tp2) { return true; })
+    .keyBy<0>()
+    .join(s1, [](auto tp1, auto tp2) { return true; })
     .print(strm);
 
   t.start(false);
@@ -95,6 +97,7 @@ TEST_CASE("Building and running a topology with joins", "[Unpartitioned Join]") 
   REQUIRE(strm.str() == expected);
 }
 
+//Symmetric Hash Join with different tuple attributes
 TEST_CASE("Building and running a topology with joins on different tuple formats",
           "[Join different tuples]") {
   typedef TuplePtr<int, std::string, double> T1;
@@ -119,12 +122,12 @@ TEST_CASE("Building and running a topology with joins on different tuple formats
     .map<T2>([](auto tp, bool outdated) -> T2 {
         return makeTuplePtr(get<0>(tp), get<2>(tp));
     })
-    .keyBy<int>([](auto tp) { return get<0>(tp); });
+    .keyBy<0>();
 
   auto s2 = t.newStreamFromFile("file1.csv")
     .extract<T1>(',')
-    .keyBy<int>([](auto tp) { return get<0>(tp); })
-    .join<int>(s1, [](auto tp1, auto tp2) { return true; })
+    .keyBy<0>()
+    .join(s1, [](auto tp1, auto tp2) { return true; })
     .print(strm);
 
   t.start(false);
@@ -132,6 +135,7 @@ TEST_CASE("Building and running a topology with joins on different tuple formats
   REQUIRE(strm.str() == expected);
 }
 
+//Symmetric Hash Join with the left data stream partitioned
 TEST_CASE("Building and running a topology with a join on one partitioned stream", 
           "[Partitioned and unpartitioned Join]") {
   typedef TuplePtr<unsigned long, unsigned long> MyTuplePtr;
@@ -145,12 +149,12 @@ TEST_CASE("Building and running a topology with a join on one partitioned stream
 
   Topology t;
   auto s2 = t.streamFromGenerator<MyTuplePtr>(streamGen, num)
-    .keyBy<0>();
+    .keyBy<1>();
 
   auto s1 = t.streamFromGenerator<MyTuplePtr>(streamGen, num)
-    .keyBy<0>()
+    .keyBy<1>()
     .partitionBy([](auto tp) { return get<1>(tp) % 5; }, 5)
-    .join(s2, [](auto tp1, auto tp2) { return get<1>(tp1) == get<1>(tp2); })
+    .join(s2, [](auto tp1, auto tp2) { return true; })
     .merge()
     .notify([&](auto tp, bool outdated) {
         std::vector<unsigned long> tmp_vec;
@@ -161,23 +165,105 @@ TEST_CASE("Building and running a topology with a join on one partitioned stream
 
         results.push_back(tmp_vec);
     });
-    //.print();
 
   t.start(false);
 
-  std::this_thread::sleep_for(2s);
+  std::this_thread::sleep_for(1s);
 
-  REQUIRE(results.size() == num);
+  REQUIRE(results.size() == num*10);
 
-  for (auto i=0u; i<num; i++) {
-    REQUIRE(results[i][0] == results[i][2]);
+  for (auto i=0u; i<num*10; i++) {
     REQUIRE(results[i][1] == results[i][3]);
   }
 }
 
-/*TEST_CASE("Building and running a topology with a join on two partitioned streams", 
+//Symmetric Hash Join with the right data stream partitioned and additional operator
+TEST_CASE("Building and running a topology with a join on another partitioned stream with op",
+          "[Unpartitioned and partitioned Join with op]") {
+  typedef TuplePtr<unsigned long, unsigned long> MyTuplePtr;
+
+  StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {
+    return makeTuplePtr(n, n%100);
+  });
+  unsigned long num = 1000;
+
+  std::vector<std::vector<unsigned long>> results;
+
+  Topology t;
+  auto s2 = t.streamFromGenerator<MyTuplePtr>(streamGen, num)
+    .partitionBy([](auto tp) { return get<1>(tp) % 5; }, 5)
+    .notify([](auto tp, bool outdated){})
+    .keyBy<1>();
+
+  auto s1 = t.streamFromGenerator<MyTuplePtr>(streamGen, num)
+    .keyBy<1>()
+    .join(s2, [](auto tp1, auto tp2) { return true; })
+    .notify([&](auto tp, bool outdated) {
+        std::vector<unsigned long> tmp_vec;
+        tmp_vec.push_back(get<0>(tp));
+        tmp_vec.push_back(get<1>(tp));
+        tmp_vec.push_back(get<2>(tp));
+        tmp_vec.push_back(get<3>(tp));
+
+        results.push_back(tmp_vec);
+    });
+
+  t.start(false);
+
+  std::this_thread::sleep_for(1s);
+
+  REQUIRE(results.size() == num*10);
+
+  for (auto i=0u; i<num*10; i++) {
+    REQUIRE(results[i][1] == results[i][3]);
+  }
+}
+
+//Symmetric Hash Join with the right data stream partitioned without additional operator
+TEST_CASE("Building and running a topology with a join on another partitioned stream without op",
+          "[Unpartitioned and partitioned Join without op]") {
+  typedef TuplePtr<unsigned long, unsigned long> MyTuplePtr;
+
+  StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {
+    return makeTuplePtr(n, n%100);
+  });
+  unsigned long num = 1000;
+
+  std::vector<std::vector<unsigned long>> results;
+
+  Topology t;
+  auto s2 = t.streamFromGenerator<MyTuplePtr>(streamGen, num)
+    .partitionBy([](auto tp) { return get<1>(tp) % 5; }, 5)
+    .keyBy<1>();
+
+  auto s1 = t.streamFromGenerator<MyTuplePtr>(streamGen, num)
+    .keyBy<1>()
+    .join(s2, [](auto tp1, auto tp2) { return true; })
+    .notify([&](auto tp, bool outdated) {
+        std::vector<unsigned long> tmp_vec;
+        tmp_vec.push_back(get<0>(tp));
+        tmp_vec.push_back(get<1>(tp));
+        tmp_vec.push_back(get<2>(tp));
+        tmp_vec.push_back(get<3>(tp));
+
+        results.push_back(tmp_vec);
+    });
+
+  t.start(false);
+
+  std::this_thread::sleep_for(1s);
+
+  REQUIRE(results.size() == num*10);
+
+  for (auto i=0u; i<num*10; i++) {
+    REQUIRE(results[i][1] == results[i][3]);
+  }
+}
+
+//Symmetric Hash Join with both data streams partitioned
+TEST_CASE("Building and running a topology with a join on two partitioned streams",
           "[Partitioned Join]") {
-  typedef TuplePtr<Tuple<unsigned long, unsigned long>> MyTuplePtr;
+  typedef TuplePtr<unsigned long, unsigned long> MyTuplePtr;
 
   StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {
     return makeTuplePtr(n, n % 100); 
@@ -189,12 +275,12 @@ TEST_CASE("Building and running a topology with a join on one partitioned stream
   Topology t;
   auto s2 = t.streamFromGenerator<MyTuplePtr>(streamGen, num)
     .partitionBy([](auto tp) { return get<1>(tp) % 5; }, 5)
-    .keyBy<0>();
+    .keyBy<1>();
 
   auto s1 = t.streamFromGenerator<MyTuplePtr>(streamGen, num)
-    .keyBy<0>()
+    .keyBy<1>()
     .partitionBy([](auto tp) { return get<1>(tp) % 5; }, 5)
-    .join(s2, [](auto tp1, auto tp2) { return get<1>(tp1) == get<1>(tp2); })
+    .join(s2, [](auto tp1, auto tp2) { return true; })
     .merge()
     .notify([&](auto tp, bool outdated) {
         std::vector<unsigned long> tmp_vec;
@@ -205,16 +291,14 @@ TEST_CASE("Building and running a topology with a join on one partitioned stream
 
         results.push_back(tmp_vec);
     });
-    //.print();
 
   t.start(false);
 
-  std::this_thread::sleep_for(2s);
+  std::this_thread::sleep_for(1s);
 
-  REQUIRE(results.size() == num);
+  REQUIRE(results.size() == num*10);
 
-  for (auto i=0u; i<num; i++) {
-    REQUIRE(results[i][0] == results[i][2]);
+  for (auto i=0u; i<num*10; i++) {
     REQUIRE(results[i][1] == results[i][3]);
   }
-}*/
+}

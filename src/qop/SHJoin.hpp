@@ -69,6 +69,8 @@ namespace pfabric {
        */
       typedef std::function< bool(const LeftInputStreamElement&, const RightInputStreamElement&) > JoinPredicateFunc;
 
+      const std::string opName() const override { return std::string("SHJoin"); }
+
     private:
       /**
        * The type definition for our hash tables: we use the native Boost implementation.

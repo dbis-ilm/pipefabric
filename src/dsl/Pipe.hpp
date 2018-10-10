@@ -182,65 +182,112 @@ class Pipe {
   }
 
   template <typename T2, typename KeyType>
-  OpIterator addPartitionedJoin(
-      std::vector<std::shared_ptr<SHJoin<T, T2, KeyType>>>& opList, DataSource<T2>* otherOp,
-      PartitioningState otherPartitioningState) noexcept(false) {
+  OpIterator addJoin(std::vector<std::shared_ptr<SHJoin<T, T2, KeyType>>>& opList,
+                                Pipe<T2>& otherPipe) noexcept(false) {
     typedef typename std::shared_ptr<SHJoin<T, T2, KeyType>> JoinOpPtr;
-    if (partitioningState == NoPartitioning)
-      throw TopologyException("Missing partitionBy operator in topology.");
+
+    auto otherOpIt = otherPipe.getPublishers();
 
     if (partitioningState == FirstInPartitioning) {
       auto partition = castOperator<PartitionBy<T>>(getPublisher());
 
       for (auto i = 0u; i < opList.size(); i++) {
-        // auto op = opList[i];
         JoinOpPtr op = opList[i];
 
-        // connect to left input channels
-        partition->connectChannelsForPartition(
-            i,
-            op->getLeftInputDataChannel(),
-            op->getInputPunctuationChannel());
-        // connect to right input channels
-        if (otherPartitioningState == NoPartitioning) {
-          connectChannels(otherOp->getOutputDataChannel(),
-                          op->getRightInputDataChannel());
-          connectChannels(otherOp->getOutputPunctuationChannel(),
-                          op->getInputPunctuationChannel());
+        //connect to left input channels
+        partition->connectChannelsForPartition(i,
+                                               op->getLeftInputDataChannel(),
+                                               op->getInputPunctuationChannel());
+        //connect to right input channels
+        if (otherPipe.partitioningState == NoPartitioning) {
+          //other pipe has no partitions
+          auto otherOp = castOperator<DataSource<T2>>(otherPipe.getPublisher());
+          connectChannels(otherOp->getOutputDataChannel(), op->getRightInputDataChannel());
+          connectChannels(otherOp->getOutputPunctuationChannel(), op->getInputPunctuationChannel());
         } else {
-          assert(false);
-          // TODO: check partitioning state
-          // make sure we have the same number of partitions
-          // if FirstInPartitioning
-          //      cast otherSource to PartitionBy operator
-          //      connectChannelsForPartition
-          // else
-          //      connectChannels
+          //other pipe has partitions
+          auto otherOp = castOperator<DataSource<T2>>(otherOpIt->get());
+
+          //if the other pipe has no operators after PartitionBy
+          if(otherOp->opName() == "PartitionBy") {
+            auto partition2 = castOperator<PartitionBy<T2>>(otherOpIt->get());
+            partition2->connectChannelsForPartition(i,
+                                                    op->getRightInputDataChannel(),
+                                                    op->getInputPunctuationChannel());
+          } else {
+            //only if there are partitions left on the other pipe
+            if(otherOpIt != dataflow->publisherEnd()) {
+              connectChannels(otherOp->getOutputDataChannel(), op->getRightInputDataChannel());
+              connectChannels(otherOp->getOutputPunctuationChannel(), op->getInputPunctuationChannel());
+              otherOpIt++;
+            }
+          }
         }
       }
       partitioningState = NextInPartitioning;
     } else {
-      auto iter = getPublishers();
-      for (auto i = 0u; i < opList.size() && iter != dataflow->publisherEnd();
-           i++) {
-        auto p = iter->get();
-        auto pOp = castOperator<DataSource<T>>(p);
-        // connect to left input channels
-        connectChannels(pOp->getOutputDataChannel(),
-                        opList[i]->getLeftInputDataChannel());
-        connectChannels(pOp->getOutputPunctuationChannel(),
-                        opList[i]->getInputPunctuationChannel());
-        // connect to right input channels
-        if (otherPartitioningState == NoPartitioning) {
-          connectChannels(otherOp->getOutputDataChannel(),
-                          opList[i]->getRightInputDataChannel());
-          connectChannels(otherOp->getOutputPunctuationChannel(),
-                          opList[i]->getInputPunctuationChannel());
+      if(partitioningState == NoPartitioning) {
+        auto pOp = castOperator<DataSource<T>>(getPublisher());
+
+        //connect to left input channels
+        connectChannels(pOp->getOutputDataChannel(), opList[0]->getLeftInputDataChannel());
+        connectChannels(pOp->getOutputPunctuationChannel(), opList[0]->getInputPunctuationChannel());
+
+        //connect to right input channels
+        auto otherOp = castOperator<DataSource<T2>>(otherOpIt->get());
+
+        //if the other pipe has no operators after PartitionBy
+        if(otherOp->opName() == "PartitionBy") {
+          auto partition2 = castOperator<PartitionBy<T2>>(otherOpIt->get());
+          for (unsigned int i=0; i<otherPipe.numPartitions; ++i) {
+            partition2->connectChannelsForPartition(i,
+                                                    opList[0]->getRightInputDataChannel(),
+                                                    opList[0]->getInputPunctuationChannel());
+          }
         } else {
-          // TODO
-          assert(false);
+          for (auto iter = otherPipe.getPublishers(); iter != dataflow->publisherEnd(); iter++) {
+            auto otherOp = castOperator<DataSource<T2>>(iter->get());
+            if (otherOp->opName() != "BaseOp") {
+              connectChannels(otherOp->getOutputDataChannel(), opList[0]->getRightInputDataChannel());
+              connectChannels(otherOp->getOutputPunctuationChannel(), opList[0]->getInputPunctuationChannel());
+            }
+          }
         }
-        iter++;
+      } else {
+        auto iter = getPublishers();
+        for (auto i = 0u; i < opList.size() && iter != dataflow->publisherEnd(); ++i) {
+          auto pOp = castOperator<DataSource<T>>(iter->get());
+          //connect to left input channels
+          connectChannels(pOp->getOutputDataChannel(), opList[i]->getLeftInputDataChannel());
+          connectChannels(pOp->getOutputPunctuationChannel(), opList[i]->getInputPunctuationChannel());
+
+          //connect to right input channels
+          if (otherPipe.partitioningState == NoPartitioning) {
+            //other pipe has no partitions
+            auto otherOp = castOperator<DataSource<T2>>(otherPipe.getPublisher());
+            connectChannels(otherOp->getOutputDataChannel(), opList[i]->getRightInputDataChannel());
+            connectChannels(otherOp->getOutputPunctuationChannel(), opList[i]->getInputPunctuationChannel());
+          } else {
+            //other pipe has partitions
+            auto otherOp = castOperator<DataSource<T2>>(otherOpIt->get());
+
+            //if the other pipe has no operators after PartitionBy
+            if(otherOp->opName() == "PartitionBy") {
+              auto partition2 = castOperator<PartitionBy<T2>>(otherOpIt->get());
+              partition2->connectChannelsForPartition(i,
+                                                      opList[i]->getRightInputDataChannel(),
+                                                      opList[i]->getInputPunctuationChannel());
+            } else {
+              //only if there are partitions left on the other pipe
+              if(otherOpIt != dataflow->publisherEnd()) {
+                connectChannels(otherOp->getOutputDataChannel(), opList[i]->getRightInputDataChannel());
+                connectChannels(otherOp->getOutputPunctuationChannel(), opList[i]->getInputPunctuationChannel());
+                otherOpIt++;
+              }
+            }
+          }
+          iter++;
+        }
       }
     }
     Dataflow::BaseOpList bops(opList.begin(), opList.end());
@@ -1348,47 +1395,72 @@ class Pipe {
    * @return a new pipe
    */
   template <typename KeyType = DefaultKeyType, typename T2>
-  Pipe<typename SHJoin<T, T2, KeyType>::ResultElement> join(
-      Pipe<T2>& otherPipe, typename SHJoin<T, T2, KeyType>::JoinPredicateFunc
-                               pred) noexcept(false) {
+  Pipe<typename SHJoin<T, T2, KeyType>::ResultElement> join(Pipe<T2>& otherPipe,
+                                                            typename SHJoin<T, T2, KeyType>::JoinPredicateFunc
+                                                            pred) noexcept(false) {
     typedef typename SHJoin<T, T2, KeyType>::ResultElement Tout;
     try {
       typedef std::function<KeyType(const T&)> LKeyExtractorFunc;
       typedef std::function<KeyType(const T2&)> RKeyExtractorFunc;
 
       LKeyExtractorFunc fn1 = boost::any_cast<LKeyExtractorFunc>(keyExtractor);
-      RKeyExtractorFunc fn2 =
-          boost::any_cast<RKeyExtractorFunc>(otherPipe.keyExtractor);
-      auto otherOp = castOperator<DataSource<T2>>(otherPipe.getPublisher());
+      RKeyExtractorFunc fn2 = boost::any_cast<RKeyExtractorFunc>(otherPipe.keyExtractor);
 
-      if (partitioningState == NoPartitioning &&
-          otherPipe.partitioningState == NoPartitioning) {
+      if (partitioningState == NoPartitioning && otherPipe.partitioningState == NoPartitioning) {
+        //both streams are not partitioned
         auto op = std::make_shared<SHJoin<T, T2, KeyType>>(fn1, fn2, pred);
 
         auto pOp = castOperator<DataSource<T>>(getPublisher());
+        connectChannels(pOp->getOutputDataChannel(), op->getLeftInputDataChannel());
+        connectChannels(pOp->getOutputPunctuationChannel(), op->getInputPunctuationChannel());
 
-        connectChannels(pOp->getOutputDataChannel(),
-                        op->getLeftInputDataChannel());
-        connectChannels(pOp->getOutputPunctuationChannel(),
-                        op->getInputPunctuationChannel());
-
-        connectChannels(otherOp->getOutputDataChannel(),
-                        op->getRightInputDataChannel());
-        connectChannels(otherOp->getOutputPunctuationChannel(),
-                        op->getInputPunctuationChannel());
+        auto otherOp = castOperator<DataSource<T2>>(otherPipe.getPublisher());
+        connectChannels(otherOp->getOutputDataChannel(), op->getRightInputDataChannel());
+        connectChannels(otherOp->getOutputPunctuationChannel(), op->getInputPunctuationChannel());
 
         auto iter = dataflow->addPublisher(op);
         return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                           partitioningState, numPartitions);
-      } else {
-        // one of the input streams is already partitioned
+      } else if(partitioningState == NoPartitioning) {
+        //other stream partitioned, this stream is not partitioned
         std::vector<std::shared_ptr<SHJoin<T, T2, KeyType>>> ops;
+        auto op = std::make_shared<SHJoin<T, T2, KeyType>>(fn1, fn2, pred);
+        ops.push_back(op);
+        auto iter = addJoin<T2, KeyType>(ops, otherPipe);
+
+        /*auto pOp = castOperator<DataSource<T>>(getPublisher());
+        connectChannels(pOp->getOutputDataChannel(), op->getLeftInputDataChannel());
+        connectChannels(pOp->getOutputPunctuationChannel(), op->getInputPunctuationChannel());
+
+        auto otherOpIt = otherPipe.getPublishers();
+        auto otherOpN = castOperator<DataSource<T2>>(otherOpIt->get());
+        if(otherOpN->opName() == "PartitionBy") {
+          auto partition2 = castOperator<PartitionBy<T2>>(otherOpIt->get());
+          partition2->connectChannelsForPartition(0,
+                                                  op->getRightInputDataChannel(),
+                                                  op->getInputPunctuationChannel());
+        } else {
+          for (auto iter = otherPipe.getPublishers(); iter != dataflow->publisherEnd(); iter++) {
+            auto otherOp = castOperator<DataSource<T2>>(iter->get());
+            std::cout<<otherOp->opName()<<std::endl;
+            connectChannels(otherOp->getOutputDataChannel(), op->getRightInputDataChannel());
+            connectChannels(otherOp->getOutputPunctuationChannel(), op->getInputPunctuationChannel());
+          }
+        }
+
+        auto iter = dataflow->addPublisher(op);*/
+        return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
+                          partitioningState, numPartitions);
+      } else {
+        //this stream is partitioned
+        std::vector<std::shared_ptr<SHJoin<T, T2, KeyType>>> ops;
+
         for (auto i = 0u; i < numPartitions; i++) {
           auto op = std::make_shared<SHJoin<T, T2, KeyType>>(fn1, fn2, pred);
           ops.push_back(op);
         }
-        auto iter = addPartitionedJoin<T2, KeyType>(
-            ops, otherOp, otherPipe.partitioningState);
+
+        auto iter = addJoin<T2, KeyType>(ops, otherPipe);
         return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                           partitioningState, numPartitions);
       }
