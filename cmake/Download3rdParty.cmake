@@ -130,6 +130,34 @@ download_project(PROJ               data
 file(COPY ${PROJECT_BINARY_DIR}/data-src/DEBS2017
      DESTINATION ${THIRD_PARTY_DIR}
 )
+
+# Linear Road Data Driver
+download_project(PROJ               linroad
+	            GIT_REPOSITORY      https://github.com/samsonxian/Linear-Road-Benchmark-Data-Driver.git
+	            GIT_TAG             master
+	            UPDATE_DISCONNECTED 1
+	            QUIET
+)
+add_custom_command(
+        OUTPUT ${THIRD_PARTY_DIR}/linroad
+        COMMAND ${CMAKE_COMMAND} -E copy
+                ${PROJECT_SOURCE_DIR}/usecases/LinearRoad/CMakeLists.txt
+                ${linroad_SOURCE_DIR}/src
+        COMMAND ${CMAKE_COMMAND} -E chdir ${linroad_SOURCE_DIR}/src cmake .
+        COMMAND ${CMAKE_COMMAND} -E chdir ${linroad_SOURCE_DIR}/src $(MAKE)
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/linroad/data
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/linroad/include
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/linroad/lib
+        COMMAND ${CMAKE_COMMAND} -E copy
+	            ${linroad_SOURCE_DIR}/src/Data/datafile20seconds.dat
+	            ${THIRD_PARTY_DIR}/linroad/data
+        COMMAND ${CMAKE_COMMAND} -E copy
+	            ${linroad_SOURCE_DIR}/src/libLRDataProvider.a
+	            ${THIRD_PARTY_DIR}/linroad/lib
+        COMMAND ${CMAKE_COMMAND} -E copy
+	            ${linroad_SOURCE_DIR}/src/LRDataProvider.h
+	            ${THIRD_PARTY_DIR}/linroad/include
+)
 endif()
 
 #--------------------------------------------------------------------------------

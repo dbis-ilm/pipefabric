@@ -36,11 +36,6 @@ option(BUILD_PYTHON            "build python interface for pipefabric"          
 ############################################################################################
 #
 
-# Use cases require matrix support (image and graph processing)
-if(BUILD_USE_CASES)
-  set(SUPPORT_MATRICES ON)
-endif()
-
 # Benchmark test requires benchmark library
 if (BUILD_BENCHMARKS)
   set(BUILD_GOOGLE_BENCH ON)
@@ -81,6 +76,7 @@ endif()
 include_directories("${THIRD_PARTY_DIR}")
 
 set(core_sources
+  ${core_sources}
   # we need this as dependency to download the sources from github
   ${THIRD_PARTY_DIR}/json
   ${THIRD_PARTY_DIR}/fmt
@@ -88,6 +84,28 @@ set(core_sources
   ${THIRD_PARTY_DIR}/catch
 )
 set(core_libs "")
+
+if(BUILD_USE_CASES)
+  add_definitions(-DBUILD_USE_CASES)
+
+  # Use case for linear road
+  include_directories("${THIRD_PARTY_DIR}/linroad/include")
+  set(LINROAD_LIB "${THIRD_PARTY_DIR}/linroad/lib/libLRDataProvider.a")
+  file(COPY ${PROJECT_SOURCE_DIR}/usecases/LinearRoad/LinearRoadTest.cpp
+       DESTINATION ${PROJECT_SOURCE_DIR}/test
+  )
+  set(core_sources
+    ${core_sources}
+    ${THIRD_PARTY_DIR}/linroad
+  )
+  set(core_libs
+    ${core_libs}
+    ${LINROAD_LIB}
+  )
+
+  # Use cases require matrix support (image and graph processing)
+  set(SUPPORT_MATRICES ON)
+endif()
 
 
 ############################################################################################

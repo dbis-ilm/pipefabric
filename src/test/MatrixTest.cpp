@@ -68,7 +68,7 @@ TEST_CASE("Dense matrix. Insert operations", "[MatrixOperations]")
   }
 }
 
-TEST_CASE("Filling random values", "[MatrixOperations][SparseMatrix]")
+/*TEST_CASE("Filling random values", "[MatrixOperations][SparseMatrix]")
 {
   typedef Matrix<CellType, ReaderValue<InputType> > MatrixType;
 
@@ -102,7 +102,7 @@ TEST_CASE("Filling random values", "[MatrixOperations][SparseMatrix]")
 
     REQUIRE(matrix->get(x, y) == z);
   }
-}
+}*/
 
 TEST_CASE("Read vector from a tuple to matrix", "[MatrixTest]")
 {
@@ -130,9 +130,9 @@ TEST_CASE("Read vector from a tuple to matrix", "[MatrixTest]")
 
   { // Sparse matrix
     typedef SparseVector<CellType>              VectorCol;
-    typedef Tuple< int, int, VectorCol >       Tuple;
+    typedef pfabric::Tuple< int, int, VectorCol >       mTuple;
   
-    Tuple record(valTuple.data());
+    mTuple record(valTuple.data());
     // validator(record);
   }
 
@@ -140,9 +140,9 @@ TEST_CASE("Read vector from a tuple to matrix", "[MatrixTest]")
 
     // typedef DenseMatrix<CellType, ReaderValue<InputType> > MatrixType;
     typedef VectorY<CellType> VectorCol;
-    typedef Tuple< int, int, VectorCol > Tuple;
+    typedef pfabric::Tuple< int, int, VectorCol > mTuple;
     
-    Tuple record(valTuple.data());
+    mTuple record(valTuple.data());
     validator(record);
   }
 }

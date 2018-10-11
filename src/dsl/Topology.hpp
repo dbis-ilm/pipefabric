@@ -56,6 +56,9 @@
 #ifdef USE_MQTT
   #include "net/MQTTSource.hpp"
 #endif
+#ifdef BUILD_USE_CASES
+  #include "usecases/LinearRoad/DataDriverLR.hpp"
+#endif
 
 namespace pfabric {
 
@@ -410,6 +413,16 @@ namespace pfabric {
       registerPrepareFunction([=]() -> unsigned long { return op->prepare(); });
       return Pipe<T>(dataflow, dataflow->addPublisher(op));
     }
+
+#ifdef BUILD_USE_CASES
+    //Linear Road data producer
+    template<typename T>
+    Pipe<T> newStreamFromLinRoad(const std::string& fname) {
+      auto op = std::make_shared<DataDriverLR<T>>(fname);
+      registerStartupFunction([=]() -> unsigned long { return op->start(); });
+      return Pipe<T>(dataflow, dataflow->addPublisher(op));
+    }
+#endif
   };
 
 }

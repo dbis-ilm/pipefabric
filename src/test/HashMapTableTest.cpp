@@ -28,7 +28,7 @@
 
 using namespace pfabric;
 
-typedef Tuple<unsigned long, int, std::string, double> MyTuple;
+typedef pfabric::Tuple<unsigned long, int, std::string, double> MyTuple;
 
 template <typename RecordType, typename KeyType = DefaultKeyType>
 using HTable = HashMapTable<RecordType, KeyType>;
