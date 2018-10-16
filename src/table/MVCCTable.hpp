@@ -302,7 +302,7 @@ class MVCCTable : public BaseTable,
         last.usedSlots |= (1LL << iPos);
       }
       /* Entry does not exist yet */
-      catch (TableException exc) {
+      catch (TableException& exc) {
         newEntries[i] = {e.first, MVCCObject<TupleType>()};
         auto &last = newEntries[i].mvcc;
         last.headers[0] = {txnID, DTS_INF};
@@ -473,19 +473,19 @@ class MVCCTable : public BaseTable,
     SmartPtr<pfabric::Tuple<MVCCObject<TupleType>>> tplPtr;
     try {
       tplPtr = tbl.getByKey(key);
-    } catch (TableException exc) {
+    } catch (TableException& exc) {
 //      locks.unlockShared(key);
       return Errc::NOT_FOUND;
     }
-    const auto mvcc = get<0>(*tplPtr);
+    const auto& mvcc = get<0>(*tplPtr);
 //    locks.unlockShared(key);
    
     /* Get read CTS (version that was read first) for consistency */
-    auto readCTS = sCtx.getReadCTS(txnID, 0);
+    auto& readCTS = sCtx.getReadCTS(txnID, 0);
     if(readCTS == 0) {
       /* first read operation by this txnID --> save snapshot version */
       readCTS = sCtx.getLastCTS(0);
-      sCtx.setReadCTS(txnID, 0, readCTS);
+      //sCtx.setReadCTS(txnID, 0, readCTS);
     }
 
     /* Read visible tuple,

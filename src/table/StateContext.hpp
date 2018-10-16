@@ -56,10 +56,10 @@ class ZipfianGenerator {
     static constexpr double ZIPFIAN_CONSTANT = 0.99;
     ZipfianGenerator(unsigned int min, unsigned int max, double zipfianconstant);
     unsigned int nextValue();
-  
+
 	private:
     unsigned int nextInt(unsigned int itemcount);
-    
+
     /** Number of items. */
     const unsigned int items;
 
@@ -135,7 +135,11 @@ class StateContext {
 
   /** Get status of a reading transaction; returns read snapshot version */
   const ReadCTS getReadCTS(const TransactionID txnID,
-                            const GroupID topoID) const {
+                           const GroupID topoID) const {
+    return std::get<2>(activeTxs[getPosFromTxnID(txnID)])[topoID];
+  }
+
+  ReadCTS& getReadCTS(const TransactionID txnID, const GroupID topoID) {
     return std::get<2>(activeTxs[getPosFromTxnID(txnID)])[topoID];
   }
 
@@ -154,7 +158,7 @@ class StateContext {
       }
       return oldest;
   }
-  
+
   /** Registers a new transaction to the context */
   const TransactionID newTx() {
     const auto txnID = nextTxID.fetch_add(1);
@@ -237,14 +241,11 @@ class StateContext {
  private:
 
   /** calculate and return the position in the activeTxs array for the given
-   *  transaction ID; TODO: can this be more efficient? */
+   *  transaction ID; */
   const uint8_t getPosFromTxnID(const TransactionID txnID) const {
-    const auto slots = usedSlots.load(std::memory_order_relaxed);
-    for(int pos = 0; pos < 64; ++pos) {
-      if(slots & (1ULL << pos) && std::get<0>(activeTxs[pos]) == txnID)
-        return pos;
-    }
-    return 64;
+    auto pos = -1;
+    while(std::get<0>(activeTxs[++pos]) != txnID);
+    return pos;
   }
 
   std::atomic<std::uint64_t> usedSlots;

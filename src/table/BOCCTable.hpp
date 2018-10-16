@@ -248,7 +248,7 @@ class BOCCTable : public BaseTable,
     writeSet.clean();
 
     /* Cleanup old write sets [remove all where EndTS < oldest active tx] */
-//    if (committedWSs.size() > 1000) {
+//    if (committedWSs.size() > 100) {
       auto oldestTx = sCtx.getOldestActiveTx();
       if (oldestTx == txnID) oldestTx = ws.endTS;
       for(auto it = committedWSs.cbegin(); it != committedWSs.cend(); ++it) {
@@ -425,10 +425,10 @@ class BOCCTable : public BaseTable,
     SmartPtr<RecordType> tplPtr;
     try {
       tplPtr = tbl.getByKey(key);
-    } catch (TableException exc) {
+    } catch (TableException& exc) {
       return Errc::NOT_FOUND;
     }
-    outValue =tplPtr;
+    outValue = tplPtr;
     return Errc::SUCCESS;
   }
 

@@ -258,11 +258,11 @@ template<typename TableType> class TxExample {
           theta = thetas[t];
           sCtx.setDistribution(zipf, 0, keyRange-1, theta);
           for (auto i = 0u; i < repetitions; i++) {
-          generateWorkload<zipf>(theta, "wl_writes_zipf.csv");
+            generateWorkload<zipf>(theta, "wl_writes_zipf.csv");
             runTopologies();
             accumulateMeasures();
+            resFile.flush();
           }
-          resFile.flush();
         }
       } else {
         generateWorkload<zipf>(0, "wl_writes_uni.csv");
