@@ -125,8 +125,8 @@ using pmem::obj::p;
 using pmem::obj::persistent_ptr;
 using pmem::obj::pool;
 using pmem::obj::transaction;
-using ptable::PTable;
-using ptable::PTuple;
+using dbis::ptable::PTable;
+using dbis::ptable::PTuple;
 
 template<typename KeyType, typename RecordType>
 class NVMIterator {
@@ -355,7 +355,7 @@ class NVMTable : public BaseTable {
     try {
       SmartPtr<RecordType> tptr(new RecordType(*pTable->getByKey(key).createTuple()));
       return tptr;
-    } catch (ptable::PTableException &pex) {
+    } catch (dbis::ptable::PTableException &pex) {
       throw TableException(pex.what());
     }
   }
@@ -429,7 +429,7 @@ class NVMTable : public BaseTable {
 
   void drop() {
     auto pop = pool_by_pptr(q);
-    transaction::exec_tx(pop, [&] {
+    transaction::run(pop, [&] {
       delete_persistent<PTableType>(pTable);
       pTable = nullptr;
       delete_persistent<root>(q);
@@ -451,19 +451,19 @@ class NVMTable : public BaseTable {
 
     if (access(path.c_str(), F_OK) != 0) {
       //TODO: How do we estimate the required pool size
-      pop = pool<root>::create(path, ptable::LAYOUT, 64 * 1024 * 1024);
-      transaction::exec_tx(pop, [&] {
-        ptable::StringVector sVector;
+      pop = pool<root>::create(path, dbis::ptable::LAYOUT, 64 * 1024 * 1024);
+      transaction::run(pop, [&] {
+          dbis::ptable::StringVector sVector;
         for (const auto &c : tableInfo) {
           sVector.emplace_back(c.getName());
         }
-        ptable::VTableInfo<KeyType, TupleType> vTableInfo(tableInfo.tableName(), std::move(sVector));
-        pop.get_root()->pTable = make_persistent<PTableType>(std::move(vTableInfo));
+        dbis::ptable::VTableInfo<KeyType, TupleType> vTableInfo(tableInfo.tableName(), std::move(sVector));
+        pop.root()->pTable = make_persistent<PTableType>(std::move(vTableInfo));
       });
     } else {
-      pop = pool<root>::open(path, ptable::LAYOUT);
+      pop = pool<root>::open(path, dbis::ptable::LAYOUT);
     }
-    q = std::move(pop.get_root());
+    q = std::move(pop.root());
     pTable = q->pTable;
   }
 

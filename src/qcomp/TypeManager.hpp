@@ -37,7 +37,7 @@ public:
   TypeManager() {}
 
   void registerType(const TableInfo& tInfo);
-  std::string nameOfType(const TableInfo& tInfo) throw (QueryCompileException);
+  std::string nameOfType(const TableInfo& tInfo);
 
   TypeIterator begin() const { return mTypeTable.begin(); }
   TypeIterator end() const { return mTypeTable.end(); }

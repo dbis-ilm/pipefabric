@@ -92,8 +92,7 @@ class MapColumnVisitor : public boost::static_visitor<> {
   std::map<std::string, int> columnMap;
 };
 
-void QueryCompiler::readSettings(const boost::filesystem::path& lib_path) throw(
-    QueryCompileException) {
+void QueryCompiler::readSettings(const boost::filesystem::path& lib_path) {
   po::options_description desc("Options");
   desc.add_options()("cc", po::value<std::string>(&cc), "c++ compiler")(
       "cflags", po::value<std::string>(&cflags), "c++ flags")(
@@ -128,7 +127,7 @@ void QueryCompiler::traverse(PlanOpPtr op, QueryCompiler::TraverseFunc f) {
 }
 
 void QueryCompiler::checkPlan(PFabricContext& ctx,
-                              PlanPtr plan) throw(QueryCompileException) {
+                              PlanPtr plan) {
   traverse(plan->sinkOperator(), [&](PlanOpPtr op) {
     switch (op->mOpType) {
       case BasePlanOp::Where_Op: {
@@ -181,7 +180,7 @@ void QueryCompiler::modifyWhereExpression(
 }
 
 void QueryCompiler::constructMapSchema(
-    std::shared_ptr<PlanOp<MapInfo>> mapOp) throw(QueryCompileException) {
+    std::shared_ptr<PlanOp<MapInfo>> mapOp) {
   MapInfo& mInfo = mapOp->payload();
   auto inputSchema = mapOp->mChild->mOutputSchema;
   TableInfo::ColumnVector outputColumns;
@@ -202,7 +201,7 @@ void QueryCompiler::constructMapSchema(
 
 TopologyBuilderPtr QueryCompiler::execQuery(
     PFabricContext& ctx,
-    const std::string& queryString) throw(QueryCompileException) {
+    const std::string& queryString) {
   TopologyBuilderPtr topology;
 
   try {
@@ -210,7 +209,7 @@ TopologyBuilderPtr QueryCompiler::execQuery(
     topology = entry.builder;
     entry.topology->start(false);
 
-  } catch (std::out_of_range) {
+  } catch (std::out_of_range&) {
     auto queryName = compileQuery(ctx, queryString);
 
     auto queryObj = queryName + "_obj_";
@@ -232,7 +231,7 @@ TopologyBuilderPtr QueryCompiler::execQuery(
 
 std::string QueryCompiler::compileQuery(
     PFabricContext& ctx,
-    const std::string& queryString) throw(QueryCompileException) {
+    const std::string& queryString) {
   SQLParser parser;
   auto query = parser.parse(queryString);
   auto plan = Plan::constructFromSQLQuery(query);
@@ -249,7 +248,7 @@ std::string QueryCompiler::compileQuery(
 
 void QueryCompiler::generateCode(
     PFabricContext& ctx, PlanPtr plan,
-    const std::string& className) throw(QueryCompileException) {
+    const std::string& className) {
   std::string cppFile = className + ".cpp";
 
   std::ofstream cppStream(cppFile);
@@ -375,7 +374,7 @@ std::string QueryCompiler::generateMapExpression(const MapInfo& mInfo) {
 
 std::string QueryCompiler::compileCppCode(
     const boost::filesystem::path& lib_path,
-    const std::string& cppFileName) throw(QueryCompileException) {
+    const std::string& cppFileName) {
   std::ostringstream cmd;
   auto pos = cppFileName.find(".cpp");
   std::string fileName = cppFileName.substr(0, pos);

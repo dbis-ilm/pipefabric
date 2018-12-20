@@ -26,7 +26,7 @@ void PlanCache::addToCache(const std::string& queryString, const CacheEntry& ent
   planCache.insert({ queryString, entry });
 }
 
-const CacheEntry& PlanCache::findPlanForQuery(const std::string& queryString) throw (std::out_of_range) {
+const CacheEntry& PlanCache::findPlanForQuery(const std::string& queryString) {
   auto iter = planCache.find(queryString);
   if (iter == planCache.end())
     throw std::out_of_range("query not found in cache");

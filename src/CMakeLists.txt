@@ -47,7 +47,7 @@ endif()
 #CMAKE_FORCE_CXX_COMPILER(icpc "Intel C++ Compiler")
 
 # C++ compiler flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated -g -O3 -Wsign-compare")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -Wall -Wno-deprecated -g -O3 -Wsign-compare")
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedefs -Wno-#pragma-messages")
 elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
@@ -189,21 +189,23 @@ if (USE_NVM_TABLE)
     "${THIRD_PARTY_DIR}/pmdk/lib/libpmempool.a"
     "${THIRD_PARTY_DIR}/pmdk/lib/libpmem.a"
      ${DYLIB_LIBRARY}
-    "${THIRD_PARTY_DIR}/ptable/lib/libptable.so"
+    "${THIRD_PARTY_DIR}/nvmDS/lib/libptable.so"
   )
   include_directories(
     "${THIRD_PARTY_DIR}/pmdk/include"
-    "${THIRD_PARTY_DIR}/ptable/include"
+    "${THIRD_PARTY_DIR}/nvmDS/include"
   )
-  add_definitions(-DDO_LOG=0)
   set(core_sources
     ${core_sources}
     ${THIRD_PARTY_DIR}/pmdk
-    ${THIRD_PARTY_DIR}/ptable
+    ${THIRD_PARTY_DIR}/pmdk-cpp
+    ${THIRD_PARTY_DIR}/nvmDS
   )
   set(core_libs
     ${core_libs}
     ${PMDK_LIBRARIES}
+    ndctl
+    daxctl
   )
 else ()
   message(STATUS "don't use NVM based persistent table")

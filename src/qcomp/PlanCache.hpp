@@ -42,7 +42,7 @@ namespace pfabric {
       PlanCache() {}
 
       void addToCache(const std::string& queryString, const CacheEntry& entry);
-      const CacheEntry& findPlanForQuery(const std::string& queryString) throw (std::out_of_range);
+      const CacheEntry& findPlanForQuery(const std::string& queryString);
 
      private:
         std::map<std::string, CacheEntry> planCache;

@@ -32,7 +32,7 @@ void TypeManager::registerType(const TableInfo& tInfo) {
   }
 }
 
-std::string TypeManager::nameOfType(const TableInfo& tInfo) throw (QueryCompileException) {
+std::string TypeManager::nameOfType(const TableInfo& tInfo) {
   auto iter = mTypeTable.find(tInfo.typeSignature());
   if (iter == mTypeTable.end()) 
     throw QueryCompileException("unkown type");

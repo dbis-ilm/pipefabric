@@ -140,7 +140,7 @@ public:
    * @param key the key value of the tuple
    * @param rec the actual tuple
    */
-  void insert(KeyType key, const RecordType& rec) throw (TableException) {
+  void insert(KeyType key, const RecordType& rec) {
     {
       // make sure we have exclusive access
       std::lock_guard<std::mutex> lock(mMtx);
@@ -327,7 +327,7 @@ public:
    * @param key the key value
    * @return the tuple associated with the given key
    */
-  const SmartPtr<RecordType> getByKey(KeyType key) throw (TableException) {
+  const SmartPtr<RecordType> getByKey(KeyType key) {
     // make sure we have exclusive access
     std::lock_guard<std::mutex> lock(mMtx);
 

@@ -156,7 +156,7 @@ class SQLParser {
 public:
   SQLParser() {}
 
-  sql::SQLQueryPtr parse(const std::string& stmt) throw (QueryCompileException);
+  sql::SQLQueryPtr parse(const std::string& stmt);
 };
 
 }

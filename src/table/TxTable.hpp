@@ -94,16 +94,12 @@ class TxTable : public BaseTable {
   // details
   typedef typename Table::Predicate Predicate;
 
-  TxTable(const TableInfo& tInfo) throw(TableException)
-      : BaseTable(tInfo), tbl(tInfo) {
-  }
+  TxTable(const TableInfo& tInfo) : BaseTable(tInfo), tbl(tInfo) {}
 
   /**
    * Constructor for creating an empty table.
    */
-  TxTable(const std::string& tableName) throw(TableException)
-  : tbl(tableName) {
-  }
+  TxTable(const std::string& tableName) : tbl(tableName) {}
 
   /**
     * Destructor for table.
@@ -145,7 +141,7 @@ class TxTable : public BaseTable {
    * @param key the key value of the tuple
    * @param rec the actual tuple
    */
-  void insert(const TransactionID& txID, KeyType key, const RecordType& rec) throw(TableException) {
+  void insert(const TransactionID& txID, KeyType key, const RecordType& rec) {
     // Tx support
     logBuffer.append(txID, LogOp::Insert, key, rec);
   }
@@ -243,7 +239,7 @@ class TxTable : public BaseTable {
    * @param key the key value
    * @return the tuple associated with the given key
    */
-  SmartPtr<RecordType> getByKey(KeyType key) throw(TableException) { return tbl.getByKey(key); }
+  SmartPtr<RecordType> getByKey(KeyType key) { return tbl.getByKey(key); }
 
   /**
    * @brief Return a pair of iterators for scanning the table with a

@@ -175,16 +175,29 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E chdir ${pmdk_SOURCE_DIR} $(MAKE) install prefix=${THIRD_PARTY_DIR}/pmdk
 )
 
-# PTable (internal gitlab project) for NVM
-download_project(PROJ               ptable
-                GIT_REPOSITORY      https://dbgit.prakinf.tu-ilmenau.de/code/PTable.git
+download_project(PROJ               pmdk-cpp
+                GIT_REPOSITORY      https://github.com/pmem/libpmemobj-cpp
                 GIT_TAG             master
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
 add_custom_command(
-    OUTPUT ${THIRD_PARTY_DIR}/ptable
-    COMMAND ${CMAKE_COMMAND} -E chdir ${ptable_SOURCE_DIR} cmake -DPTABLE_DIR=${THIRD_PARTY_DIR}/ptable src
-    COMMAND ${CMAKE_COMMAND} -E chdir ${ptable_SOURCE_DIR} $(MAKE) install
+        OUTPUT ${THIRD_PARTY_DIR}/pmdk-cpp
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${pmdk-cpp_SOURCE_DIR}/include
+                ${THIRD_PARTY_DIR}/pmdk/include
+)
+
+# PTable (part of nvm-based data structures) for NVM
+download_project(PROJ               nvmDS
+                GIT_REPOSITORY      https://dbgit.prakinf.tu-ilmenau.de/code/nvm-based_data_structures.git
+                GIT_TAG             master
+                UPDATE_DISCONNECTED 1
+                QUIET
+)
+add_custom_command(
+  OUTPUT ${THIRD_PARTY_DIR}/nvmDS
+  COMMAND ${CMAKE_COMMAND} -E chdir ${nvmDS_SOURCE_DIR} cmake -DBUILD_TEST_CASES=OFF -DPROJECT_INSTALL_DIR=${THIRD_PARTY_DIR}/nvmDS src
+  COMMAND ${CMAKE_COMMAND} -E chdir ${nvmDS_SOURCE_DIR} $(MAKE) install
 )
 endif()

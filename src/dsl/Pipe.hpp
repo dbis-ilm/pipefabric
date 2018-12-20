@@ -1494,8 +1494,7 @@ class Pipe {
    */
   template <typename KeyType = DefaultKeyType, typename T2>
   Pipe<typename ScaleJoin<T, T2, KeyType>::ResultElement> scaleJoin(
-    Pipe<T2>& otherPipe, typename ScaleJoin<T, T2, KeyType>::JoinPredicateFunc pred, const int threadnum)
-    throw(TopologyException) {
+    Pipe<T2>& otherPipe, typename ScaleJoin<T, T2, KeyType>::JoinPredicateFunc pred, const int threadnum) {
 
     typedef typename ScaleJoin<T, T2, KeyType>::ResultElement Tout;
 
@@ -1589,7 +1588,7 @@ class Pipe {
    */
   template <typename KeyType = DefaultKeyType>
   Pipe<T> toTxTable(std::shared_ptr<TxTable<typename T::element_type, KeyType>> tbl,
-                  bool autoCommit = false) throw(TopologyException) {
+                  bool autoCommit = false) {
     typedef std::function<KeyType(const T&)> KeyExtractorFunc;
     typedef std::function<TransactionID(const T&)> TxIDExtractorFunc;
 
