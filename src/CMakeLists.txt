@@ -24,7 +24,7 @@ option(USE_MQTT                "use MQTT as network source"                     
 option(USE_BOOST_SPIRIT_PARSER "use the boost::spirit::qi parsers (strings convertion)" ON )
 option(USE_ROCKSDB_TABLE       "use RocksDB for implementing persistent tables"         OFF)
 option(USE_NVM_TABLE           "use NVM for implementing persistent memory tables"      OFF)
-option(BUILD_ONLY_LIBS         "build only the two pipefabric libraries"                ON )
+option(BUILD_ONLY_LIB          "build only the main pipefabric library"                 ON )
 option(BUILD_TEST_CASES        "build tests for pipefabric functionality"               ON )
 option(BUILD_GOOGLE_BENCH      "build google benchmark"                                 OFF)
 option(BUILD_BENCHMARKS        "build benchmark test for pipefabric"                    OFF)
@@ -102,9 +102,10 @@ if(BUILD_USE_CASES)
     ${core_libs}
     ${LINROAD_LIB}
   )
-
-  # Use cases require matrix support (image and graph processing)
-  set(SUPPORT_MATRICES ON)
+  if(SUPPORT_MATRICES)
+    # Use cases require matrix support (image and graph processing)
+    set(SUPPORT_MATRICES ON)
+  endif()
 endif()
 
 
@@ -440,15 +441,17 @@ target_link_libraries(pfabric_core
 ############################################################################################
 #
 
-add_library(pfabric_cep SHARED
-  cep/Matcher.cpp
-  # we need this as dependency to download the sources from github
-  ${THIRD_PARTY_DIR}/fmt
-)
+if(NOT BUILD_ONLY_LIB)
+  add_library(pfabric_cep SHARED
+    cep/Matcher.cpp
+    # we need this as dependency to download the sources from github
+    ${THIRD_PARTY_DIR}/fmt
+ )
 
-target_link_libraries(pfabric_cep
-  ${BOOST_LIBRARIES}
-)
+  target_link_libraries(pfabric_cep
+    ${BOOST_LIBRARIES}
+  )
+endif()
 
 
 ############################################################################################
@@ -478,23 +481,25 @@ endif()
 ############################################################################################
 #
 
-add_library(pfabric_qcomp SHARED
-  qcomp/Plan.cpp
-  qcomp/PlanCache.cpp
-  qcomp/QueryCompiler.cpp
-  qcomp/TypeManager.cpp
-  qcomp/UniqueNameGenerator.cpp
-  qcomp/SQLParser.cpp
-)
+if(BUILD_USE_CASES OR NOT BUILD_ONLY_LIB)
+  add_library(pfabric_qcomp SHARED
+    qcomp/Plan.cpp
+    qcomp/PlanCache.cpp
+    qcomp/QueryCompiler.cpp
+    qcomp/TypeManager.cpp
+    qcomp/UniqueNameGenerator.cpp
+    qcomp/SQLParser.cpp
+  )
 
-target_link_libraries(pfabric_qcomp
-  pfabric_core
-  ${Boost_PROGRAM_OPTIONS_LIBRARY}
-  ${Boost_FILESYSTEM_LIBRARY}
-  ${BOOST_LIBRARIES}
-)
+  target_link_libraries(pfabric_qcomp
+    pfabric_core
+    ${Boost_PROGRAM_OPTIONS_LIBRARY}
+    ${Boost_FILESYSTEM_LIBRARY}
+    ${BOOST_LIBRARIES}
+  )
 
-add_subdirectory(qcomp)
+  add_subdirectory(qcomp)
+endif()
 
 
 ############################################################################################
@@ -502,7 +507,9 @@ add_subdirectory(qcomp)
 ############################################################################################
 #
 
-add_subdirectory(demo)
+if(NOT BUILD_ONLY_LIB)
+  add_subdirectory(demo)
+endif()
 
 
 ############################################################################################
@@ -531,6 +538,9 @@ if(BUILD_USE_CASES)
     message(STATUS "OpenCV not found")
   endif()
   add_subdirectory(usecases)
+
+  add_executable(LinRoad usecases/LinearRoad/LinRoad.cpp)
+  target_link_libraries(LinRoad pfabric_core)
 endif()
 
 
@@ -542,7 +552,11 @@ endif()
 # Installation path
 set(PIPEFABRIC_DIR "/usr/local/pfabric")
 
-set(PIPEFABRIC_LIBS pfabric_core pfabric_cep)
+if(BUILD_ONLY_LIB)
+  set(PIPEFABRIC_LIBS pfabric_core)
+else()
+  set(PIPEFABRIC_LIBS pfabric_core pfabric_cep)
+endif()
 set(PIPEFABRIC_LIB_DIR "${PIPEFABRIC_DIR}/lib")
 set(PIPEFABRIC_INCLUDE_DIR "${PIPEFABRIC_DIR}/include")
 
