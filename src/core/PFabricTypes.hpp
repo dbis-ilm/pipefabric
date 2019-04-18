@@ -47,7 +47,7 @@ typedef std::size_t AttributeIdx;
  * Typedef for the timestamps associated with each tuple. A timestamp represents the number
  * of microseconds since 01/01/1970 indicating when the tuple arrived in the system.
  */
-typedef unsigned long long Timestamp;
+typedef std::chrono::microseconds Timestamp;
 
 /// a number for limiting the number of produced tuples
 typedef std::size_t TupleLimit;

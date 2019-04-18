@@ -237,7 +237,7 @@ class Tuplifier
       it->second.matches++;
       it->second.tripleList.push_back(data);
     } else {
-      const Timestamp ts = this->mTimestampExtractor == nullptr ? 0 : this->mTimestampExtractor(data);
+      const Timestamp ts = this->mTimestampExtractor == nullptr ? Timestamp(0) : this->mTimestampExtractor(data);
       
       BufferItem item(ts);
       item.tripleList.push_back(data);
@@ -298,7 +298,7 @@ class Tuplifier
   void produceOutdatedTuples() {
     for (auto it = tupleBuffer.begin(); it != tupleBuffer.end();) {
       BufferItem& bitem = it->second;
-      if (bitem.arrivalTime == 0) {
+      if (bitem.arrivalTime == Timestamp(0)) {
         produceTuple(bitem.tripleList);
         // remove it from the map
         it = tupleBuffer.erase(it);
@@ -307,14 +307,13 @@ class Tuplifier
     }
   }
 
-   TimestampExtractorFunc mTimestampExtractor; //< a function for extracting timestamps from a tuple
-  BufferMap
-      tupleBuffer;  //< a buffer for all received triples not yet published
-  PredicateMap predicates;  //< a map containing all predicates and their
-                            //position in the tuple
-  TuplifierParams::TuplifyMode mode;         //< the mode for constructing tuples from triples
-  std::string currentSubj;  //< the current subject in the triple stream (only
-                            //useful for ordered)
+  TimestampExtractorFunc mTimestampExtractor; //< a function for extracting timestamps from a tuple
+  BufferMap tupleBuffer;                      //< a buffer for all received triples not yet published
+  PredicateMap predicates;                    //< a map containing all predicates and their
+                                              //position in the tuple
+  TuplifierParams::TuplifyMode mode;          //< the mode for constructing tuples from triples
+  std::string currentSubj;                    //< the current subject in the triple stream (only
+                                              //useful for ordered)
   std::unique_ptr<TriggerNotifier> notifier;  //< the notifier object which
                                               //triggers the computation
                                               //periodically

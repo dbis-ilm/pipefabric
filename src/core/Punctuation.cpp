@@ -17,7 +17,6 @@
  * along with PipeFabric. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "TimestampHelper.hpp"
 #include "Punctuation.hpp"
 
 using namespace pfabric;

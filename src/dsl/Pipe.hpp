@@ -21,7 +21,6 @@
 #define Pipe_hpp_
 
 #include <string>
-
 #include <typeinfo>
 
 #include <boost/any.hpp>
@@ -396,8 +395,7 @@ class Pipe {
    */
   Pipe<T> assignTimestamps(typename Window<T>::TimestampExtractorFunc func) {
     return Pipe<T>(dataflow, tailIter, keyExtractor, func, transactionIDExtractor,
-       partitioningState,
-                   numPartitions);
+       partitioningState, numPartitions);
   }
 
   /**
@@ -416,11 +414,10 @@ class Pipe {
   template <int N>
   Pipe<T> assignTimestamps() {
     std::function<Timestamp(const T&)> func = [](const T& tp) -> Timestamp {
-      return getAttribute<N>(tp);
+      return Timestamp(getAttribute<N>(tp) * 1000 * 1000); //< default interpretation as seconds
     };
     return Pipe<T>(dataflow, tailIter, keyExtractor, func,  transactionIDExtractor,
-      partitioningState,
-                   numPartitions);
+      partitioningState, numPartitions);
   }
 
   /**
@@ -481,7 +478,7 @@ class Pipe {
         return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor,  transactionIDExtractor,
                        partitioningState, numPartitions);
       }
-    } catch (boost::bad_any_cast& e) {
+    } catch (const boost::bad_any_cast& e) {
       throw TopologyException(
           "No TimestampExtractor defined for slidingWindow.");
     }
@@ -540,7 +537,7 @@ class Pipe {
         return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                        partitioningState, numPartitions);
       }
-    } catch (boost::bad_any_cast& e) {
+    } catch (const boost::bad_any_cast& e) {
       throw TopologyException(
           "No TimestampExtractor defined for tumblingWindow.");
     }
@@ -1103,23 +1100,28 @@ class Pipe {
       typename Aggregation<T, Tout, AggrState>::IterateFunc iterFun,
       AggregationTriggerType tType = TriggerAll,
       const unsigned int tInterval = 0) noexcept(false) {
+    using AggrType = Aggregation<T, Tout, AggrState>;
+    if (!timestampExtractor.empty()) tType = TriggerByTimestamp;
     if (partitioningState == NoPartitioning) {
-      auto op = std::make_shared<Aggregation<T, Tout, AggrState>>(
-          finalFun, iterFun, tType, tInterval);
-      auto iter =
-          addPublisher<Aggregation<T, Tout, AggrState>, DataSource<T>>(op);
-      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
-                        partitioningState, numPartitions);
-    } else {
-      std::vector<std::shared_ptr<Aggregation<T, Tout, AggrState>>> ops;
-      for (auto i = 0u; i < numPartitions; i++) {
-        ops.push_back(std::make_shared<Aggregation<T, Tout, AggrState>>(
-            finalFun, iterFun, tType, tInterval));
+      std::shared_ptr<AggrType> op;
+      if (tType == TriggerByTimestamp) {
+        using ExtractorFunc = typename AggrType::TimestampExtractorFunc;
+        auto fn = boost::any_cast<ExtractorFunc>(timestampExtractor);
+        op = std::make_shared<AggrType>(finalFun, iterFun, fn, tInterval);
+      } else {
+        op = std::make_shared<AggrType>(finalFun, iterFun, tType, tInterval);
       }
-      auto iter =
-          addPartitionedPublisher<Aggregation<T, Tout, AggrState>, T>(ops);
-      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
-                        partitioningState, numPartitions);
+      auto iter = addPublisher<AggrType, DataSource<T>>(op);
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+                        transactionIDExtractor, partitioningState, numPartitions);
+    } else {
+      std::vector<std::shared_ptr<AggrType>> ops;
+      for (auto i = 0u; i < numPartitions; i++) {
+        ops.push_back(std::make_shared<AggrType>(finalFun, iterFun, tType, tInterval));
+      }
+      auto iter = addPartitionedPublisher<AggrType, T>(ops);
+      return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
+                        transactionIDExtractor, partitioningState, numPartitions);
     }
   }
 
@@ -1255,7 +1257,7 @@ class Pipe {
         return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                           partitioningState, numPartitions);
       }
-    } catch (boost::bad_any_cast& e) {
+    } catch (const boost::bad_any_cast& e) {
       throw TopologyException("No KeyExtractor defined for groupBy.");
     }
   }
@@ -1297,7 +1299,7 @@ class Pipe {
         return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                           partitioningState, numPartitions);
       }
-    } catch (boost::bad_any_cast& e) {
+    } catch (const boost::bad_any_cast& e) {
       throw TopologyException("No KeyExtractor defined for groupBy.");
     }
   }
@@ -1464,7 +1466,7 @@ class Pipe {
         return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                           partitioningState, numPartitions);
       }
-    } catch (boost::bad_any_cast& e) {
+    } catch (const boost::bad_any_cast& e) {
       throw TopologyException("No KeyExtractor defined for join.");
     }
   }
@@ -1559,7 +1561,7 @@ class Pipe {
       return Pipe<Tout>(dataflow, iter, keyExtractor, timestampExtractor,
          transactionIDExtractor, partitioningState, numPartitions);
 
-    } catch (boost::bad_any_cast& e) {
+    } catch (const boost::bad_any_cast& e) {
       throw TopologyException("No KeyExtractor defined for join.");
     }
   }
@@ -1605,7 +1607,7 @@ class Pipe {
       auto iter = addPublisher<ToTxTable<T, KeyType>, DataSource<T>>(op);
       return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                      partitioningState, numPartitions);
-    } catch (boost::bad_any_cast& e) {
+    } catch (const boost::bad_any_cast& e) {
       throw TopologyException("No KeyExtractor or TransactionIDExtractor defined for toTxTable.");
     }
   }
@@ -1624,7 +1626,7 @@ class Pipe {
       auto iter = addPublisher<ToTable<T, KeyType>, DataSource<T>>(op);
       return Pipe<T>(dataflow, iter, keyExtractor, timestampExtractor, transactionIDExtractor,
                      partitioningState, numPartitions);
-    } catch (boost::bad_any_cast& e) {
+    } catch (const boost::bad_any_cast& e) {
       throw TopologyException("No KeyExtractor defined for toTable.");
     }
   }
@@ -1687,7 +1689,7 @@ class Pipe {
             });
         return tp;
       });
-    } catch (boost::bad_any_cast& e) {
+    } catch (const boost::bad_any_cast& e) {
       throw TopologyException("No KeyExtractor defined for updateTable.");
     }
   }

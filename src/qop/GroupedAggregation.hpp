@@ -270,7 +270,7 @@ private:
     switch (mTriggerType) {
       case TriggerByCount:
       {
-        if (++mCounter == mTriggerInterval) {
+        if (++mCounter == boost::get<unsigned int>(mTriggerInterval)) {
           notificationCallback();
           mCounter = 0;
         }
@@ -279,7 +279,7 @@ private:
       case TriggerByTimestamp:
       {
         auto ts = mTimestampExtractor(data);
-        if (ts - mLastTriggerTime >= mTriggerInterval) {
+        if (ts - mLastTriggerTime >= boost::get<Timestamp>(mTriggerInterval)) {
           notificationCallback();
           mLastTriggerTime = ts;
         }
@@ -326,7 +326,7 @@ private:
 	 */
 	void processNewAggregationGroup(KeyType grpKey, const InputStreamElement& data, const Lock& lock) {
 		const bool outdated = false;
-    const Timestamp elementTime = mTimestampExtractor != nullptr ? mTimestampExtractor(data) : 0;
+    const Timestamp elementTime = mTimestampExtractor != nullptr ? mTimestampExtractor(data) : Timestamp(0);
 
 		// create a new aggregation state
     // if a factory object was provided we can call its create method
@@ -367,7 +367,7 @@ private:
       auto groupEntry = mAggregateTable.find(grpKey);
 
       AggregateStatePtr aggrState = groupEntry->second;
-      const Timestamp elementTime = mTimestampExtractor != nullptr ? mTimestampExtractor(data) : 0;
+      const Timestamp elementTime = mTimestampExtractor != nullptr ? mTimestampExtractor(data) : Timestamp(0);
       /* 1. Send the previous aggregated state as outdated
       if (mTriggerType == TriggerAll) {
         produceAggregate(aggrState, elementTime, true, lock);
@@ -456,21 +456,23 @@ protected:
   }
 
 private:
-    HashTable mAggregateTable;                  //< a hash table for storing the aggregation states for each group
-    TimestampExtractorFunc mTimestampExtractor; //!< a pointer to the function for extracting the timestamp from the tuple
-                                                //!< for each group at runtime
-    mutable AggregationMutex mAggrMtx;           //!< a mutex for synchronizing access between the trigger notifier thread
-                                                //!< and aggregation operator
-    GroupByFunc mGroupByFunc;                   //!< a pointer to the function determining the key value for the group
-    IterateFunc mIterateFunc;                   //!< a pointer to the iteration function called for each tuple
-    FinalFunc mFinalFunc;                       //!< a  pointer to a function computing the final (or periodical) aggregates
-		unsigned int mTriggerInterval;              //!< the interval (time in seconds, number of tuples) for publishing aggregates
-    std::unique_ptr<TriggerNotifier> mNotifier; //!< the notifier object which triggers the computation of aggregates periodically
-    Timestamp mLastTriggerTime;                 //!< the timestamp of the last aggregate publishing
-    AggregationTriggerType mTriggerType;        //!< the type of trigger activating the publishing of an aggregate value
-    unsigned int mCounter;                      //!< the number of tuples processed since the last aggregate publishing
-		AggregateStatePtr mFactory;
-		FactoryFunc mFactoryFunc;
+  using IntervalType = boost::variant<Timestamp, unsigned int>;
+
+  HashTable mAggregateTable;                  //< a hash table for storing the aggregation states for each group
+  TimestampExtractorFunc mTimestampExtractor; //!< a pointer to the function for extracting the timestamp from the tuple
+                                              //!< for each group at runtime
+  mutable AggregationMutex mAggrMtx;           //!< a mutex for synchronizing access between the trigger notifier thread
+                                              //!< and aggregation operator
+  GroupByFunc mGroupByFunc;                   //!< a pointer to the function determining the key value for the group
+  IterateFunc mIterateFunc;                   //!< a pointer to the iteration function called for each tuple
+  FinalFunc mFinalFunc;                       //!< a  pointer to a function computing the final (or periodical) aggregates
+  IntervalType mTriggerInterval;              //!< the interval (time in seconds, number of tuples) for publishing aggregates
+  std::unique_ptr<TriggerNotifier> mNotifier; //!< the notifier object which triggers the computation of aggregates periodically
+  Timestamp mLastTriggerTime;                 //!< the timestamp of the last aggregate publishing
+  AggregationTriggerType mTriggerType;        //!< the type of trigger activating the publishing of an aggregate value
+  unsigned int mCounter;                      //!< the number of tuples processed since the last aggregate publishing
+  AggregateStatePtr mFactory;
+  FactoryFunc mFactoryFunc;
 };
 
 } /* end namespace pfabric */

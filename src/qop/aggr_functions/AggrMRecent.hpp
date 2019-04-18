@@ -53,7 +53,7 @@ public:
     }
 
     virtual void init() override {
-    	mMostRecentTime = 0;
+      mMostRecentTime = Timestamp(0);
     }
 
     virtual void iterate(Tin const& data, bool outdated = false) override {

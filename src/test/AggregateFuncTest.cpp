@@ -180,7 +180,7 @@ TEST_CASE("Calculate most recent values with timestamps", "[AggregateFunc]") {
 	AggrMRecent<int> aggr;
 	Timestamp ts;
 	for (int i = 0; i < 100; i++) {
-		ts = (i < 50 ? i : 100 - i);
+		ts = (i < 50 ? Timestamp(i) : Timestamp(100 - i));
 		aggr.iterate(i, ts);
 	}
 	REQUIRE(aggr.value() == 50);

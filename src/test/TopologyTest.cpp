@@ -58,7 +58,7 @@ TEST_CASE("Building and running a simple topology", "[Topology]") {
     .map<T2>([](auto tp, bool outdated) -> T2 {
       return makeTuplePtr(get<2>(tp), get<0>(tp));
     })
-    .assignTimestamps([](auto tp) { return get<1>(tp); })
+    .assignTimestamps([](auto tp) { return Timestamp(get<1>(tp)); })
     .print(strm);
 
   t.start();

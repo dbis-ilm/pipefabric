@@ -20,10 +20,12 @@
 #ifndef Window_hpp_
 #define Window_hpp_
 
+#include <chrono>
 #include <list>
 #include <thread>
 #include <mutex>
 #include <boost/assert.hpp>
+#include <boost/variant.hpp>
 
 #include "qop/UnaryTransform.hpp"
 #include "qop/OperatorMacros.hpp"
@@ -88,6 +90,9 @@ namespace pfabric {
     /**
      * Creates a new window operator instance with the given parameters.
      *
+     * Create a new window operator of a given window . This constructor should
+     * be mainly used with time-based windows (WindowParams::RangeWindow).
+     *
      * @param func a function for extracting the timestamp value from the stream element
      * @param wt the type of the window (range or row)
      * @param sz the window size (seconds or number of tuples)
@@ -95,18 +100,39 @@ namespace pfabric {
      * @param ei the eviction interval, i.e., time for triggering the eviction (in milliseconds)
      */
     Window(TimestampExtractorFunc func, const WindowParams::WinType& wt,
-           const unsigned int sz, WindowOpFunc winOpFunc = nullptr, const unsigned int ei = 0) :
-    mTimestampExtractor(func), mWinType(wt), mWinSize(sz), mWindowOpFunc(winOpFunc), mEvictInterval(ei), mCurrSize(0) {
-      mDiffTime = (mWinType == WindowParams::RangeWindow ?
-                   boost::posix_time::seconds(mWinSize).total_microseconds() : 0
-                   );
+        const unsigned int sz, WindowOpFunc winOpFunc = nullptr, const unsigned int ei = 0) :
+      mTimestampExtractor(func), mWinType(wt), mWindowOpFunc(winOpFunc), mEvictInterval(ei), mCurrSize(0) {
+        if (mWinType == WindowParams::RangeWindow)
+          mWinSize = Timestamp(sz * 1000 * 1000); //< input interpreted as seconds
+        else mWinSize = sz;
+    }
+
+    /**
+     * Creates a new window operator instance with the given parameters.
+     *
+     * Create a new window operator of a given window . This constructor should
+     * be mainly used with time-based windows (WindowParams::RangeWindow).
+     *
+     * @param func a function for extracting the timestamp value from the stream element
+     * @param wt the type of the window (range or row)
+     * @param sz the window size (as chrono duration or number of tuples)
+     * @param winOpFunc optional function for modifying incoming tuples
+     * @param ei the eviction interval, i.e., time for triggering the eviction (in milliseconds)
+     */
+    template<class Rep, class Period = std::ratio<1>>
+    Window(TimestampExtractorFunc func, const WindowParams::WinType& wt,
+        const std::chrono::duration<Rep, Period> sz, WindowOpFunc winOpFunc = nullptr, const unsigned int ei = 0) :
+      mTimestampExtractor(func), mWinType(wt), mWinSize(sz), mWindowOpFunc(winOpFunc), mEvictInterval(ei), mCurrSize(0) {
+        if (mWinType == WindowParams::RangeWindow)
+          mWinSize = std::chrono::duration_cast<Timestamp>(sz);
+        else mWinSize = sz;
     }
 
     /**
      * @brief Create a new  window operator instance with the given parameters.
      *
-     * Create a new sliding window operator of a given window . This constructor
-     * should be mainly used with row-based windows (WindowParams::RowWindow).
+     * Create a new window operator of a given window . This constructor should
+     * be mainly used with row-based windows (WindowParams::RowWindow).
      *
      * @param wt the type of the window (range or row)
      * @param sz the window size (seconds or number of tuples)
@@ -115,24 +141,22 @@ namespace pfabric {
      */
     Window(const WindowParams::WinType& wt,
            const unsigned int sz, WindowOpFunc winOpFunc = nullptr, const unsigned int ei = 0) :
-    mWinType(wt), mWinSize(sz), mWindowOpFunc(winOpFunc), mEvictInterval(ei), mCurrSize(0), mDiffTime(0) {
+    mWinType(wt), mWinSize(sz), mWindowOpFunc(winOpFunc), mEvictInterval(ei), mCurrSize(0) {
       BOOST_ASSERT_MSG(mWinType == WindowParams::RowWindow, "RowWindow requires timestamp extractor function.");
     }
 
     /// a list for stream elements in the windows
-    typedef std::list< StreamElement > TupleList;
-
-    typedef std::unique_ptr< EvictionNotifier > EvictionThread;
+    using TupleList = std::list< StreamElement >;
+    using EvictionThread = std::unique_ptr< EvictionNotifier >;
+    using WinSizeType = boost::variant< Timestamp, unsigned int >;
 
     TimestampExtractorFunc mTimestampExtractor; //< a function for extracting timestamps from a tuple
     WindowParams::WinType mWinType;             //< the type of window
-    unsigned int mWinSize;                      //< the size of window (time or number of tuples)
+    WinSizeType mWinSize;                       //< the size of window (time or number of tuples)
     WindowOpFunc mWindowOpFunc;                 //< function for modifying incoming tuples
     unsigned int mEvictInterval;                //< the slide length of window (time or number of tuples)
     TupleList mTupleBuf;                        //< the actual window buffer
     unsigned int mCurrSize;                     //< the current number of tuples in the window
-    Timestamp mDiffTime;                        //< for time-based window the window size in
-                                                //< number of microseconds
     WindowParams::EvictionFunc mEvictFun;       //< a function implementing the eviction policy
     EvictionThread mEvictThread;                //< the thread for running the eviction function
                                                 //< (if the eviction interval > 0)
