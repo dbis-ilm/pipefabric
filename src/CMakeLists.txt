@@ -47,7 +47,7 @@ endif()
 #CMAKE_FORCE_CXX_COMPILER(icpc "Intel C++ Compiler")
 
 # C++ compiler flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -Wall -Wno-deprecated -g -O3 -Wsign-compare")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-deprecated -Wsign-compare")
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedefs -Wno-#pragma-messages")
 elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
@@ -57,6 +57,15 @@ elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Intel")
 endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused -Wno-uninitialized")
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_FLAGS_DEBUG -g)
+set(CMAKE_CXX_FLAGS_RELEASE -O3)
+if(NOT CMAKE_BUILD_TYPE)
+  message(STATUS "Setting build type to 'Release' as none was specified.")
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+endif()
+
 
 # Add our CMake directory to CMake's module path
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/")
@@ -580,4 +589,4 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/"
 #target_link_libraries(ExecutableName pfabric_core)
 
 # show used compiler
-message("Using Compiler: ${CMAKE_CXX_COMPILER_ID}.")
+message("Using Compiler: ${CMAKE_CXX_COMPILER_ID} (Config: ${CMAKE_BUILD_TYPE}).")
