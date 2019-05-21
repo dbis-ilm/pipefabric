@@ -1,6 +1,7 @@
 if(BUILD_USE_CASES)
   add_subdirectory(DEBS2017)
-# add_subdirectory(MatrixProcessing)
   add_subdirectory(FreqTrajectories)
+# add_subdirectory(MatrixProcessing)
+  add_subdirectory(SECRET)
   add_subdirectory(TxSupport)
 endif()
