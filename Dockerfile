@@ -28,8 +28,8 @@ WORKDIR /home/$USER
 
 # Download and build PipeFabric
 RUN git config --global http.sslverify false && \
-    git clone https://dbgit.prakinf.tu-ilmenau.de/code/pfabric.git
+    git clone https://dbgit.prakinf.tu-ilmenau.de/code/pfabric.git && \
+    cd pfabric && mkdir build && cd build && \
+    cmake ../src
 # This costs too much space for the image
-#    cd pfabric && mkdir build && cd build && \
-#    cmake ../src && \
 #    make VERBOSE=1 && make test
