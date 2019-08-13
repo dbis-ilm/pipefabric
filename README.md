@@ -1,4 +1,8 @@
-### PipeFabric ###
+PipeFabric
+==========
+
+[![pipeline status](https://dbgit.prakinf.tu-ilmenau.de/code/pfabric/badges/master/pipeline.svg)](https://dbgit.prakinf.tu-ilmenau.de/code/pfabric/commits/master)
+[![coverage report](https://dbgit.prakinf.tu-ilmenau.de/code/pfabric/badges/master/coverage.svg?job=coverage)](https://dbgit.prakinf.tu-ilmenau.de/code/pfabric/commits/master)
 
 PipeFabric is a C++ framework for processing streams of tuples where the
 processing steps are described by queries formulated as dataflow graphs of
