@@ -9,6 +9,7 @@ set(THIRD_PARTY_DIR "${PROJECT_BINARY_DIR}/3rdparty")
 download_project(PROJ               Catch
                 GIT_REPOSITORY      https://github.com/philsquared/Catch
                 GIT_TAG             master
+                GIT_SHALLOW         1
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
@@ -20,17 +21,27 @@ add_custom_command(
 
 #--------------------------------------------------------------------------------
 # the JSON library
-download_project(PROJ               json
-                GIT_REPOSITORY      https://github.com/nlohmann/json.git
-                GIT_TAG             develop
-                UPDATE_DISCONNECTED 1
-                QUIET
+# this repository is too big (~500MB)
+#download_project(PROJ               json
+#                GIT_REPOSITORY      https://github.com/nlohmann/json.git
+#                GIT_TAG             develop
+#                GIT_SHALLOW         1
+#                UPDATE_DISCONNECTED 1
+#                QUIET
+#)
+download_project(PROJ json
+                 URL https://raw.githubusercontent.com/nlohmann/json/v3.7.0/single_include/nlohmann/json.hpp
+                 DOWNLOAD_NO_EXTRACT 1
+                 CONFIGURE_COMMAND ""
+                 BUILD_COMMAND ""
+                 INSTALL_COMMAND ""
+                 QUIET
 )
 add_custom_command(
         OUTPUT ${THIRD_PARTY_DIR}/json
         COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/json
         COMMAND ${CMAKE_COMMAND} -E copy
-                ${json_SOURCE_DIR}/single_include/nlohmann/json.hpp
+                ${json_SOURCE_DIR}/json.hpp
                 ${THIRD_PARTY_DIR}/json/)
 
 include_directories("${THIRD_PARTY_DIR}/json")
@@ -40,6 +51,7 @@ include_directories("${THIRD_PARTY_DIR}/json")
 download_project(PROJ               Format
                 GIT_REPOSITORY      https://github.com/fmtlib/fmt.git
                 GIT_TAG             4.1.0
+                GIT_SHALLOW         1
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
@@ -61,6 +73,7 @@ include_directories("${THIRD_PARTY_DIR}/fmt")
 download_project(PROJ               SimpleWeb
                 GIT_REPOSITORY      https://github.com/eidheim/Simple-Web-Server.git
                 GIT_TAG             master
+                GIT_SHALLOW         1
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
@@ -77,6 +90,7 @@ if (BUILD_GOOGLE_BENCH)
 download_project(PROJ               benchmark
                 GIT_REPOSITORY      https://github.com/google/benchmark.git
                 GIT_TAG             v1.2.0
+                GIT_SHALLOW         1
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
@@ -98,9 +112,10 @@ endif()
 #--------------------------------------------------------------------------------
 if(USE_ROCKSDB_TABLE)
 # RocksDB key-value store
-download_project(PROJ               rocksdb
+download_project(PROJ             rocksdb
 	            GIT_REPOSITORY      https://github.com/facebook/rocksdb
 	            GIT_TAG             v5.1.4
+              GIT_SHALLOW         1
 	            UPDATE_DISCONNECTED 1
 	            QUIET
 )
@@ -121,9 +136,10 @@ endif()
 #--------------------------------------------------------------------------------
 if(BUILD_USE_CASES)
 # data for use cases
-download_project(PROJ               data
+download_project(PROJ             data
 	            GIT_REPOSITORY      https://github.com/dbis-ilm/data.git
 	            GIT_TAG             master
+              GIT_SHALLOW         1
 	            UPDATE_DISCONNECTED 1
 	            QUIET
 )
@@ -135,6 +151,7 @@ file(COPY ${PROJECT_BINARY_DIR}/data-src/DEBS2017
 download_project(PROJ               linroad
 	            GIT_REPOSITORY      https://github.com/samsonxian/Linear-Road-Benchmark-Data-Driver.git
 	            GIT_TAG             master
+              GIT_SHALLOW         1
 	            UPDATE_DISCONNECTED 1
 	            QUIET
 )
@@ -166,6 +183,7 @@ if(USE_NVM_TABLE)
 download_project(PROJ               pmdk
                 GIT_REPOSITORY      https://github.com/pmem/pmdk.git
                 GIT_TAG             master
+                GIT_SHALLOW         1
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
@@ -178,6 +196,7 @@ add_custom_command(
 download_project(PROJ               pmdk-cpp
                 GIT_REPOSITORY      https://github.com/pmem/libpmemobj-cpp
                 GIT_TAG             master
+                GIT_SHALLOW         1
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
@@ -192,6 +211,7 @@ add_custom_command(
 download_project(PROJ               nvmDS
                 GIT_REPOSITORY      https://dbgit.prakinf.tu-ilmenau.de/code/nvm-based_data_structures.git
                 GIT_TAG             master
+                GIT_SHALLOW         1
                 UPDATE_DISCONNECTED 1
                 QUIET
 )
