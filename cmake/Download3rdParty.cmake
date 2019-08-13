@@ -41,7 +41,7 @@ add_custom_command(
         OUTPUT ${THIRD_PARTY_DIR}/json
         COMMAND ${CMAKE_COMMAND} -E make_directory ${THIRD_PARTY_DIR}/json
         COMMAND ${CMAKE_COMMAND} -E copy
-                ${json_SOURCE_DIR}/json.hpp
+                ${json_SOURCE_DIR}/../json-download/json-download-prefix/src/json.hpp
                 ${THIRD_PARTY_DIR}/json/)
 
 include_directories("${THIRD_PARTY_DIR}/json")
