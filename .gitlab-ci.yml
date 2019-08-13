@@ -1,0 +1,47 @@
+image: "dbisilm/pfabric:alpine"
+
+stages:
+  - build
+  - test
+
+build:
+  stage: build
+  tags: 
+    - grouprunner
+  script:
+    - mkdir build
+    - cd build
+    - cmake -DCMAKE_BUILD_TYPE=Release ../src
+    - make
+    # clean up unnecessary files and strip binaries
+    - rm -rf *-src  *-download *-build 3rdparty
+    - strip test/*Test
+  artifacts:
+    paths:
+      - build/
+    expire_in: 30 minutes
+
+test:
+  stage: test
+  tags:
+    - grouprunner
+  script:
+    - cd build
+    - ctest
+  dependencies:
+    - build
+
+coverage:
+  stage: build
+  tags: 
+    - grouprunner
+  script:
+    - echo pfpass | sudo -S apk add py-pip
+    - pip install gcovr --user
+    - mkdir build
+    - cd build
+    - cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-g -O0 -fprofile-arcs -ftest-coverage" ../src
+    - make
+    - ctest
+    - ~/.local/bin/gcovr -r .. --exclude 3rdparty --exclude '(.+/)?catch\.hpp$'
+  coverage: '/^TOTAL.*\s+(\d+\%)$/'
