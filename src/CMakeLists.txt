@@ -22,7 +22,7 @@ option(USE_RABBITMQ            "use RabbitMQ as network source"                 
 option(USE_KAFKA               "use Apache Kafka as network source"                     OFF)
 option(USE_MQTT                "use MQTT as network source"                             OFF)
 option(USE_BOOST_SPIRIT_PARSER "use the boost::spirit::qi parsers (strings convertion)" ON )
-option(USE_ROCKSDB_TABLE       "use RocksDB for implementing persistent tables"         OFF)
+option(USE_ROCKSDB_TABLE       "use RocksDB for implementing persistent tables"         ON)
 option(USE_NVM_TABLE           "use NVM for implementing persistent memory tables"      OFF)
 option(BUILD_ONLY_LIBS         "build only the two pipefabric libraries"                ON )
 option(BUILD_TEST_CASES        "build tests for pipefabric functionality"               OFF)

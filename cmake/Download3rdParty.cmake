@@ -100,7 +100,7 @@ if(USE_ROCKSDB_TABLE)
 # RocksDB key-value store
 download_project(PROJ             rocksdb
 	            GIT_REPOSITORY      https://github.com/facebook/rocksdb
-	            GIT_TAG             v5.15.10
+	            GIT_TAG             v6.2.2
 	            UPDATE_DISCONNECTED 1
 	            QUIET
 )

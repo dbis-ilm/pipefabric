@@ -479,6 +479,7 @@ class RDBTable : public BaseTable {
     db = nullptr;
     boost::filesystem::path dbFile(mTableName + ".db");
     boost::filesystem::remove_all(dbFile);
+    openOrCreateTable(mTableName);
   }
 
   /**
@@ -506,6 +507,7 @@ class RDBTable : public BaseTable {
 
  private:
   void openOrCreateTable(const std::string& tableName) throw(TableException) {
+    // writeOptions.sync = true;
     std::string fileName = tableName + ".db";
     rocksdb::Options options;
     options.create_if_missing = true;
