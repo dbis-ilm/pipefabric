@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -22,6 +22,7 @@
 
 #include "libcpp/types/types.hpp"
 
+#include <chrono>
 #include <string>
 #include <vector>
 
@@ -47,7 +48,7 @@ typedef std::size_t AttributeIdx;
  * Typedef for the timestamps associated with each tuple. A timestamp represents the number
  * of microseconds since 01/01/1970 indicating when the tuple arrived in the system.
  */
-typedef unsigned long long Timestamp;
+typedef std::chrono::microseconds Timestamp;
 
 /// a number for limiting the number of produced tuples
 typedef std::size_t TupleLimit;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -32,7 +32,7 @@ void TypeManager::registerType(const TableInfo& tInfo) {
   }
 }
 
-std::string TypeManager::nameOfType(const TableInfo& tInfo) throw (QueryCompileException) {
+std::string TypeManager::nameOfType(const TableInfo& tInfo) {
   auto iter = mTypeTable.find(tInfo.typeSignature());
   if (iter == mTypeTable.end()) 
     throw QueryCompileException("unkown type");

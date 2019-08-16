@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -22,6 +22,8 @@
 
 #include <thread>
 #include <mutex>
+
+#include <boost/variant.hpp>
 
 #include "core/Tuple.hpp"
 #include "core/Punctuation.hpp"
@@ -62,28 +64,28 @@ namespace pfabric {
 
   public:
     /**
-     * Typedef for pointer to the aggregation state
+     * Alias for pointer to the aggregation state
      */
-    typedef std::shared_ptr<AggregateState> AggregateStatePtr;
+    using AggregateStatePtr = std::shared_ptr<AggregateState>;
 
     /**
-     * Typedef for a function to extract the timestamp from a tuple
+     * Alias for a function to extract the timestamp from a tuple
      */
-    typedef std::function<Timestamp(const InputStreamElement&)> TimestampExtractorFunc;
+    using TimestampExtractorFunc = std::function<Timestamp(const InputStreamElement&)>;
 
     /**
      * @brief The aggregation function which produces the final (or periodic) aggregation result.
      *
      * This function gets a pointer to the aggregate state as well as the timestamp for the result elment.
      */
-    typedef std::function< OutputStreamElement(AggregateStatePtr) > FinalFunc;
+    using FinalFunc = std::function<OutputStreamElement(AggregateStatePtr)>;
 
     /**
      * @brief The function which is invoked for each incoming stream element to calculate the incremental aggregates.
      *
      * This function gets the incoming stream element, the aggregate state, and the boolean flag for outdated elements.
      */
-    typedef std::function< void(const InputStreamElement&, AggregateStatePtr, const bool) > IterateFunc;
+    using IterateFunc = std::function<void(const InputStreamElement&, AggregateStatePtr, const bool)>;
 
 
     /**
@@ -142,21 +144,27 @@ namespace pfabric {
      */
     Aggregation(FinalFunc final_fun, IterateFunc it_fun,
                 TimestampExtractorFunc func, const unsigned int tInterval) :
-                mAggrState(std::make_shared<AggregateState>()),
-                mIterateFunc( it_fun ), mFinalFunc( final_fun ),
-                mTimestampExtractor(func),
-                mTriggerType(TriggerByTimestamp), mTriggerInterval( tInterval ),
-                mNotifier(nullptr), mLastTriggerTime(0), mCounter(0) {
-    }
+      Aggregation(std::make_shared<AggregateState>(), final_fun, it_fun, func, Timestamp(tInterval * 1000 * 1000)) {}
 
     Aggregation(AggregateStatePtr state, FinalFunc final_fun, IterateFunc it_fun,
                 TimestampExtractorFunc func, const unsigned int tInterval) :
+      Aggregation(state, final_fun, it_fun, func, Timestamp(tInterval * 1000 * 1000)) {}
+
+    template<class Rep, class Period = std::ratio<1>>
+    Aggregation(FinalFunc final_fun, IterateFunc it_fun,
+                TimestampExtractorFunc func, const std::chrono::duration<Rep, Period> tInterval) :
+      Aggregation(std::make_shared<AggregateState>(), final_fun, it_fun, func, tInterval) {}
+
+    template<class Rep, class Period = std::ratio<1>>
+    Aggregation(AggregateStatePtr state, FinalFunc final_fun, IterateFunc it_fun,
+                TimestampExtractorFunc func, const std::chrono::duration<Rep, Period> tInterval) :
                 mAggrState(state),
                 mIterateFunc( it_fun ), mFinalFunc( final_fun ),
-                mTimestampExtractor(func),
-                mTriggerType(TriggerByTimestamp), mTriggerInterval( tInterval ),
-                mNotifier(nullptr), mLastTriggerTime(0), mCounter(0) {
-    }
+                mTimestampExtractor(func), mNotifier(nullptr), mLastTriggerTime(0),
+                mTriggerType(TriggerByTimestamp),
+                mTriggerInterval(std::chrono::duration_cast<Timestamp>(tInterval)),
+                mCounter(0) {}
+
     /**
      * @brief Bind the callback for the data channel.
      */
@@ -187,37 +195,39 @@ namespace pfabric {
       // the actual aggregation is outsourced to a user-defined expression
       mIterateFunc(data, mAggrState, outdated);
 
-      switch (mTriggerType) {
-        case  TriggerAll:
-        {
-          // produce an aggregate tuple
-          auto tn = mFinalFunc(mAggrState);
-          this->getOutputDataChannel().publish( tn, outdated );
-          break;
-        }
-        case TriggerByCount:
-        {
-          if (++mCounter == mTriggerInterval) {
-            myLock.unlock(); // we have to unlock here: produceAggregate will acquire its own lock
-            notificationCallback();
-            mCounter = 0;
-            return;
+      if (!outdated) {
+        switch (mTriggerType) {
+          case  TriggerAll: {
+            // produce an aggregate tuple
+            auto tn = mFinalFunc(mAggrState);
+            this->getOutputDataChannel().publish( tn, outdated );
+            break;
           }
-          break;
-        }
-        case TriggerByTimestamp:
-        {
-          auto ts = mTimestampExtractor(data);
-          if (ts - mLastTriggerTime >= mTriggerInterval) {
-            myLock.unlock();
-            notificationCallback();
-            mLastTriggerTime = ts;
-            return;
+          case TriggerByCount: {
+            if (++mCounter == boost::get<unsigned int>(mTriggerInterval)) {
+              myLock.unlock(); // we have to unlock here: produceAggregate will acquire its own lock
+              notificationCallback();
+              mCounter = 0;
+              return;
+            }
+            break;
           }
-          break;
+          case TriggerByTimestamp: {
+            const auto ts = mTimestampExtractor(data);
+            if (ts - mLastTriggerTime >= boost::get<Timestamp>(mTriggerInterval)) {
+              myLock.unlock();
+              notificationCallback();
+              mLastTriggerTime = ts;
+              return;
+            }
+            break;
+          }
+          default:
+            break;
         }
-        default:
-          break;
+      } else {
+        auto aggregationResult = mFinalFunc( mAggrState );
+        this->getOutputDataChannel().publish( aggregationResult, true );
       }
       myLock.unlock();
     }
@@ -233,11 +243,13 @@ namespace pfabric {
      */
     void processPunctuation( const PunctuationPtr& punctuation ) {
       // if we receive a punctuation on expired slides we produce aggregates
+      //TODO: already handled by notificationCallback?...
+      /*
       if( punctuation->ptype() == Punctuation::EndOfStream
          || punctuation->ptype() == Punctuation::WindowExpired
          || punctuation->ptype() == Punctuation::SlideExpired ) {
         produceAggregates();
-      }
+      }*/
       this->getOutputPunctuationChannel().publish(punctuation);
     }
 
@@ -264,20 +276,22 @@ namespace pfabric {
       this->getOutputPunctuationChannel().publish(punctuation);
     }
 
-    TimestampExtractorFunc mTimestampExtractor; //< a pointer to the function for extracting
-                                                //< the timestamp from the tuple
+    using IntervalType = boost::variant<Timestamp, unsigned int>;
+
     AggregateStatePtr mAggrState;               //< a pointer to the object representing the aggregation state
     mutable std::mutex aggrMtx;                 //< a mutex for synchronizing access between
                                                 //< the trigger notifier thread and aggregation operator
     IterateFunc mIterateFunc;                   //< a pointer to the iteration function called for each tuple
     FinalFunc mFinalFunc;                       //< a  pointer to a function computing the final
                                                 //< (or periodical) aggregates
+    TimestampExtractorFunc mTimestampExtractor; //< a pointer to the function for extracting
+                                                //< the timestamp from the tuple
     std::unique_ptr<TriggerNotifier> mNotifier; //< the notifier object which triggers the
                                                 //< computation of aggregates periodically
     Timestamp mLastTriggerTime;                 //< the timestamp of the last aggregate publishing
     AggregationTriggerType mTriggerType;        //< the type of trigger activating the publishing
                                                 //< of an aggregate value
-    unsigned int mTriggerInterval;              //< the interval (time in seconds, number of tuples)
+    IntervalType mTriggerInterval;               //< the interval (time in seconds, number of tuples)
                                                 //< for publishing aggregates
     unsigned int mCounter;                      //< the number of tuples processed since the
                                                 //< last aggregate publishing

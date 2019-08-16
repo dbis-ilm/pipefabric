@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -172,7 +172,7 @@ namespace sql {
 
 using namespace pfabric;
 
-sql::SQLQueryPtr SQLParser::parse(const std::string& stmt) throw(QueryCompileException) {
+sql::SQLQueryPtr SQLParser::parse(const std::string& stmt) {
   using boost::spirit::ascii::space;
   typedef std::string::const_iterator iterator_type;
   typedef sql::sql_grammar<iterator_type> sql_parser;

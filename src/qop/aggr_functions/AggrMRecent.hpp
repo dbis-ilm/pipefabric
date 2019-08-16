@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -53,7 +53,7 @@ public:
     }
 
     virtual void init() override {
-    	mMostRecentTime = 0;
+      mMostRecentTime = Timestamp(0);
     }
 
     virtual void iterate(Tin const& data, bool outdated = false) override {

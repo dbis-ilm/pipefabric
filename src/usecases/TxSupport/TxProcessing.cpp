@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -82,19 +82,19 @@ int main(int argc, char **argv) {
     if (self.state()->lastTx == 0)
       // we received the first tuple - let's begin a new transaction
       self.publishPunctuation(
-          std::make_shared<Punctuation>(Punctuation::TxBegin, txID, 0));
+          std::make_shared<Punctuation>(Punctuation::TxBegin, txID, Timestamp(0)));
     else if (self.state()->lastTx != txID) {
       // we start a new transaction but first commit the previous one
       std::cout << "Commit of tx #" << self.state()->lastTx << std::endl;
       self.publishPunctuation(std::make_shared<Punctuation>(
-          Punctuation::TxCommit, self.state()->lastTx, 0));
+          Punctuation::TxCommit, self.state()->lastTx, Timestamp(0)));
       self.state()->lastTx = txID;
 
       // we wait 10 seconds to run another query concurrently
       using namespace std::chrono_literals;
       std::this_thread::sleep_for(10s);
       self.publishPunctuation(
-          std::make_shared<Punctuation>(Punctuation::TxBegin, txID, 0));
+          std::make_shared<Punctuation>(Punctuation::TxBegin, txID, Timestamp(0)));
     }
     self.state()->lastTx = txID;
     return tp;

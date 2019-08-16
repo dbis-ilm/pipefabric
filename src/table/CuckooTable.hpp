@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -141,14 +141,14 @@ public:
    * @param key the key value of the tuple
    * @param rec the actual tuple
    */
-  void insert(KeyType key, const RecordType& rec) throw (TableException) {
+  void insert(KeyType key, const RecordType& rec) {
     mDataTable.insert(key, rec); //< calls upsert
     // we inform our observers
     notifyObservers(rec, TableParams::Insert, TableParams::Immediate);
   }
 
 
-  void insert(KeyType key, RecordType&& rec) throw (TableException) {
+  void insert(KeyType key, RecordType&& rec) {
     mDataTable.insert(key, std::move(rec)); //< calls upsert
     // we inform our observers
     notifyObservers(rec, TableParams::Insert, TableParams::Immediate);
@@ -171,7 +171,7 @@ public:
         notifyObservers(res, TableParams::Delete, TableParams::Immediate);
       // and delete the tuples
       mDataTable.erase_fn(key, [](RecordType r){return true;});
-    } catch(std::out_of_range e) {
+    } catch(std::out_of_range &e) {
       return 0;
     }
     return 1;
@@ -297,7 +297,7 @@ public:
    * @param key the key value
    * @return the tuple associated with the given key
    */
-  const SmartPtr<RecordType> getByKey(KeyType key) throw (TableException) {
+  const SmartPtr<RecordType> getByKey(KeyType key) {
     try {
       auto res = mDataTable.find(key);
       // if we found the tuple we return a TuplePtr containing a copy of it

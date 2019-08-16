@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -180,7 +180,7 @@ TEST_CASE("Calculate most recent values with timestamps", "[AggregateFunc]") {
 	AggrMRecent<int> aggr;
 	Timestamp ts;
 	for (int i = 0; i < 100; i++) {
-		ts = (i < 50 ? i : 100 - i);
+		ts = (i < 50 ? Timestamp(i) : Timestamp(100 - i));
 		aggr.iterate(i, ts);
 	}
 	REQUIRE(aggr.value() == 50);

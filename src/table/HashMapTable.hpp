@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -140,7 +140,7 @@ public:
    * @param key the key value of the tuple
    * @param rec the actual tuple
    */
-  void insert(const KeyType key, const RecordType& rec) throw (TableException) {
+  void insert(const KeyType key, const RecordType& rec) {
     {
       // make sure we have exclusive access
       //std::lock_guard<std::mutex> lock(mMtx);

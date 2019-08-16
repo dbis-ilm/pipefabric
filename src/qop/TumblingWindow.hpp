@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -57,15 +57,28 @@ namespace pfabric {
      * @param windowFunc optional function for modifying incoming tuples
      */
     TumblingWindow(typename Window<StreamElement>::TimestampExtractorFunc func,
-                   const WindowParams::WinType& wt, const unsigned int sz,
+                   const WindowParams::WinType& wt,
+                   const unsigned int sz,
                    typename Window<StreamElement>::WindowOpFunc windowFunc = nullptr) :
     WindowBase(func, wt, sz, windowFunc ) {
-      if( this->mWinType == WindowParams::RowWindow ) {
-        this->mEvictFun = std::bind(&TumblingWindow::evictByCount, this);
-      }
-      else {
-        this->mEvictFun = std::bind(&TumblingWindow::evictByTime, this);
-      }
+      setupEviction();
+    }
+
+    /**
+     * Create a new tumbling window operator instance with the given parameters.
+     *
+     * @param func a function for extracting the timestamp value from the stream element
+     * @param wt the type of the window (range or row)
+     * @param sz the window size (as chrono duration or number of tuples)
+     * @param windowFunc optional function for modifying incoming tuples
+     */
+    template<class Rep, class Period = std::ratio<1>>
+    TumblingWindow(typename Window<StreamElement>::TimestampExtractorFunc func,
+                   const WindowParams::WinType& wt,
+                   const std::chrono::duration<Rep, Period> sz,
+                   typename Window<StreamElement>::WindowOpFunc windowFunc = nullptr) :
+    WindowBase(func, wt, sz, windowFunc ) {
+      setupEviction();
     }
 
     /**
@@ -78,12 +91,7 @@ namespace pfabric {
     TumblingWindow(const WindowParams::WinType& wt, const unsigned int sz,
     typename Window<StreamElement>::WindowOpFunc windowFunc = nullptr) :
     WindowBase(wt, sz, windowFunc ) {
-      if( this->mWinType == WindowParams::RowWindow ) {
-        this->mEvictFun = std::bind(&TumblingWindow::evictByCount, this);
-      }
-      else {
-        this->mEvictFun = std::bind(&TumblingWindow::evictByTime, this);
-      }
+      setupEviction();
     }
 
     /**
@@ -158,17 +166,27 @@ namespace pfabric {
             this->mCurrSize++;
           }
 
-          //forward the incoming tuple
-          this->getOutputDataChannel().publish(data, outdated);
-
           // check for outdated tuples
           if (!this->mEvictThread) {
             this->mEvictFun();
           }
+
+          //forward the incoming tuple
+          this->getOutputDataChannel().publish(data, outdated);
         }
       }
     }
 
+    /**
+     * Sets up the eviction function.
+     **/
+    void setupEviction() {
+      if( this->mWinType == WindowParams::RowWindow ) {
+        this->mEvictFun = std::bind(&TumblingWindow::evictByCount, this);
+      } else {
+        this->mEvictFun = std::bind(&TumblingWindow::evictByTime, this);
+      }
+    }
 
     /**
      * Implements an eviction strategy for RowWindow, i.e. all tuples are
@@ -178,7 +196,7 @@ namespace pfabric {
     void evictByCount() {
       std::lock_guard<std::mutex> guard(this->mMtx);
 
-      if (this->mCurrSize == this->mWinSize) {
+      if (this->mCurrSize == boost::get<unsigned int>(this->mWinSize)) {
         for (auto it = this->mTupleBuf.begin(); it != this->mTupleBuf.end(); it++) {
           this->getOutputDataChannel().publish( *it, true );
         }
@@ -204,8 +222,8 @@ namespace pfabric {
        * It may happen that the timestamp of a tuple is less than window time, e.g. if we work with artificial timestamps like 0, 1, ...
        * In this case, accepted_time could be less than 0. We check this before to avoid overflows.
        */
-      if( lastTupleTime >= this->mDiffTime ) {
-        const Timestamp accepted_time = lastTupleTime - this->mDiffTime;
+      if( lastTupleTime >= boost::get<Timestamp>(this->mWinSize) ) {
+        const Timestamp accepted_time = lastTupleTime - boost::get<Timestamp>(this->mWinSize);
         const auto& tup = this->mTupleBuf.front();
 
         if( this->mTimestampExtractor( tup ) <= accepted_time ) {

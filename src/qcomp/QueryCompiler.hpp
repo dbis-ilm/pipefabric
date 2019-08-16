@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -42,19 +42,19 @@ namespace pfabric {
   public:
     QueryCompiler() {}
 
-    void readSettings(const boost::filesystem::path& lib_path) throw (QueryCompileException);
+    void readSettings(const boost::filesystem::path& lib_path);
  
-    std::string compileQuery(PFabricContext& ctx, const std::string& queryString) throw (QueryCompileException);
-    TopologyBuilderPtr execQuery(PFabricContext& ctx, const std::string& queryString) throw (QueryCompileException);
+    std::string compileQuery(PFabricContext& ctx, const std::string& queryString);
+    TopologyBuilderPtr execQuery(PFabricContext& ctx, const std::string& queryString);
 
   private:
-    void checkPlan(PFabricContext& ctx, PlanPtr plan) throw(QueryCompileException);
+    void checkPlan(PFabricContext& ctx, PlanPtr plan);
     void traverse(PlanOpPtr op, TraverseFunc f);
 
     void modifyWhereExpression(std::shared_ptr<PlanOp<WhereInfo>> whereOp);
-    void constructMapSchema(std::shared_ptr<PlanOp<MapInfo>> mapOp) throw (QueryCompileException);
+    void constructMapSchema(std::shared_ptr<PlanOp<MapInfo>> mapOp);
 
-    void generateCode(PFabricContext& ctx, PlanPtr plan, const std::string& cppFile) throw (QueryCompileException);
+    void generateCode(PFabricContext& ctx, PlanPtr plan, const std::string& cppFile);
     void generateHeader(std::ostream& os, const std::string& className); 
     void generateFooter(std::ostream& os, const std::string& className); 
     void generateTypedefs(std::ostream& os);
@@ -65,7 +65,7 @@ namespace pfabric {
     std::string generateWhereExpression(const WhereInfo& wInfo);
     std::string generateMapExpression(const MapInfo& mInfo);
 
-    std::string compileCppCode(const boost::filesystem::path& lib_path, const std::string& cppFileName) throw (QueryCompileException);
+    std::string compileCppCode(const boost::filesystem::path& lib_path, const std::string& cppFileName);
 
     std::string cc, cflags, ldflags, libs;
     std::set<std::string> mTableSet;

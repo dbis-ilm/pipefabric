@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -163,9 +163,7 @@ class S2PLTable : public BaseTable,
   /**
    * Constructor for creating an empty table.
    */
-  S2PLTable(const std::string& tableName) throw(TableException)
-  : tbl(tableName) {
-  }
+  S2PLTable(const std::string& tableName) : tbl(tableName) {}
 
   /**
     * Destructor for table.
@@ -348,7 +346,7 @@ class S2PLTable : public BaseTable,
     SmartPtr<RecordType> tplPtr;
     try {
       tplPtr = tbl.getByKey(key);
-    } catch (TableException exc) {
+    } catch (TableException &exc) {
       locks.unlockShared(key);
       return Errc::NOT_FOUND;
     }

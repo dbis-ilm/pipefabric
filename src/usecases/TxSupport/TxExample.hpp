@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -88,17 +88,17 @@ template<typename TableType> class TxExample {
             const auto txID = sCtx.newTx();
             sCtx.tToTX[get<0>(tp)] = txID;
             self.publishPunctuation(
-                std::make_shared<Punctuation>(Punctuation::TxBegin, txID, 0));
+                std::make_shared<Punctuation>(Punctuation::TxBegin, txID, Timestamp(0)));
           } else if (self.state()->lastTx != get<0>(tp)) {
             /* we start a new transaction but first commit the previous one */
             self.publishPunctuation(std::make_shared<Punctuation>(
-                  Punctuation::TxCommit, sCtx.tToTX[self.state()->lastTx], 0));
+                  Punctuation::TxCommit, sCtx.tToTX[self.state()->lastTx], Timestamp(0)));
             self.state()->lastTx = get<0>(tp);
 
             const auto txID = sCtx.newTx();
             sCtx.tToTX[get<0>(tp)] = txID;
             self.publishPunctuation(
-                std::make_shared<Punctuation>(Punctuation::TxBegin, txID, 0));
+                std::make_shared<Punctuation>(Punctuation::TxBegin, txID, Timestamp(0)));
           }
           self.state()->lastTx = get<0>(tp);
           return tp;

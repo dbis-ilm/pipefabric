@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -17,7 +17,6 @@
  * along with PipeFabric. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "TimestampHelper.hpp"
 #include "Punctuation.hpp"
 
 using namespace pfabric;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -24,8 +24,6 @@
 #include <chrono>
 #include <future>
 
-#include <boost/filesystem.hpp>
-
 #include "core/Tuple.hpp"
 
 #include "dsl/Topology.hpp"
@@ -34,14 +32,14 @@
 using namespace pfabric;
 using namespace ns_types;
 
-TEST_CASE("Building and running a topology with unpartitioned aggregation", 
+TEST_CASE("Building and running a topology with unpartitioned aggregation",
         "[Unpartitioned Aggregation]") {
   typedef TuplePtr<unsigned long, double> MyTuplePtr;
   typedef TuplePtr<double> AggregationResultPtr;
   typedef Aggregator1<MyTuplePtr, AggrSum<double>, 1> AggrStateSum;
-        
+
   StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {
-    return makeTuplePtr(n, (double)n + 0.5); 
+    return makeTuplePtr(n, (double)n + 0.5);
   });
   unsigned long num = 1000;
   unsigned long tuplesProcessed = 0;
@@ -60,8 +58,6 @@ TEST_CASE("Building and running a topology with unpartitioned aggregation",
 
   t.start(false);
 
-  std::this_thread::sleep_for(2s);
-
   REQUIRE(results.size() == num);
 
   for (auto i=0u; i<num; i++) {
@@ -70,14 +66,14 @@ TEST_CASE("Building and running a topology with unpartitioned aggregation",
   }
 }
 
-TEST_CASE("Building and running a topology with partitioned aggregation", 
+TEST_CASE("Building and running a topology with partitioned aggregation",
         "[Partitioned Aggregation]") {
   typedef TuplePtr<unsigned long, double> MyTuplePtr;
   typedef TuplePtr<double> AggregationResultPtr;
   typedef Aggregator1<MyTuplePtr, AggrSum<double>, 1> AggrStateSum;
 
   StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {
-    return makeTuplePtr(n, (double)n + 0.5); 
+    return makeTuplePtr(n, (double)n + 0.5);
   });
   unsigned long num = 1000;
   unsigned long tuplesProcessed = 0;
@@ -100,10 +96,85 @@ TEST_CASE("Building and running a topology with partitioned aggregation",
 
   std::this_thread::sleep_for(2s);
 
-  /*for (auto i=0u; i<results.size(); i++) {
-  	std::cout<<results[i]<<std::endl;
-  }*/
-
   REQUIRE(results.size() == num);
-  //REQUIRE(results[num-1] == 500000);
+}
+
+TEST_CASE("Building and running a topology with sliding window-based aggregation",
+        "[Window Aggregation]") {
+  using TpPtr = TuplePtr<unsigned int, unsigned long>;
+  using AggrC = Aggregator1<TpPtr, AggrCount<unsigned long, int> , 1>;
+  const auto amountOfTp = 10;
+
+  StreamGenerator<TpPtr>::Generator streamGen ([](unsigned long n) -> TpPtr {
+      return makeTuplePtr((unsigned int)(n+1), n+1);
+  });
+
+  const std::vector<unsigned long> expected = {1, 2, 3, 4, 5, 5, 5, 5, 5, 5};
+  std::vector<unsigned long> results;
+
+  Topology t;
+  auto s = t.streamFromGenerator<TpPtr>(streamGen, amountOfTp)
+    .assignTimestamps<0>()
+    .slidingWindow(WindowParams::RangeWindow, 5)
+    .aggregate<AggrC>()
+    .notify([&](auto tp, bool outdated) {
+        if (!outdated) results.push_back(get<0>(tp));
+    });
+  t.start(false);
+
+  REQUIRE(results == expected);
+}
+
+TEST_CASE("Building and running a topology with tumbling window-based aggregation",
+        "[Window Aggregation]") {
+  using TpPtr = TuplePtr<unsigned int, unsigned long>;
+  using AggrC = Aggregator1<TpPtr, AggrCount<unsigned long, int> , 1>;
+  const auto amountOfTp = 10;
+
+  StreamGenerator<TpPtr>::Generator streamGen ([](unsigned long n) -> TpPtr {
+      return makeTuplePtr((unsigned int)(n+1), n+1);
+  });
+
+  const std::vector<unsigned long> expected = {1, 2, 3, 4, 5, 1, 2, 3, 4, 5};
+  std::vector<unsigned long> results;
+
+  Topology t;
+  auto func = [](auto tp) { return Timestamp(get<0>(tp)*1000*1000); };
+  auto s = t.streamFromGenerator<TpPtr>(streamGen, amountOfTp)
+    .assignTimestamps(func)
+    .tumblingWindow(WindowParams::RangeWindow, 5)
+    .aggregate<AggrC>()
+    .notify([&](auto tp, bool outdated) {
+        if (!outdated) results.push_back(get<0>(tp));
+    });
+  t.start(false);
+
+  REQUIRE(results == expected);
+}
+
+TEST_CASE("Building and running a topology with window-based aggregation and custom reporting",
+        "[Window Aggregation]") {
+  using TpPtr = TuplePtr<unsigned int, unsigned long>;
+  using AggrC = Aggregator1<TpPtr, AggrCount<unsigned long, int> , 1>;
+  const auto amountOfTp = 10;
+
+  StreamGenerator<TpPtr>::Generator streamGen ([](unsigned long n) -> TpPtr {
+      return makeTuplePtr((unsigned int)(n+1), n+1);
+  });
+
+  const std::vector<unsigned long> expected = {5, 5};
+  std::vector<unsigned long> results;
+
+  Topology t;
+  auto func = [](auto tp) { return std::chrono::seconds(get<0>(tp)); };
+  auto s = t.streamFromGenerator<TpPtr>(streamGen, amountOfTp)
+    .assignTimestamps(func)
+    .tumblingWindow(WindowParams::RangeWindow, 5)
+    .aggregate<AggrC>(TriggerByTimestamp, 5)
+    .notify([&](auto tp, bool outdated) {
+        if (!outdated) results.push_back(get<0>(tp));
+    });
+  t.start(false);
+
+  REQUIRE(results == expected);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -73,17 +73,30 @@ namespace pfabric {
                   typename Window<StreamElement>::WindowOpFunc windowFunc = nullptr,
                   const unsigned int ei = 0) :
     WindowBase(func, wt, sz, windowFunc, ei ) {
-      if (ei == 0) {
-        // sliding window where the incoming tuple evicts outdated tuples
-        this->mEvictFun = std::bind( this->mWinType == WindowParams::RangeWindow ?
-                                      &SlidingWindow::evictByTime : &SlidingWindow::evictByCount, this
-                                      );
-      }
-      else {
-        // sliding window, but we need a thread for evicting tuples
-        WindowParams::EvictionFunc efun = boost::bind( &SlidingWindow::evictByTime, this );
-        this->mEvictThread = std::make_unique< EvictionNotifier >( this->mEvictInterval, efun );
-      }
+      setupEviction(ei);
+    }
+
+    /**
+     * @brief Create a new sliding window operator instance with the given parameters.
+     *
+     * Create a new sliding window operator of a given window type with a timestamp
+     * extractor function. This constructor should be mainly used with time-based
+     * windows (WindowParams::RangeWindow).
+     *
+     * @param func a function for extracting the timestamp value from the stream element
+     * @param wt the type of the window (range or row)
+     * @param sz the window size (as chrono duration or number of tuples)
+     * @param windowFunc optional function for modifying incoming tuples
+     * @param ei ei the eviction interval, i.e., time for triggering the eviction (in milliseconds)
+     */
+    template<class Rep, class Period = std::ratio<1>>
+    SlidingWindow(typename Window<StreamElement>::TimestampExtractorFunc func,
+                  const WindowParams::WinType& wt,
+                  const std::chrono::duration<Rep, Period> sz,
+                  typename Window<StreamElement>::WindowOpFunc windowFunc = nullptr,
+                  const unsigned int ei = 0) :
+    WindowBase(func, wt, sz, windowFunc, ei ) {
+      setupEviction(ei);
     }
 
     /**
@@ -102,17 +115,7 @@ namespace pfabric {
                   typename Window<StreamElement>::WindowOpFunc windowFunc = nullptr,
                   const unsigned int ei = 0) :
     WindowBase(wt, sz, windowFunc, ei ) {
-      if (ei == 0) {
-        // sliding window where the incoming tuple evicts outdated tuples
-        this->mEvictFun = std::bind( this->mWinType == WindowParams::RangeWindow ?
-                                      &SlidingWindow::evictByTime : &SlidingWindow::evictByCount, this
-                                      );
-      }
-      else {
-        // sliding window, but we need a thread for evicting tuples
-        WindowParams::EvictionFunc efun = boost::bind( &SlidingWindow::evictByTime, this );
-        this->mEvictThread = std::make_unique< EvictionNotifier >( this->mEvictInterval, efun );
-      }
+      setupEviction(ei);
     }
 
     /**
@@ -192,6 +195,22 @@ namespace pfabric {
       }
     }
 
+    /**
+     * Sets up the eviction function or thread.
+     */
+    void setupEviction(const unsigned int ei) {
+      if (ei == 0) {
+        // sliding window where the incoming tuple evicts outdated tuples
+        this->mEvictFun = std::bind( this->mWinType == WindowParams::RangeWindow ?
+                                      &SlidingWindow::evictByTime : &SlidingWindow::evictByCount, this
+                                      );
+      } else {
+        // sliding window, but we need a thread for evicting tuples
+        WindowParams::EvictionFunc efun = boost::bind( &SlidingWindow::evictByTime, this );
+        this->mEvictThread = std::make_unique< EvictionNotifier >( this->mEvictInterval, efun );
+      }
+    }
+
 
     /**
      * Implements an eviction strategy for RowWindow, i.e. a tuple is
@@ -201,7 +220,7 @@ namespace pfabric {
     void evictByCount() {
       std::lock_guard<std::mutex> guard(this->mMtx);
       // as long as we have too many tuples ...
-      while (this->mCurrSize > this->mWinSize) {
+      while (this->mCurrSize > boost::get<unsigned int>(this->mWinSize)) {
         const auto tup = this->mTupleBuf.front();
         // let's get rid of it ...
         this->mTupleBuf.pop_front();
@@ -219,20 +238,20 @@ namespace pfabric {
     void evictByTime() {
       std::lock_guard<std::mutex> guard(this->mMtx);
       const auto& lastWindowElement = this->mTupleBuf.back();
-      const Timestamp lastTupleTime = this->mTimestampExtractor( lastWindowElement );
+      const auto lastTupleTime = this->mTimestampExtractor( lastWindowElement );
 
       /*
        * It may happen that the timestamp of a tuple is less than window time, e.g. if we work with artificial timestamps like 0, 1, ...
        * In this case, accepted_time could be less than 0. We check this before to avoid overflows.
        */
-      if( lastTupleTime >= this->mDiffTime ) {
-        const Timestamp accepted_time = lastTupleTime - this->mDiffTime;
+      if( lastTupleTime >= boost::get<Timestamp>(this->mWinSize) ) {
+        const auto accepted_time = lastTupleTime - boost::get<Timestamp>(this->mWinSize);
         bool finished = false;
 
         // as long as we have tuples which are now outside the valid time window ...
         while (!finished && !this->mTupleBuf.empty()) {
           const auto tup = this->mTupleBuf.front();
-          if( this->mTimestampExtractor( tup ) < accepted_time ) {
+          if( this->mTimestampExtractor( tup ) <= accepted_time ) {
             // let's get rid of it ...
             this->mTupleBuf.pop_front();
             this->mCurrSize--;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -37,7 +37,7 @@ public:
   TypeManager() {}
 
   void registerType(const TableInfo& tInfo);
-  std::string nameOfType(const TableInfo& tInfo) throw (QueryCompileException);
+  std::string nameOfType(const TableInfo& tInfo);
 
   TypeIterator begin() const { return mTypeTable.begin(); }
   TypeIterator end() const { return mTypeTable.end(); }

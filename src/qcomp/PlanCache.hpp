@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -42,7 +42,7 @@ namespace pfabric {
       PlanCache() {}
 
       void addToCache(const std::string& queryString, const CacheEntry& entry);
-      const CacheEntry& findPlanForQuery(const std::string& queryString) throw (std::out_of_range);
+      const CacheEntry& findPlanForQuery(const std::string& queryString);
 
      private:
         std::map<std::string, CacheEntry> planCache;

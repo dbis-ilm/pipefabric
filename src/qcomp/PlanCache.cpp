@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -26,7 +26,7 @@ void PlanCache::addToCache(const std::string& queryString, const CacheEntry& ent
   planCache.insert({ queryString, entry });
 }
 
-const CacheEntry& PlanCache::findPlanForQuery(const std::string& queryString) throw (std::out_of_range) {
+const CacheEntry& PlanCache::findPlanForQuery(const std::string& queryString) {
   auto iter = planCache.find(queryString);
   if (iter == planCache.end())
     throw std::out_of_range("query not found in cache");

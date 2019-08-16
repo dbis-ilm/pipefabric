@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -68,6 +68,8 @@ namespace pfabric {
        * Typedef for the pointer to a function implementing the join predicate.
        */
       typedef std::function< bool(const LeftInputStreamElement&, const RightInputStreamElement&) > JoinPredicateFunc;
+
+      const std::string opName() const override { return std::string("SHJoin"); }
 
     private:
       /**

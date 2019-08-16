@@ -22,11 +22,11 @@ option(USE_RABBITMQ            "use RabbitMQ as network source"                 
 option(USE_KAFKA               "use Apache Kafka as network source"                     OFF)
 option(USE_MQTT                "use MQTT as network source"                             OFF)
 option(USE_BOOST_SPIRIT_PARSER "use the boost::spirit::qi parsers (strings convertion)" ON )
-option(USE_ROCKSDB_TABLE       "use RocksDB for implementing persistent tables"         ON)
+option(USE_ROCKSDB_TABLE       "use RocksDB for implementing persistent tables"         OFF)
 option(USE_NVM_TABLE           "use NVM for implementing persistent memory tables"      OFF)
 option(BUILD_ONLY_LIBS         "build only the two pipefabric libraries"                ON )
 option(BUILD_TEST_CASES        "build tests for pipefabric functionality"               OFF)
-option(BUILD_GOOGLE_BENCH      "build google benchmark"                                 ON )
+option(BUILD_GOOGLE_BENCH      "build google benchmark"                                 OFF)
 option(BUILD_BENCHMARKS        "build benchmark test for pipefabric"                    OFF)
 option(BUILD_PYTHON            "build python interface for pipefabric"                  OFF)
 
@@ -35,11 +35,6 @@ option(BUILD_PYTHON            "build python interface for pipefabric"          
 # End of customization section                                                             #
 ############################################################################################
 #
-
-# Use cases require matrix support (image and graph processing)
-if(BUILD_USE_CASES)
-    set(SUPPORT_MATRICES OFF)
-endif()
 
 # Benchmark test requires benchmark library
 if (BUILD_BENCHMARKS)
@@ -52,7 +47,7 @@ endif()
 #CMAKE_FORCE_CXX_COMPILER(icpc "Intel C++ Compiler")
 
 # C++ compiler flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated -g -O3 -Wsign-compare")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-deprecated -Wsign-compare")
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedefs -Wno-#pragma-messages")
 elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
@@ -62,6 +57,15 @@ elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Intel")
 endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused -Wno-uninitialized")
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_FLAGS_DEBUG -g)
+set(CMAKE_CXX_FLAGS_RELEASE -O3)
+if(NOT CMAKE_BUILD_TYPE)
+  message(STATUS "Setting build type to 'Release' as none was specified.")
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+endif()
+
 
 # Add our CMake directory to CMake's module path
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/")
@@ -81,6 +85,7 @@ endif()
 include_directories("${THIRD_PARTY_DIR}")
 
 set(core_sources
+  ${core_sources}
   # we need this as dependency to download the sources from github
   ${THIRD_PARTY_DIR}/json
   ${THIRD_PARTY_DIR}/fmt
@@ -89,6 +94,29 @@ set(core_sources
   ${THIRD_PARTY_DIR}/catch
 )
 set(core_libs "")
+
+if(BUILD_USE_CASES)
+  add_definitions(-DBUILD_USE_CASES)
+
+  # Use case for linear road
+  include_directories("${THIRD_PARTY_DIR}/linroad/include")
+  set(LINROAD_LIB "${THIRD_PARTY_DIR}/linroad/lib/libLRDataProvider.a")
+  file(COPY ${PROJECT_SOURCE_DIR}/usecases/LinearRoad/LinearRoadTest.cpp
+       DESTINATION ${PROJECT_SOURCE_DIR}/test
+  )
+  set(core_sources
+    ${core_sources}
+    ${THIRD_PARTY_DIR}/linroad
+  )
+  set(core_libs
+    ${core_libs}
+    ${LINROAD_LIB}
+  )
+  if(SUPPORT_MATRICES)
+    # Use cases require matrix support (image and graph processing)
+    set(SUPPORT_MATRICES ON)
+  endif()
+endif()
 
 
 ############################################################################################
@@ -172,21 +200,23 @@ if (USE_NVM_TABLE)
     "${THIRD_PARTY_DIR}/pmdk/lib/libpmempool.a"
     "${THIRD_PARTY_DIR}/pmdk/lib/libpmem.a"
      ${DYLIB_LIBRARY}
-    "${THIRD_PARTY_DIR}/ptable/lib/libptable.so"
+    "${THIRD_PARTY_DIR}/nvmDS/lib/libptable.so"
   )
   include_directories(
     "${THIRD_PARTY_DIR}/pmdk/include"
-    "${THIRD_PARTY_DIR}/ptable/include"
+    "${THIRD_PARTY_DIR}/nvmDS/include"
   )
-  add_definitions(-DDO_LOG=0)
   set(core_sources
     ${core_sources}
     ${THIRD_PARTY_DIR}/pmdk
-    ${THIRD_PARTY_DIR}/ptable
+    ${THIRD_PARTY_DIR}/pmdk-cpp
+    ${THIRD_PARTY_DIR}/nvmDS
   )
   set(core_libs
     ${core_libs}
     ${PMDK_LIBRARIES}
+    ndctl
+    daxctl
   )
 else ()
   message(STATUS "don't use NVM based persistent table")
@@ -429,15 +459,17 @@ target_link_libraries(pfabric_core
 ############################################################################################
 #
 
-add_library(pfabric_cep SHARED
-  cep/Matcher.cpp
-  # we need this as dependency to download the sources from github
-  ${THIRD_PARTY_DIR}/fmt
-)
+if(NOT BUILD_ONLY_LIB)
+  add_library(pfabric_cep SHARED
+    cep/Matcher.cpp
+    # we need this as dependency to download the sources from github
+    ${THIRD_PARTY_DIR}/fmt
+ )
 
-target_link_libraries(pfabric_cep
-  ${BOOST_LIBRARIES}
-)
+  target_link_libraries(pfabric_cep
+    ${BOOST_LIBRARIES}
+  )
+endif()
 
 
 ############################################################################################
@@ -467,23 +499,25 @@ endif()
 ############################################################################################
 #
 
-add_library(pfabric_qcomp SHARED
-  qcomp/Plan.cpp
-  qcomp/PlanCache.cpp
-  qcomp/QueryCompiler.cpp
-  qcomp/TypeManager.cpp
-  qcomp/UniqueNameGenerator.cpp
-  qcomp/SQLParser.cpp
-)
+if(BUILD_USE_CASES OR NOT BUILD_ONLY_LIB)
+  add_library(pfabric_qcomp SHARED
+    qcomp/Plan.cpp
+    qcomp/PlanCache.cpp
+    qcomp/QueryCompiler.cpp
+    qcomp/TypeManager.cpp
+    qcomp/UniqueNameGenerator.cpp
+    qcomp/SQLParser.cpp
+  )
 
-target_link_libraries(pfabric_qcomp
-  pfabric_core
-  ${Boost_PROGRAM_OPTIONS_LIBRARY}
-  ${Boost_FILESYSTEM_LIBRARY}
-  ${BOOST_LIBRARIES}
-)
+  target_link_libraries(pfabric_qcomp
+    pfabric_core
+    ${Boost_PROGRAM_OPTIONS_LIBRARY}
+    ${Boost_FILESYSTEM_LIBRARY}
+    ${BOOST_LIBRARIES}
+  )
 
-add_subdirectory(qcomp)
+  add_subdirectory(qcomp)
+endif()
 
 
 ############################################################################################
@@ -491,7 +525,9 @@ add_subdirectory(qcomp)
 ############################################################################################
 #
 
-add_subdirectory(demo)
+if(NOT BUILD_ONLY_LIB)
+  add_subdirectory(demo)
+endif()
 
 
 ############################################################################################
@@ -513,6 +549,8 @@ add_subdirectory(test)
 
 if(BUILD_USE_CASES)
   add_subdirectory(usecases)
+  add_executable(LinRoad usecases/LinearRoad/LinRoad.cpp)
+  target_link_libraries(LinRoad pfabric_core)
 endif()
 
 
@@ -524,7 +562,11 @@ endif()
 # Installation path
 set(PIPEFABRIC_DIR "/usr/local/pfabric")
 
-set(PIPEFABRIC_LIBS pfabric_core pfabric_cep)
+if(BUILD_ONLY_LIB)
+  set(PIPEFABRIC_LIBS pfabric_core)
+else()
+  set(PIPEFABRIC_LIBS pfabric_core pfabric_cep)
+endif()
 set(PIPEFABRIC_LIB_DIR "${PIPEFABRIC_DIR}/lib")
 set(PIPEFABRIC_INCLUDE_DIR "${PIPEFABRIC_DIR}/include")
 
@@ -548,4 +590,4 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/"
 #target_link_libraries(ExecutableName pfabric_core)
 
 # show used compiler
-message("Using Compiler: ${CMAKE_CXX_COMPILER_ID}.")
+message("Using Compiler: ${CMAKE_CXX_COMPILER_ID} (Config: ${CMAKE_BUILD_TYPE}).")

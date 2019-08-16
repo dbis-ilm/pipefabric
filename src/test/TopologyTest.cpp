@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -58,7 +58,7 @@ TEST_CASE("Building and running a simple topology", "[Topology]") {
     .map<T2>([](auto tp, bool outdated) -> T2 {
       return makeTuplePtr(get<2>(tp), get<0>(tp));
     })
-    .assignTimestamps([](auto tp) { return get<1>(tp); })
+    .assignTimestamps([](auto tp) { return Timestamp(get<1>(tp)); })
     .print(strm);
 
   t.start();
@@ -170,37 +170,66 @@ TEST_CASE("Building and running a topology with partitioning", "[Topology]") {
 
 TEST_CASE("Building and running a topology with batcher", "[Topology]") {
   typedef TuplePtr<int, std::string, double> T1;
-  typedef TuplePtr<int> T2;
-  typedef BatchPtr<T2> B2;
 
   TestDataGenerator tgen("file.csv");
   tgen.writeData(1000);
 
-  std::vector<int> results;
-  std::mutex r_mutex;
+  int procBatchCount = 0;
 
-  Topology t;
-  auto s = t.newStreamFromFile("file.csv")
+  std::vector<int> results;
+
+  //run batch & unbatch singlethreaded
+  Topology t1;
+  auto s1 = t1.newStreamFromFile("file.csv")
     .extract<T1>(',')
-    .map<T2>([](auto tp, bool outdated) -> T2 { return makeTuplePtr(get<0>(tp)); } )
-    .batch(100)
+    .batch(10)
     .notify([&](auto tp, bool outdated) {
-      std::lock_guard<std::mutex> lock(r_mutex);
-      auto vec = get<0>(tp);
-      REQUIRE(vec.size() == 100);
-      for (auto& v : vec) {
-        results.push_back(get<0>(v.first));
-      }
-    });
-  t.start();
+      procBatchCount++;
+    })
+    .unbatch<T1>()
+    .notify([&](auto tp, bool outdated) {
+      results.push_back(get<0>(tp));
+    })
+    ;
+
+  t1.start(false);
+
+  REQUIRE(procBatchCount == 100);
+  REQUIRE(results.size() == 1000);
+
+  for (size_t i = 0; i < results.size(); ++i) {
+    REQUIRE(results[i] == i);
+  }
+
+  //run batch & unbatch multithreaded with partitioning
+  std::mutex mtx;
+  procBatchCount = 0;
+  int procTupleCount = 0;
+
+  Topology t2;
+
+  auto s2 = t2.newStreamFromFile("file.csv")
+    .extract<T1>(',')
+    .partitionBy([](auto tp) { return get<0>(tp) % 2; }, 2)
+    .batch(10)
+    .notify([&](auto tp, bool outdated) {
+      std::lock_guard<std::mutex> lock(mtx);
+      procBatchCount++;
+    })
+    .unbatch<T1>()
+    .merge()
+    .notify([&](auto tp, bool outdated) {
+      procTupleCount++;
+    })
+    ;
+
+  t2.start(false);
 
   using namespace std::chrono_literals;
   std::this_thread::sleep_for(2s);
 
-  REQUIRE(results.size() == 1000);
-  for (std::size_t i = 0; i < results.size(); i++) {
-    REQUIRE(results[i] == i);
-  }
+  REQUIRE(procBatchCount == 100);
+  REQUIRE(procTupleCount == 1000);
 }
 
 TEST_CASE("Building and running a topology with stream generator", "[StreamGenerator]") {

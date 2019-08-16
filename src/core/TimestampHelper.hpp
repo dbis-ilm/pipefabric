@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -48,14 +48,15 @@ struct TimestampHelper {
 	 * Returns the current system time as timestamp (microseconds since 01/01/1970).
 	 */
 	static inline Timestamp timestampFromCurrentTime() {
-		return (boost::posix_time::microsec_clock::local_time() - UNIX_EPOCH).total_microseconds();
+    const auto duration = std::chrono::system_clock::now().time_since_epoch();
+    return std::chrono::duration_cast<std::chrono::microseconds>(duration);
 	}
 
 	/**
 	 * Converts the given POSIX time into a timestamp (microseconds since 01/01/1970).
 	 */
 	static inline Timestamp timestampFromTime(const boost::posix_time::ptime& tm) {
-		return (tm - UNIX_EPOCH).total_microseconds();
+    return Timestamp((tm - UNIX_EPOCH).total_microseconds());
 	}
 
 	/**
@@ -65,12 +66,16 @@ struct TimestampHelper {
 
 	/**
 	 * Returns the given timestamp as a POSIX time value.
+   * Inspired by: https://stackoverflow.com/a/4918873
 	 */
 	static inline boost::posix_time::ptime timestampToPtime(Timestamp ts) {
-		return boost::posix_time::ptime(
-			boost::gregorian::date(1970,1,1),
-			boost::posix_time::time_duration(0, 0, 0, ts)
-		);
+    using duration_t = std::chrono::nanoseconds;
+    const auto d = std::chrono::duration_cast<duration_t>(ts).count();
+    const auto sec = d / (1000 * 1000 * 1000);
+    const auto nsec = d % (1000 * 1000 * 1000);
+    return boost::posix_time::from_time_t(0)+
+      boost::posix_time::seconds(static_cast<long>(sec))+
+      boost::posix_time::microseconds((nsec+500)/1000);
 	}
 
 	/**
@@ -79,7 +84,9 @@ struct TimestampHelper {
 	static Timestamp stringToTimestamp(const std::string& date);
 
 	// 1000 microseconds * 60 seconds * 60 minutes * 24 hours
-	static unsigned int toDays(Timestamp ts) { return ts / 86400000; }
+	static unsigned int toDays(Timestamp ts) {
+    return std::chrono::duration_cast<std::chrono::hours>(ts).count() / 24;
+  }
 
 	/**
 	 * TODO

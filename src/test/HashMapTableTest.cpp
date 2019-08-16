@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 DBIS Group - TU Ilmenau, All Rights Reserved.
+ * Copyright (C) 2014-2019 DBIS Group - TU Ilmenau, All Rights Reserved.
  *
  * This file is part of the PipeFabric package.
  *
@@ -28,7 +28,7 @@
 
 using namespace pfabric;
 
-typedef Tuple<unsigned long, int, std::string, double> MyTuple;
+typedef pfabric::Tuple<unsigned long, int, std::string, double> MyTuple;
 
 template <typename RecordType, typename KeyType = DefaultKeyType>
 using HTable = HashMapTable<RecordType, KeyType>;
