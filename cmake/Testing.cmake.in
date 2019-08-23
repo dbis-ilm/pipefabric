@@ -46,6 +46,7 @@ macro (do_bench arg)
     add_test(
         NAME ${arg}
         COMMAND "${CMAKE_CURRENT_BINARY_DIR}/${arg}"
+        --benchmark_min_time=0.01
     )
     build_executable( ${arg} )
 endmacro(do_bench)
