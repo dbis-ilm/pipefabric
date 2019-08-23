@@ -397,6 +397,7 @@ class S2PLTable : public BaseTable,
   unsigned long size() const { return tbl.size(); }
 
   void drop() { tbl.drop(); }
+  void truncate() { tbl.truncate(); }
 
  private:
   S2PLLocks<KeyType> locks;

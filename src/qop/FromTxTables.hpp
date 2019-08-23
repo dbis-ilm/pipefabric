@@ -98,6 +98,7 @@ namespace pfabric {
             mSCtx.restarts++;
             mTables[0]->cleanUpReads(mKeys, i?j+1:j);
             mTables[1]->cleanUpReads(mKeys, j);
+            mSCtx.setReadCTS(mTxnID, 0, 0);
             boost::this_thread::sleep_for(boost::chrono::nanoseconds(500*TxSize*waitTime));
 //            waitTime *= 2;
 //            boost::this_thread::interruption_point();

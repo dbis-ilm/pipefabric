@@ -25,6 +25,8 @@
 #include <string>
 #include <vector>
 
+#include "core/Tuple.hpp"
+
 namespace pfabric {
 
 struct ColumnInfo {
@@ -76,7 +78,69 @@ class TableInfo {
   ColumnInfo::ColumnType mKeyType;
 };
 
-typedef std::shared_ptr<TableInfo> TableInfoPtr;
+using TableInfoPtr = std::shared_ptr<TableInfo>;
+
+struct GetType {
+  template<typename T>
+    static auto apply(T &t) {
+      return ColumnInfo::Void_Type;
+    }
+};
+
+template<>
+inline auto GetType::apply<int>(int &t) {
+  return ColumnInfo::Int_Type;
+}
+
+template<>
+inline auto GetType::apply<double>(double &t) {
+  return ColumnInfo::Double_Type;
+}
+
+template<>
+inline auto GetType::apply<std::string>(std::string &t) {
+  return ColumnInfo::String_Type;
+}
+
+template<class Tuple, std::size_t CurrentIndex>
+struct TupleTypes;
+
+template<class Tuple, std::size_t CurrentIndex>
+struct TupleTypes {
+  static void apply(Tuple tp, std::vector<ColumnInfo> &cols) {
+    TupleTypes<Tuple, CurrentIndex - 1>::apply(tp, cols);
+    auto type = GetType::apply(std::get<CurrentIndex - 1>(tp));
+    cols.push_back(ColumnInfo("", type));
+  }
+};
+
+template<class Tuple>
+struct TupleTypes<Tuple, 1> {
+	static void apply(Tuple tp, std::vector<ColumnInfo> &cols) {
+		auto type = GetType::apply(std::get<0>(tp));
+		cols.push_back(ColumnInfo("", type));
+	}
+};
+
+template<class Tuple>
+TableInfo constructSchema(const std::string &tableName) {
+	using Base = typename Tuple::Base;
+	Base t; // create default initialized std::tuple
+
+	std::vector<ColumnInfo> cols;
+	TupleTypes<Base, std::tuple_size<Base>::value>::apply(t, cols);
+	TableInfo tInfo(tableName);
+	tInfo.setColumns(cols);
+	return tInfo;
+}
+
+template<typename T>
+struct is_tuple_impl : std::false_type {};
+template<typename... Ts>
+struct is_tuple_impl<pfabric::Tuple<Ts...>> : std::true_type {};
+template<typename T>
+struct is_tuple : is_tuple_impl<std::decay_t<T>> {};
+
 }
 
 std::ostream& operator<<(std::ostream& os, pfabric::ColumnInfo::ColumnType ct);

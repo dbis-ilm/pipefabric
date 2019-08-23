@@ -92,7 +92,7 @@ TEST_CASE("Building and running a topology with ZMQ", "[Topology]") {
     for(const std::string &s : input) {
       zmq::message_t request (4);
       memcpy (request.data (), s.c_str(), 4);
-      publisher.send (request);
+      publisher.send(request, zmq::send_flags::none);
     }
   });
 
@@ -480,7 +480,7 @@ TEST_CASE("Building and running a topology with Transactions", "[Transactions]")
   auto s1 = t1->streamFromGenerator<T1>(streamGen, num)
     .assignTransactionID([](auto tp) { return get<0>(tp); })
     .keyBy<1, int>()
-    .toTxTable<int>(testTable, autocommit);
+    .toTxTable<TxTable<T1::element_type, int>>(testTable, autocommit);
 
   t1->start();
   t1->wait();

@@ -479,6 +479,13 @@ class RDBTable : public BaseTable {
     db = nullptr;
     boost::filesystem::path dbFile(mTableName + ".db");
     boost::filesystem::remove_all(dbFile);
+  }
+  
+  void truncate() {
+    delete db;
+    db = nullptr;
+    boost::filesystem::path dbFile(mTableName + ".db");
+    boost::filesystem::remove_all(dbFile);
     openOrCreateTable(mTableName);
   }
 

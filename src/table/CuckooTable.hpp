@@ -377,6 +377,11 @@ public:
 
   void drop() {
     mDataTable.clear();
+    //mDataTable = nullptr;
+  }
+
+  void truncate() {
+    mDataTable.clear();
   }
 
 private:

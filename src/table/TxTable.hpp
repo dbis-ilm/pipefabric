@@ -293,6 +293,7 @@ class TxTable : public BaseTable {
   unsigned long size() const { return tbl.size(); }
 
   void drop() { tbl.drop(); }
+  void truncate() { tbl.truncate(); }
 
  private:
   std::mutex tblMtx;

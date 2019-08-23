@@ -475,6 +475,7 @@ class BOCCTable : public BaseTable,
   unsigned long size() const { return tbl.size(); }
 
   void drop() { committedWSs.clear(); tbl.drop(); }
+  void truncate() { committedWSs.clear(); tbl.truncate(); }
 
  private:
 

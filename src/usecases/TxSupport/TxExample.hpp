@@ -139,6 +139,8 @@ template<typename TableType> class TxExample {
        * Prepare Tables                                                           *
        *==========================================================================*/
       auto prepareTables = [&]() {
+        accountTable->truncate();
+        replicaTable->truncate();
         auto start = std::chrono::high_resolution_clock::now();
         const auto txID = sCtx.newTx();
         for (auto i = 0u; i < keyRange; i++) {
@@ -168,7 +170,7 @@ template<typename TableType> class TxExample {
         for (auto j = 0u; j < runs; j++) {
           std::cout << "\rRun " << j+1 << '/' << runs << std::flush;
           prepareTables();
-          
+
           /* Necessary to clear streamFromMemory data vector */
           tWriter = ctx.createTopology();
           tWriter->newStreamFromMemory<AccountPtr>(zipf? "wl_writes_zipf.csv" : "wl_writes_uni.csv")
@@ -179,7 +181,7 @@ template<typename TableType> class TxExample {
             .template toTxTable<TableType>(replicaTable);
 
           tWriter->prepare();
-          
+
           auto start = std::chrono::high_resolution_clock::now();
 
           tWriter->start(true);
@@ -188,7 +190,7 @@ template<typename TableType> class TxExample {
 
           auto end = std::chrono::high_resolution_clock::now();
           auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-          
+
           measures.push_back(diff);
           txnCnt.push_back(sCtx.nextTxID.load(memory_order_relaxed));
           restarts.push_back(sCtx.restarts.load(memory_order_relaxed));
@@ -198,8 +200,6 @@ template<typename TableType> class TxExample {
           tWriter->cleanStartupFunctions();
           for (const auto &t : tReaders) t->stopThreads();
           sCtx.reset();
-          accountTable->drop();
-          replicaTable->drop();
         }
         std::cout << '\n';
       };
@@ -213,29 +213,29 @@ template<typename TableType> class TxExample {
          * Two because for each table a validation and end time stamp is requested */
         const auto throughput = tpsScaling?
           (((std::accumulate(txnCnt.begin(), txnCnt.end(), 0) - std::accumulate(restarts.begin(), restarts.end(), 0)) / 5) *
-           1000ULL / std::accumulate(measures.begin(), measures.end(), 0)) 
+           1000ULL / std::accumulate(measures.begin(), measures.end(), 0))
           :
           (std::accumulate(txnCnt.begin(), txnCnt.end(), 0) *
            1000ULL / std::accumulate(measures.begin(), measures.end(), 0));
         const auto errors = std::accumulate(restarts.begin(), restarts.end(), 0) * 100.0 /
           std::accumulate(txnCnt.begin(), txnCnt.end(), 0);
 
-        const auto rTp =  
+        const auto rTp =
           (std::accumulate(txnCntR.begin(), txnCntR.end(), 0) *
            1000ULL / std::accumulate(measures.begin(), measures.end(), 0));
         const auto wTp=
           (std::accumulate(txnCntW.begin(), txnCntW.end(), 0) *
            1000ULL / std::accumulate(measures.begin(), measures.end(), 0));
-           
+
         /*
-           std::cout << "Results:"
-           << "\n\tTime: " << avg << "ms"
+        std::cout << "Results:"
+         //  << "\n\tTime: " << avg << "ms"
            << "\n\tThroughput: " << throughput << "tx/s"
            << "\n\tError Rate: " << errors << "%\n";
-          
+
            std::cout << "Read Tps: " << rTp << "tx/s, "
-           << "Write Tps: " << wTp/2 << "tx/s\n";
-           */
+           << "Write Tps: " << wTp << "tx/s\n";
+        */
 
         /* protocol,table_size,transaction_size,readers,contention,throughput,error_rate */
         resFile << pName << ',' << keyRange << ',' << txSize*2 << ',' << simReaders << ',' << theta << ',' << "read" << ',' << rTp << ',' << errors << '\n';

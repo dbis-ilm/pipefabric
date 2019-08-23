@@ -37,6 +37,8 @@
 #ifdef USE_ROCKSDB_TABLE
 #include "rocksdb/db.h"
 #include "table/RDBTable.hpp"
+#elif USE_NVM_TABLES
+#include "table/PBPTreeTable.hpp"
 #else
 #include "table/CuckooTable.hpp"
 #include "table/HashMapTable.hpp"
@@ -195,6 +197,8 @@ class MVCCTable : public BaseTable,
  public:
 #ifdef USE_ROCKSDB_TABLE
   using Table = RDBTable<pfabric::Tuple<MVCCObject<TupleType>>, KeyType>;
+#elif USE_NVM_TABLES
+  using Table = PBPTreeTable<pfabric::Tuple<MVCCObject<TupleType>>, KeyType>;
 #else
   using Table = CuckooTable<pfabric::Tuple<MVCCObject<TupleType>>, KeyType>;
 #endif
@@ -286,7 +290,7 @@ class MVCCTable : public BaseTable,
     for(const auto &e : writeSet.set) {
       /* if entry exists */
       try {
-        newEntries[i] = KeyMVCCPair{e.first, get<0>(*tbl.getByKey(e.first))};
+        newEntries[i] = KeyMVCCPair{e.first, ns_types::get<0>(*tbl.getByKey(e.first))};
         auto &last = newEntries[i].mvcc;
         auto iPos = getFreePos(last.usedSlots);
         while (iPos > last.Versions - 1) {
@@ -477,7 +481,7 @@ class MVCCTable : public BaseTable,
 //      locks.unlockShared(key);
       return Errc::NOT_FOUND;
     }
-    const auto& mvcc = get<0>(*tplPtr);
+    const auto& mvcc = ns_types::get<0>(*tplPtr);
 //    locks.unlockShared(key);
    
     /* Get read CTS (version that was read first) for consistency */
@@ -542,6 +546,7 @@ class MVCCTable : public BaseTable,
   unsigned long size() const { return tbl.size(); }
 
   void drop() { tbl.drop(); }
+  void truncate() { tbl.truncate(); }
 
  private:
 
@@ -556,6 +561,7 @@ class MVCCTable : public BaseTable,
   SCtxType& sCtx;
 
 }; /* end class MVCCTable */
+
 
 } /* end namespace pfabric */
 
