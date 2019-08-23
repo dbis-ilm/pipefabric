@@ -23,9 +23,9 @@ option(USE_KAFKA               "use Apache Kafka as network source"             
 option(USE_MQTT                "use MQTT as network source"                             OFF)
 option(USE_BOOST_SPIRIT_PARSER "use the boost::spirit::qi parsers (strings convertion)" ON )
 option(USE_ROCKSDB_TABLE       "use RocksDB for implementing persistent tables"         OFF)
-option(USE_NVM_TABLE           "use NVM for implementing persistent memory tables"      OFF)
+option(USE_NVM_TABLES          "use NVM for implementing persistent memory tables"      ON )
 option(BUILD_ONLY_LIBS         "build only the two pipefabric libraries"                ON )
-option(BUILD_TEST_CASES        "build tests for pipefabric functionality"               OFF)
+option(BUILD_TEST_CASES        "build tests for pipefabric functionality"               ON )
 option(BUILD_GOOGLE_BENCH      "build google benchmark"                                 OFF)
 option(BUILD_BENCHMARKS        "build benchmark test for pipefabric"                    OFF)
 option(BUILD_PYTHON            "build python interface for pipefabric"                  OFF)
@@ -95,28 +95,6 @@ set(core_sources
 )
 set(core_libs "")
 
-if(BUILD_USE_CASES)
-  add_definitions(-DBUILD_USE_CASES)
-
-  # Use case for linear road
-  include_directories("${THIRD_PARTY_DIR}/linroad/include")
-  set(LINROAD_LIB "${THIRD_PARTY_DIR}/linroad/lib/libLRDataProvider.a")
-  file(COPY ${PROJECT_SOURCE_DIR}/usecases/LinearRoad/LinearRoadTest.cpp
-       DESTINATION ${PROJECT_SOURCE_DIR}/test
-  )
-  set(core_sources
-    ${core_sources}
-    ${THIRD_PARTY_DIR}/linroad
-  )
-  set(core_libs
-    ${core_libs}
-    ${LINROAD_LIB}
-  )
-  if(SUPPORT_MATRICES)
-    # Use cases require matrix support (image and graph processing)
-    set(SUPPORT_MATRICES ON)
-  endif()
-endif()
 
 
 ############################################################################################
@@ -190,9 +168,9 @@ endif()
 ############################################################################################
 #
 
-if (USE_NVM_TABLE)
+if (USE_NVM_TABLES)
   message(STATUS "using NVM based persistent table")
-  add_definitions(-DUSE_NVM_TABLE)
+  add_definitions(-DUSE_NVM_TABLES)
   set (PMDK_LIBRARIES
     "${THIRD_PARTY_DIR}/pmdk/lib/libpmemblk.a"
     "${THIRD_PARTY_DIR}/pmdk/lib/libpmemlog.a"
@@ -209,7 +187,6 @@ if (USE_NVM_TABLE)
   set(core_sources
     ${core_sources}
     ${THIRD_PARTY_DIR}/pmdk
-    ${THIRD_PARTY_DIR}/pmdk-cpp
     ${THIRD_PARTY_DIR}/nvmDS
   )
   set(core_libs
@@ -422,6 +399,23 @@ if(USE_MQTT)
   )
 endif()
 
+############################################################################################
+# Linear Road Data Provider                                                                #
+############################################################################################
+#
+
+if(BUILD_USE_CASES)
+  include_directories(${THIRD_PARTY_DIR}/linroad/include)
+  set(LINROAD_LIB "${THIRD_PARTY_DIR}/linroad/lib/libLRDataProvider.a")
+  set(core_libs
+    ${core_libs}
+    ${LINROAD_LIB}
+  )
+  set(core_deps
+    ${core_deps}
+    linroad
+  )
+endif()
 
 ############################################################################################
 # Building PipeFabric core library                                                         #
@@ -445,13 +439,9 @@ set(core_sources
   table/StateContext.cpp
 )
 
-add_library(pfabric_core SHARED
-  ${core_sources}
-)
-
-target_link_libraries(pfabric_core
-  ${core_libs}
-)
+add_library(pfabric_core SHARED ${core_sources})
+target_link_libraries(pfabric_core ${core_libs})
+add_dependencies(pfabric_core ${core_deps})
 
 
 ############################################################################################
@@ -531,6 +521,16 @@ endif()
 
 
 ############################################################################################
+# Build use cases                                                                          #
+############################################################################################
+#
+
+if(BUILD_USE_CASES)
+  add_definitions(-DBUILD_USE_CASES)
+  add_subdirectory(usecases)
+endif()
+
+############################################################################################
 # Unit tests using Catch                                                                   #
 ############################################################################################
 #
@@ -540,18 +540,6 @@ target_include_directories(Catch INTERFACE test)
 
 enable_testing()
 add_subdirectory(test)
-
-
-############################################################################################
-# Build use cases                                                                          #
-############################################################################################
-#
-
-if(BUILD_USE_CASES)
-  add_subdirectory(usecases)
-  add_executable(LinRoad usecases/LinearRoad/LinRoad.cpp)
-  target_link_libraries(LinRoad pfabric_core)
-endif()
 
 
 ############################################################################################

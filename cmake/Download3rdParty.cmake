@@ -70,7 +70,7 @@ include_directories("${THIRD_PARTY_DIR}/fmt")
 #--------------------------------------------------------------------------------
 # the SimpleWeb library
 download_project(PROJ               SimpleWeb
-                GIT_REPOSITORY      https://github.com/eidheim/Simple-Web-Server.git
+                GIT_REPOSITORY      https://gitlab.com/eidheim/Simple-Web-Server.git
                 GIT_TAG             master
                 GIT_SHALLOW         1
                 UPDATE_DISCONNECTED 1
@@ -147,8 +147,8 @@ file(COPY ${PROJECT_BINARY_DIR}/data-src/DEBS2017
 )
 
 # Linear Road Data Driver
-download_project(PROJ               linroad
-              GIT_REPOSITORY      https://github.com/samsonxian/Linear-Road-Benchmark-Data-Driver.git
+download_project(PROJ             linroad
+              GIT_REPOSITORY      https://github.com/yxian29/Linear-Road-Benchmark-Data-Driver.git
               GIT_TAG             master
               GIT_SHALLOW         1
               UPDATE_DISCONNECTED 1
@@ -157,7 +157,7 @@ download_project(PROJ               linroad
 add_custom_command(
         OUTPUT ${THIRD_PARTY_DIR}/linroad
         COMMAND ${CMAKE_COMMAND} -E copy
-                ${PROJECT_SOURCE_DIR}/usecases/LinearRoad/CMakeLists.txt
+        ${PROJECT_SOURCE_DIR}/usecases/LinearRoad/DataProvider/CMakeLists.txt
                 ${linroad_SOURCE_DIR}/src
         COMMAND ${CMAKE_COMMAND} -E chdir ${linroad_SOURCE_DIR}/src cmake .
         COMMAND ${CMAKE_COMMAND} -E chdir ${linroad_SOURCE_DIR}/src $(MAKE)
@@ -174,6 +174,7 @@ add_custom_command(
               ${linroad_SOURCE_DIR}/src/LRDataProvider.h
               ${THIRD_PARTY_DIR}/linroad/include
 )
+add_custom_target(linroad ALL DEPENDS ${THIRD_PARTY_DIR}/linroad)
 endif()
 
 #--------------------------------------------------------------------------------
