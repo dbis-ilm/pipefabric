@@ -139,7 +139,6 @@ int ZMQSocket::recvString(StringRef& data, bool blocking) {
   const auto flags = (blocking == false) ? zmq::recv_flags::dontwait : zmq::recv_flags::none;
 
   if (mZMQSockPtr != NULL) {
-
     try {
       retval = mZMQSockPtr->recv(message, flags).value_or(-1);
     }
@@ -148,7 +147,7 @@ int ZMQSocket::recvString(StringRef& data, bool blocking) {
         throw;
       return -1;
     }
-    if (retval != 1) {
+    if (retval < 1) {
       retval = -1;
       std::string error("Failed to receive zeromq message: ");
       error.append(zmq_strerror(errno));
@@ -175,7 +174,7 @@ int ZMQSocket::recvBuffer(char *buf, bool blocking) {
       //std::cout << "error : " << exp.what() << std::endl;
       throw ;
     }
-    if (retval != 1) {
+    if (retval < 1) {
       retval = -1;
       std::string error("Failed to receive zeromq message: ");
       error.append(zmq_strerror(errno));
@@ -206,7 +205,7 @@ zmq::message_t& ZMQSocket::recvMessage(bool blocking) {
       //std::cout << "error : " << exp.what() << std::endl;
       throw ;
     }
-    if (retval != 1) {
+    if (retval < 1) {
       retval = -1;
       std::string error("Failed to receive zeromq message: ");
       error.append(zmq_strerror(errno));
