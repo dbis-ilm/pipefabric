@@ -70,7 +70,7 @@ TEST_CASE("Receiving a ascii tuple stream via ZMQSource", "[ZMQSource]") {
 		for(const std::string &s : input) {
 			zmq::message_t request (4);
 			memcpy (request.data (), s.c_str(), 4);
-			publisher.send (request);
+			publisher.send(request, zmq::send_flags::none);
 		}
 	});
 
@@ -121,7 +121,7 @@ TEST_CASE("Receiving a binary tuple stream via ZMQSource", "[ZMQSource]") {
       tp->serializeToStream(res);
       zmq::message_t request (res.size());
       memcpy (request.data (), res.data(), res.size());
-      publisher.send (request);
+      publisher.send(request, zmq::send_flags::none);
     }
   });
   
