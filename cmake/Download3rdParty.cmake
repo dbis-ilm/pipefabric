@@ -178,7 +178,7 @@ add_custom_target(linroad ALL DEPENDS ${THIRD_PARTY_DIR}/linroad)
 endif()
 
 #--------------------------------------------------------------------------------
-if(USE_NVM_TABLE)
+if(USE_NVM_TABLES)
 # Peristent Memory Development Kit (pmem.io)
 download_project(PROJ               pmdk
                 GIT_REPOSITORY      https://github.com/pmem/pmdk.git
@@ -206,6 +206,7 @@ add_custom_command(
                 ${pmdk-cpp_SOURCE_DIR}/include
                 ${THIRD_PARTY_DIR}/pmdk/include
 )
+add_custom_target(pmdk ALL DEPENDS ${THIRD_PARTY_DIR}/pmdk ${THIRD_PARTY_DIR}/pmdk-cpp)
 
 # PTable (part of nvm-based data structures) for NVM
 download_project(PROJ               nvmDS
@@ -220,6 +221,7 @@ add_custom_command(
   COMMAND ${CMAKE_COMMAND} -E chdir ${nvmDS_SOURCE_DIR} cmake -DBUILD_TEST_CASES=OFF -DPROJECT_INSTALL_DIR=${THIRD_PARTY_DIR}/nvmDS src
   COMMAND ${CMAKE_COMMAND} -E chdir ${nvmDS_SOURCE_DIR} $(MAKE) install
 )
+add_custom_target(nvmDS ALL DEPENDS ${THIRD_PARTY_DIR}/nvmDS)
 endif()
 
 #--------------------------------------------------------------------------------

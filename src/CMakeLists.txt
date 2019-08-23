@@ -184,16 +184,16 @@ if (USE_NVM_TABLES)
     "${THIRD_PARTY_DIR}/pmdk/include"
     "${THIRD_PARTY_DIR}/nvmDS/include"
   )
-  set(core_sources
-    ${core_sources}
-    ${THIRD_PARTY_DIR}/pmdk
-    ${THIRD_PARTY_DIR}/nvmDS
-  )
   set(core_libs
     ${core_libs}
     ${PMDK_LIBRARIES}
     ndctl
     daxctl
+  )
+  set(core_deps
+    ${core_deps}
+    pmdk
+    nvmDS
   )
 else ()
   message(STATUS "don't use NVM based persistent table")
