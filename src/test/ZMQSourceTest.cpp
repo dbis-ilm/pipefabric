@@ -46,7 +46,7 @@ TEST_CASE("Receiving a ascii tuple stream via ZMQSource", "[ZMQSource]") {
 	typedef ConsoleWriter< MyTuplePtr > TestWriter;
 
 	zmq::context_t context (1);
-	zmq::socket_t publisher (context, ZMQ_PUB);
+	zmq::socket_t publisher(context, ZMQ_PUB);
 	publisher.bind("tcp://*:5678");
 
 	auto src = std::make_shared< TestZMQSource > ("tcp://localhost:5678");
@@ -60,22 +60,21 @@ TEST_CASE("Receiving a ascii tuple stream via ZMQSource", "[ZMQSource]") {
 	auto writer = std::make_shared< TestWriter >(strm, formatter);
 	CREATE_DATA_LINK(extractor, writer);
 
-	using namespace std::chrono_literals;
-	std::this_thread::sleep_for(1s);
+	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
 	auto handle = std::async(std::launch::async, [&publisher](){
 		std::vector<std::string> input = {
 			"0|10", "1|11", "2|12", "3|13", "4|14", "5|15"
 		};
 		for(const std::string &s : input) {
-			zmq::message_t request (4);
-			memcpy (request.data (), s.c_str(), 4);
+			zmq::message_t request(s.length());
+			memcpy(request.data(), s.c_str(), s.length());
 			publisher.send(request, zmq::send_flags::none);
 		}
 	});
 
   handle.get();
-  std::this_thread::sleep_for(2s);
+	std::this_thread::sleep_for(std::chrono::milliseconds(100));
   src->stop();
 	std::string expected = "0,10\n1,11\n2,12\n3,13\n4,14\n5,15\n";
 	REQUIRE(strm.str() == expected);
@@ -104,8 +103,7 @@ TEST_CASE("Receiving a binary tuple stream via ZMQSource", "[ZMQSource]") {
   auto writer = std::make_shared< TestWriter >(strm, formatter);
   CREATE_DATA_LINK(extractor, writer);
   
-  using namespace std::chrono_literals;
-  std::this_thread::sleep_for(1s);
+	std::this_thread::sleep_for(std::chrono::milliseconds(100));
   
   auto handle = std::async(std::launch::async, [&publisher](){
     std::vector<MyTuplePtr> input = {
@@ -126,7 +124,7 @@ TEST_CASE("Receiving a binary tuple stream via ZMQSource", "[ZMQSource]") {
   });
   
   handle.get();
-  std::this_thread::sleep_for(2s);
+	std::this_thread::sleep_for(std::chrono::milliseconds(100));
   src->stop();
   std::string expected = "0,10\n1,11\n2,12\n3,13\n4,14\n5,15\n";
   REQUIRE(strm.str() == expected);

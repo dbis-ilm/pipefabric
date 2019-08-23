@@ -58,9 +58,8 @@ TEST_CASE("Building and running a topology with ScaleJoin (3 instances)", "[Scal
   t.prepare();
   t.start(false);
 
-  while(results!=num) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-  }
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
   REQUIRE(results == num);
 }
 
@@ -136,12 +135,12 @@ TEST_CASE("Building and running a topology with joins on different tuple formats
 }
 
 //Symmetric Hash Join with the left data stream partitioned
-TEST_CASE("Building and running a topology with a join on one partitioned stream", 
+TEST_CASE("Building and running a topology with a join on one partitioned stream",
           "[Partitioned and unpartitioned Join]") {
   typedef TuplePtr<unsigned long, unsigned long> MyTuplePtr;
 
   StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {
-    return makeTuplePtr(n, n % 100); 
+    return makeTuplePtr(n, n % 100);
   });
   unsigned long num = 1000;
 
@@ -168,7 +167,7 @@ TEST_CASE("Building and running a topology with a join on one partitioned stream
 
   t.start(false);
 
-  std::this_thread::sleep_for(1s);
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
   REQUIRE(results.size() == num*10);
 
@@ -210,7 +209,7 @@ TEST_CASE("Building and running a topology with a join on another partitioned st
 
   t.start(false);
 
-  std::this_thread::sleep_for(1s);
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
   REQUIRE(results.size() == num*10);
 
@@ -251,7 +250,7 @@ TEST_CASE("Building and running a topology with a join on another partitioned st
 
   t.start(false);
 
-  std::this_thread::sleep_for(1s);
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
   REQUIRE(results.size() == num*10);
 
@@ -266,7 +265,7 @@ TEST_CASE("Building and running a topology with a join on two partitioned stream
   typedef TuplePtr<unsigned long, unsigned long> MyTuplePtr;
 
   StreamGenerator<MyTuplePtr>::Generator streamGen ([](unsigned long n) -> MyTuplePtr {
-    return makeTuplePtr(n, n % 100); 
+    return makeTuplePtr(n, n % 100);
   });
   unsigned long num = 1000;
 
@@ -294,7 +293,7 @@ TEST_CASE("Building and running a topology with a join on two partitioned stream
 
   t.start(false);
 
-  std::this_thread::sleep_for(1s);
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
   REQUIRE(results.size() == num*10);
 

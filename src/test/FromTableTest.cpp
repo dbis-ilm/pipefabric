@@ -66,8 +66,8 @@ TEST_CASE("Producing a data stream from inserts into a table", "[FromTable]") {
     testTable->insert(i, *tp);
   }
 
-  using namespace std::chrono_literals;
-  std::this_thread::sleep_for(2s);
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
   REQUIRE(mockup->numTuplesProcessed() == 10);
   testTable->drop();
 }

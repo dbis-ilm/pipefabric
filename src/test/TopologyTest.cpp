@@ -82,8 +82,7 @@ TEST_CASE("Building and running a topology with ZMQ", "[Topology]") {
 
   t.start(false);
 
-  using namespace std::chrono_literals;
-  std::this_thread::sleep_for(1s);
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
   auto handle = std::async(std::launch::async, [&publisher](){
     std::vector<std::string> input = {
@@ -97,7 +96,7 @@ TEST_CASE("Building and running a topology with ZMQ", "[Topology]") {
   });
 
   handle.get();
-  std::this_thread::sleep_for(2s);
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
   std::string expected = "0,10\n1,11\n2,12\n3,13\n4,14\n5,15\n";
 
@@ -155,10 +154,9 @@ TEST_CASE("Building and running a topology with partitioning", "[Topology]") {
       results.push_back(v);
     });
 
-  t.start();
+  t.start(false);
 
-  using namespace std::chrono_literals;
-  std::this_thread::sleep_for(2s);
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
   REQUIRE(results.size() == 500);
 
@@ -225,8 +223,7 @@ TEST_CASE("Building and running a topology with batcher", "[Topology]") {
 
   t2.start(false);
 
-  using namespace std::chrono_literals;
-  std::this_thread::sleep_for(2s);
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
   REQUIRE(procBatchCount == 100);
   REQUIRE(procTupleCount == 1000);
@@ -368,11 +365,9 @@ TEST_CASE("Combining tuples from two streams to one stream", "[ToStream]") {
       results++;
     });
 
-  t.start();
-  t.wait();
+  t.start(false);
 
-  using namespace std::chrono_literals;
-  std::this_thread::sleep_for(2s);
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
   REQUIRE(results == 200);
 }

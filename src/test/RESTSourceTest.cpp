@@ -69,7 +69,7 @@ TEST_CASE("Receiving data via REST", "[RESTSource]" ) {
   // note we have to start the REST server asynchronously
   auto handle = std::async(std::launch::async, [&](std::shared_ptr<RESTSource> src){ src->start(); }, restSource);
 
-  std::this_thread::sleep_for(std::chrono::seconds(1));
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
   HttpClient client("localhost:8099");
   for (int i = 0; i < 100; i++) {
     std::string param_string = fmt::format("(\"key\": \"{0}\",\"value\": \"Always the same\")", i);

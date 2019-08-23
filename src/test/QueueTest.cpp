@@ -57,8 +57,7 @@ TEST_CASE("Decoupling producer and consumer via a queue", "[Queue]") {
     
   mockup->start();
   
-  using namespace std::chrono_literals;
-  std::this_thread::sleep_for(2s);
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
   REQUIRE(mockup->numTuplesProcessed() == expected.size());
 }
