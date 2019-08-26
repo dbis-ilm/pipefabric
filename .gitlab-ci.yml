@@ -33,6 +33,8 @@ test:
 
 coverage:
   stage: build
+  only:
+    - master
   tags: 
     - grouprunner
   script:
