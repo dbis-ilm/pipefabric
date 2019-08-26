@@ -35,7 +35,7 @@
 #include "dsl/Topology.hpp"
 #include "dsl/Pipe.hpp"
 
-#include "benchmark/include/benchmark/benchmark.h"
+#include "benchmark/benchmark.h"
 
 using namespace pfabric;
 using namespace ns_types;

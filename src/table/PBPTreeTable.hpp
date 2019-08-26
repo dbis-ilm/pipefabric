@@ -40,8 +40,9 @@
 #include <libpmemobj++/utils.hpp>
 #include <libpmempool.h>
 
-#include "PBPTree.hpp"
+#include "pbptree/PBPTree.hpp"
 
+#include "pfabric_config.h"
 #include "core/Tuple.hpp"
 #include "table/TableException.hpp"
 #include "table/BaseTable.hpp"
@@ -49,8 +50,6 @@
 
 namespace pfabric {
 
-//TODO: Maybe the pmem device path prefix should be a CMake variable?
-constexpr auto pathPrefix = "/mnt/pmem/test/";
 constexpr auto poolSize = 1024 * 1024 *1024; ///< 1GB
 constexpr auto BRANCHSIZE = 32;
 constexpr auto LEAFSIZE = 16;
@@ -374,7 +373,7 @@ class PBPTreeTable : public BaseTable {
       q = nullptr;
     });
     pop.close();
-    //pmempool_rm((pathPrefix + BaseTable::mTableInfo->tableName() + ".db").c_str(), 1);
+    //pmempool_rm((pfabric::gPmemPath + BaseTable::mTableInfo->tableName() + ".db").c_str(), 1);
     std::remove((BaseTable::mTableInfo->tableName()+".db").c_str());
   }
 
@@ -394,7 +393,7 @@ class PBPTreeTable : public BaseTable {
 
  private:
   void openOrCreateTable(const TableInfo &tableInfo) noexcept(false) {
-    const std::string path = pathPrefix + tableInfo.tableName() + ".db";
+    const std::string path = pfabric::gPmemPath + tableInfo.tableName() + ".db";
     pool<root> pop;
 
     if (access(path.c_str(), F_OK) != 0) {

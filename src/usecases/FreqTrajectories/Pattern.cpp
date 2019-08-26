@@ -19,6 +19,7 @@
 
 #include <iostream>
 #include "fmt/format.h"
+#include "fmt/ostream.h"
 #include "Pattern.hpp"
 
 using namespace std;

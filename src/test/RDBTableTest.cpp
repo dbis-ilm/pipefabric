@@ -29,7 +29,7 @@
 
 using namespace pfabric;
 
-typedef Tuple<unsigned long, int, std::string, double> MyTuple;
+typedef pfabric::Tuple<unsigned long, int, std::string, double> MyTuple;
 
 template <typename RecordType, typename KeyType>
 using LTable = RDBTable<RecordType, KeyType>;

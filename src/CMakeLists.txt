@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.11)
 project (pipefabric)
 
 set(CMAKE_MACOSX_RPATH 1)
@@ -17,19 +17,21 @@ include(CTest)
 # which can be switched off to reduce build time.
 
 option(SUPPORT_MATRICES        "support matrix operations as tuple and state type"      OFF)
-option(BUILD_USE_CASES         "build use cases to show functionality examples"         ON )
+option(BUILD_USE_CASES         "build use cases to show functionality examples"         OFF)
 option(USE_RABBITMQ            "use RabbitMQ as network source"                         OFF)
 option(USE_KAFKA               "use Apache Kafka as network source"                     OFF)
 option(USE_MQTT                "use MQTT as network source"                             OFF)
 option(USE_BOOST_SPIRIT_PARSER "use the boost::spirit::qi parsers (strings convertion)" ON )
 option(USE_ROCKSDB_TABLE       "use RocksDB for implementing persistent tables"         OFF)
-option(USE_NVM_TABLES          "use NVM for implementing persistent memory tables"      ON )
+option(USE_NVM_TABLES          "use NVM for implementing persistent memory tables"      OFF)
 option(BUILD_ONLY_LIBS         "build only the two pipefabric libraries"                ON )
 option(BUILD_TEST_CASES        "build tests for pipefabric functionality"               ON )
 option(BUILD_GOOGLE_BENCH      "build google benchmark"                                 OFF)
 option(BUILD_BENCHMARKS        "build benchmark test for pipefabric"                    OFF)
 option(BUILD_PYTHON            "build python interface for pipefabric"                  OFF)
 
+# Set the mount path of your pmem device (only when using NVM tables)
+set(PMEM_MNT_PATH "/mnt/pmem/test")
 
 ############################################################################################
 # End of customization section                                                             #
@@ -71,31 +73,24 @@ endif()
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/")
 
 # We download some 3rdparty modules from github.com before building the project.
-include(Download3rdParty)
+include(Fetch3rdParty)
+
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
 
 if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread")
   set(DYLIB_LIBRARY "-ldl")
 else()
   set(DYLIB_LIBRARY "")
 endif()
 
-# because we have downloaded external projects into build we have to add them here
-include_directories("${THIRD_PARTY_DIR}")
-
-set(core_sources
-  ${core_sources}
-  # we need this as dependency to download the sources from github
-  ${THIRD_PARTY_DIR}/json
-  ${THIRD_PARTY_DIR}/fmt
-  ${THIRD_PARTY_DIR}/libcuckoo
-  ${THIRD_PARTY_DIR}/SimpleWeb
-  ${THIRD_PARTY_DIR}/catch
+set(core_libs
+  Threads::Threads
+  ${DYLIB_LIBRARY}
+  libcuckoo
 )
-set(core_libs "")
 
-
+configure_file(pfabric_config.h.in ${CMAKE_CURRENT_BINARY_DIR}/generated/pfabric_config.h)
 
 ############################################################################################
 # Memory allocator libraries                                                               #
@@ -107,29 +102,12 @@ if(JEMALLOC_FOUND)
   message(STATUS "using the jemalloc allocator")
   set(MALLOC_LIB ${JEMALLOC_LIBRARIES})
 elseif (Tcmalloc_FOUND)
+
   message(STATUS "using the tcmalloc allocator")
   set(MALLOC_LIB ${Tcmalloc_LIBRARIES})
 else()
   set(MALLOC_LIB "")
 endif()
-
-
-############################################################################################
-# Google benchmark library                                                                 #
-############################################################################################
-#
-
-if (BUILD_GOOGLE_BENCH)
-  include_directories("${THIRD_PARTY_DIR}/benchmark/include")
-  set (BENCHMARK_LIB "${THIRD_PARTY_DIR}/benchmark/lib/libbenchmark.a")
-  set(core_sources
-    ${core_sources}
-    ${THIRD_PARTY_DIR}/benchmark
-  )
-else()
-  set (BENCHMARK_LIB "")
-endif()
-
 
 ############################################################################################
 # RocksDB database library                                                                 #
@@ -139,8 +117,8 @@ endif()
 if (USE_ROCKSDB_TABLE)
   message(STATUS "using RocksDB key-value store")
   add_definitions(-DUSE_ROCKSDB_TABLE)
-  set (ROCKSDB_LIB "${THIRD_PARTY_DIR}/rocksdb/lib/librocksdb.a")
-  include_directories("${THIRD_PARTY_DIR}/rocksdb/include")
+  set (ROCKSDB_LIB rocksdb)
+  include_directories("${rocksdb_SOURCE_DIR}/include")
 
   find_package( BZip2 )
   if ( BZIP2_FOUND )
@@ -153,10 +131,6 @@ if (USE_ROCKSDB_TABLE)
     #  include_directories( ${BZIP2_INCLUDE_DIRS} )
     set (ROCKSDB_LIB ${ROCKSDB_LIB} ${ZLIB_LIBRARIES})
   endif( ZLIB_FOUND )
-  set(core_sources
-    ${core_sources}
-    ${THIRD_PARTY_DIR}/rocksdb
-  )
 else()
   message(STATUS "don't use RocksDB key-value store")
   set (ROCKSDB_LIB "")
@@ -171,33 +145,18 @@ endif()
 if (USE_NVM_TABLES)
   message(STATUS "using NVM based persistent table")
   add_definitions(-DUSE_NVM_TABLES)
-  set (PMDK_LIBRARIES
-    "${THIRD_PARTY_DIR}/pmdk/lib/libpmemblk.a"
-    "${THIRD_PARTY_DIR}/pmdk/lib/libpmemlog.a"
-    "${THIRD_PARTY_DIR}/pmdk/lib/libpmemobj.a"
-    "${THIRD_PARTY_DIR}/pmdk/lib/libpmempool.a"
-    "${THIRD_PARTY_DIR}/pmdk/lib/libpmem.a"
-     ${DYLIB_LIBRARY}
-    "${THIRD_PARTY_DIR}/nvmDS/lib/libptable.so"
-  )
   include_directories(
-    "${THIRD_PARTY_DIR}/pmdk/include"
-    "${THIRD_PARTY_DIR}/nvmDS/include"
+    ${nvmds_SOURCE_DIR}/src
+    ${nvmds_BINARY_DIR}/generated
   )
   set(core_libs
     ${core_libs}
-    ${PMDK_LIBRARIES}
-    ndctl
-    daxctl
-  )
-  set(core_deps
-    ${core_deps}
-    pmdk
-    nvmDS
+    ptable
+    #    ${nvmds_BINARY_DIR}/ptable/libptable.so
+    ${PMDK_LIBRARIES} ndctl daxctl
   )
 else ()
   message(STATUS "don't use NVM based persistent table")
-  set (PMDK_LIBRARIES "")
 endif()
 
 
@@ -251,7 +210,6 @@ set(BOOST_LIBRARIES
   ${Boost_TIMER_LIBRARY}
   ${Boost_THREAD_LIBRARY}
   ${Boost_REGEX_LIBRARY}
-  ${DYLIB_LIBRARY}
 )
 set(core_libs
   ${core_libs}
@@ -405,15 +363,10 @@ endif()
 #
 
 if(BUILD_USE_CASES)
-  include_directories(${THIRD_PARTY_DIR}/linroad/include)
-  set(LINROAD_LIB "${THIRD_PARTY_DIR}/linroad/lib/libLRDataProvider.a")
+  include_directories(${linroad_SOURCE_DIR}/src)
   set(core_libs
     ${core_libs}
-    ${LINROAD_LIB}
-  )
-  set(core_deps
-    ${core_deps}
-    linroad
+    LRDataProvider
   )
 endif()
 
@@ -421,8 +374,9 @@ endif()
 # Building PipeFabric core library                                                         #
 ############################################################################################
 
-include_directories("${PROJECT_SOURCE_DIR}")
-include_directories("${PROJECT_SOURCE_DIR}/pubsub")
+include_directories(${PROJECT_SOURCE_DIR}
+                    ${PROJECT_BINARY_DIR}/generated
+                    ${PROJECT_SOURCE_DIR}/pubsub)
 
 set(core_sources
   ${core_sources}
@@ -441,8 +395,6 @@ set(core_sources
 
 add_library(pfabric_core SHARED ${core_sources})
 target_link_libraries(pfabric_core ${core_libs})
-add_dependencies(pfabric_core ${core_deps})
-
 
 ############################################################################################
 # Building PipeFabric CEP library                                                          #
@@ -450,17 +402,11 @@ add_dependencies(pfabric_core ${core_deps})
 #
 
 if(NOT BUILD_ONLY_LIB)
-  add_library(pfabric_cep SHARED
-    cep/Matcher.cpp
-    # we need this as dependency to download the sources from github
-    ${THIRD_PARTY_DIR}/fmt
- )
-
+  add_library(pfabric_cep SHARED cep/Matcher.cpp)
   target_link_libraries(pfabric_cep
     ${BOOST_LIBRARIES}
   )
 endif()
-
 
 ############################################################################################
 # Building PipeFabric Python library                                                       #
@@ -468,19 +414,13 @@ endif()
 #
 
 if (BUILD_PYTHON)
-  add_library(pyfabric SHARED
-    ${PYTHON_SOURCES}
-    # we need this as dependency to download the sources from github
-    ${THIRD_PARTY_DIR}/fmt
-  )
-
+  add_library(pyfabric SHARED ${PYTHON_SOURCES})
   target_link_libraries(pyfabric
     ${Boost_PYTHON3_LIBRARY}
     ${PYTHON_LIBRARIES}
     pfabric_core
     ${BOOST_LIBRARIES}
   )
-
   set_target_properties(pyfabric PROPERTIES PREFIX "" SUFFIX ".so")
 endif()
 
@@ -534,9 +474,6 @@ endif()
 # Unit tests using Catch                                                                   #
 ############################################################################################
 #
-
-add_library(Catch INTERFACE)
-target_include_directories(Catch INTERFACE test)
 
 enable_testing()
 add_subdirectory(test)

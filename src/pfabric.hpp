@@ -20,6 +20,7 @@
 #ifndef pfabric_hpp_
 #define pfabric_hpp_
 
+#include "pfabric_config.h"
 #include "core/PFabricTypes.hpp"
 #include "core/Tuple.hpp"
 #include "core/StreamElementTraits.hpp"

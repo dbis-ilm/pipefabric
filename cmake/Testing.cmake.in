@@ -8,10 +8,10 @@ macro(build_executable arg)
   add_executable( ${arg} "${arg}.cpp")
     target_link_libraries( ${arg}
       pfabric_core
+      benchmark
       ${Boost_SYSTEM_LIBRARY}
       ${ROCKSDB_LIB}
       ${PMDK_LIBRARIES}
-      ${BENCHMARK_LIB}
       ${MALLOC_LIB}
     )
 endmacro(build_executable)
@@ -24,7 +24,6 @@ macro(build_catch_test arg)
       ${Boost_SYSTEM_LIBRARY}
       ${ROCKSDB_LIB}
       ${PMDK_LIBRARIES}
-      ${BENCHMARK_LIB}
       ${MALLOC_LIB}
     )
 endmacro(build_catch_test)

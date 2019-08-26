@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 2.8.11)
-message("Building Driver for Linear Road")
-
 project(DataDriver)
+
+message("Building Driver for Linear Road")
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 

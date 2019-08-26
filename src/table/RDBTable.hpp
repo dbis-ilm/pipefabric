@@ -167,16 +167,15 @@ class RDBTable : public BaseTable {
   // details
   typedef typename TableIterator::Predicate Predicate;
 
-  RDBTable(const TableInfo& tInfo) throw(TableException)
-      : BaseTable(tInfo), mTableName(tInfo.tableName()) {
+  RDBTable(const TableInfo& tInfo) : BaseTable(tInfo),
+                                     mTableName(tInfo.tableName()) {
     openOrCreateTable(tInfo.tableName());
   }
 
   /**
    * Constructor for creating an empty table.
    */
-  RDBTable(const std::string& tableName) throw(TableException)
-      : mTableName(tableName) {
+  RDBTable(const std::string& tableName) : mTableName(tableName) {
     openOrCreateTable(tableName);
   }
 
@@ -205,7 +204,7 @@ class RDBTable : public BaseTable {
    * @param key the key value of the tuple
    * @param rec the actual tuple
    */
-  void insert(KeyType key, const RecordType& rec) throw(TableException) {
+  void insert(KeyType key, const RecordType& rec) {
     {
       StreamType buf;
       rec.serializeToStream(buf);
@@ -410,7 +409,7 @@ class RDBTable : public BaseTable {
    * @param key the key value
    * @return the tuple associated with the given key
    */
-  SmartPtr<RecordType> getByKey(KeyType key) throw(TableException) {
+  SmartPtr<RecordType> getByKey(KeyType key) {
     std::string resultData;
     auto status =
         db->Get(readOptions, pfabric::detail::valToSlice(key), &resultData);
@@ -480,7 +479,7 @@ class RDBTable : public BaseTable {
     boost::filesystem::path dbFile(mTableName + ".db");
     boost::filesystem::remove_all(dbFile);
   }
-  
+
   void truncate() {
     delete db;
     db = nullptr;
@@ -513,7 +512,7 @@ class RDBTable : public BaseTable {
   rocksdb::DB* _db() { return db; }
 
  private:
-  void openOrCreateTable(const std::string& tableName) throw(TableException) {
+  void openOrCreateTable(const std::string& tableName) {
     // writeOptions.sync = true;
     std::string fileName = tableName + ".db";
     rocksdb::Options options;

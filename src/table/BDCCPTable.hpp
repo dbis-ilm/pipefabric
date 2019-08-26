@@ -41,17 +41,15 @@
 #include <libpmempool.h>
 
 #include "fmt/format.h"
-#include "PTable.hpp"
+#include "ptable/PTable.hpp"
 
+#include "pfabric_config.h"
 #include "core/Tuple.hpp"
 #include "table/TableException.hpp"
 #include "table/BaseTable.hpp"
 #include "table/TableInfo.hpp"
 
 namespace pfabric {
-
-//TODO: Maybe the pmem device path prefix should be a CMake variable?
-//constexpr auto pathPrefix = "/mnt/pmem/test/";
 
 using pmem::obj::delete_persistent;
 using pmem::obj::make_persistent;
@@ -371,7 +369,7 @@ class BDCCPTable : public BaseTable {
       q = nullptr;
     });
     pop.close();
-    //pmempool_rm((pathPrefix + BaseTable::mTableInfo->tableName() + ".db").c_str(), 1);
+    //pmempool_rm((pfabric::gPmemPath + BaseTable::mTableInfo->tableName() + ".db").c_str(), 1);
     std::remove((BaseTable::mTableInfo->tableName()+".db").c_str());
   }
 
@@ -390,7 +388,7 @@ class BDCCPTable : public BaseTable {
 
  private:
   void openOrCreateTable(const TableInfo &tableInfo) noexcept(false) {
-    const std::string path = pathPrefix + tableInfo.tableName() + ".db";
+    const std::string path = pfabric::gPmemPath + tableInfo.tableName() + ".db";
     pool<root> pop;
 
     if (access(path.c_str(), F_OK) != 0) {
