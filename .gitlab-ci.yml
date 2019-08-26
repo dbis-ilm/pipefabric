@@ -14,7 +14,7 @@ build:
     - cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TEST_CASES=ON ../src
     - make
     # clean up unnecessary files and strip binaries
-    - rm -rf *-src  *-download *-build 3rdparty
+    - rm -rf _deps generated
     - strip test/*Test
   artifacts:
     paths:
