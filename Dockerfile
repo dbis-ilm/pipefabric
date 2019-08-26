@@ -3,18 +3,35 @@ MAINTAINER Kai-Uwe Sattler <kus@tu-ilmenau.de>
 
 # Installing dependencies
 RUN apk update && apk add --no-cache \
+      autoconf \
+      bash \
       cmake \
+      fts-dev \
       git \
       g++ \
       boost-dev \
       zeromq-dev \
       make \
+      ndctl-dev \
       sudo && \
     wget -P /usr/include/ https://raw.githubusercontent.com/zeromq/cppzmq/master/zmq.hpp && \
+    # PMDK
+    git clone https://github.com/pmem/pmdk && \
+    cd pmdk && git checkout tags/1.6 && make EXTRA_CFLAGS="-Wno-error" EXTRA_LIBS="-lfts" && \
+    make install prefix=/usr/local && \
+    git clone https://github.com/pmem/libpmemobj-cpp && \
+    cd libpmemobj-cpp && mkdir build && cd build && git checkout tags/1.7 && \
+    cmake .. -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DBUILD_DOC=OFF \
+             -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_INSTALL_LIBDIR=lib && make && make install && \
+    cd ../../.. && \
     # Cleaning up
+    rm -rf pmdk && \
     rm -rf /usr/share/doc && \
+    rm -rf /usr/local/share/doc && \
     rm -rf /usr/share/man/?? && \
-    rm -rf /usr/share/man/??_*
+    rm -rf /usr/local/share/man/?? && \
+    rm -rf /usr/share/man/??_* && \
+    rm -rf /usr/local/share/man/??_*
 
 # Add user and allow sudo
 ENV USER pf
