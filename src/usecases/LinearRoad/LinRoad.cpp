@@ -70,7 +70,7 @@ typedef TuplePtr<ReportType, Time, VID, Spd, XWay, Lane, Dir, Seg, Pos, int, int
 /* ----------------------------------------------------------------- */
 
 //all necessary information of a position report
-struct p {
+struct PosReport {
   Time  t;
   VID   v;
   Spd   spd;
@@ -82,7 +82,7 @@ struct p {
 };
 
 //all necessary information of an accident alert
-struct accAlert {
+struct AccAlert {
   ReportType  repType;
   Time        t;
   Emit        t_emit;
@@ -90,7 +90,7 @@ struct accAlert {
 };
 
 //all necessary information of a toll notification
-struct tollNote {
+struct TollNote {
   ReportType  repType;
   VID         v;
   Time        t;
@@ -100,21 +100,21 @@ struct tollNote {
 };
 
 //used as a key in the map posReports
-struct posID {
+struct PosID {
   Time  t;
   VID   v;
 
   //overwrite existing operators for == and < to use this struct as a key in a map
-  bool const operator==(const posID &o) const {
+  bool const operator==(const PosID &o) const {
     return t == o.t && v == o.v;
   }
-  bool const operator<(const posID &o) const {
+  bool const operator<(const PosID &o) const {
     return v < o.v || (v == o.v && t < o.t);
   }
 };
 
 //used as data struct in the accidents set
-struct accidentID {
+struct AccidentID {
   XWay    x;
   Seg     s;
   VID     v;
@@ -122,32 +122,32 @@ struct accidentID {
   Dir     d;
 
   //overwrite existing operators for == and < to use this struct as a key in a map
-  bool const operator==(const accidentID &o) const {
+  bool const operator==(const AccidentID &o) const {
     return s == o.s && x == o.x && v == o.v && m == o.m && d == o.d;
   }
-  bool const operator<(const accidentID &o) const {
+  bool const operator<(const AccidentID &o) const {
     return x < o.x || (x == o.x && s < o.s) || (x == o.x && s == o.s && v < o.v) || (x == o.x && s == o.s && v == o.v && m < o.m) || (x == o.x && s == o.s && v == o.v && m == o.m && d < o.d);
   }
 };
 
 //used as a key in the map spdOfSegments
-struct segID {
+struct SegID {
   Minute  m;
   XWay    x;
   Seg     s;
   Dir     d;
 
   //overwrite existing operators for == and < to use this struct as a key in a map
-  bool const operator==(const segID &o) const {
+  bool const operator==(const SegID &o) const {
     return m == o.m && x == o.x && s == o.s && d == o.d;
   }
-  bool const operator<(const segID &o) const {
+  bool const operator<(const SegID &o) const {
     return m < o.m || (m == o.m && x < o.x) || (m == o.m && x == o.x && s < o.s) || (m == o.m && x == o.x && s == o.s && d < o.d);
   }
 };
 
 //used as data struct to calculate average speed of an vehicle
-struct avgSpd {
+struct AvgSpd {
   Spd   sum;
   int   n;
 };
@@ -158,14 +158,14 @@ struct avgSpd {
 /* ----------------------------------------------------------------- */
 
 //map containing all position reports
-map<posID, p> posReports;
+map<PosID, PosReport> posReports;
 //current segment of each vehicle
 map<VID,Seg> segs;
 //holds all current accidents
-set<accidentID> accidents;
+set<AccidentID> accidents;
 //used to calculate average speed on each segment
 //also used to get number of cars at one segment
-map<segID,map<VID,avgSpd>> spdOfSegments;
+map<SegID,map<VID,AvgSpd>> spdOfSegments;
 
 
 /* ----------------------------------------------------------------- */
@@ -173,7 +173,7 @@ map<segID,map<VID,avgSpd>> spdOfSegments;
 /* ----------------------------------------------------------------- */
 
 /* Helper function to print an element of p. */
-void printPosReport(p posReport) {
+void printPosReport(PosReport posReport) {
   cout << "Time: " << posReport.t << ", ";
   cout << "VID: " << posReport.v << ", ";
   cout << "Spd: " << posReport.spd << ", ";
@@ -184,14 +184,14 @@ void printPosReport(p posReport) {
   cout << "Pos: " << posReport.pos << endl;
 }
 
-/* Helper function to print an element of posID. */
-void printPosReportKey(posID key) {
+/* Helper function to print an element of PosID. */
+void printPosReportKey(PosID key) {
   cout << "Time: " << key.t << ", ";
   cout << "VID: " << key.v << endl;
 }
 
 /* Helper function to print an accident alert. */
-void printAccidentAlert(accAlert alert) {
+void printAccidentAlert(AccAlert alert) {
   cout << "ReportType: " << alert.repType << ", ";
   cout << "Time: " << alert.t << ", ";
   cout << "Emit: " << alert.t_emit << ", ";
@@ -199,7 +199,7 @@ void printAccidentAlert(accAlert alert) {
 }
 
 /* Helper function to print a toll notification. */
-void printTollNotification(tollNote note) {
+void printTollNotification(TollNote note) {
   cout << "ReportType: " << note.repType << ", ";
   cout << "VID: " << note.v << ", ";
   cout << "Time: " << note.t << ", ";
@@ -240,7 +240,7 @@ void eraseFromPosReports(Time t, VID v) {
   activePosReports--;
 
   //get the key of the pos report
-  posID key = {t, v};
+  PosID key = {t, v};
   //erase from posReports
   posReports.erase(key);
 }
@@ -252,15 +252,15 @@ void eraseFromSegs(VID v) {
 }
 
 /* Helper function to add a tuple to the pos reports map. */
-void addToPosReports(p posReport) {
+void addToPosReports(PosReport posReport) {
 
   //only for testing purposes
   activePosReports++;
 
   //get the key of the pos report from tuple
-  posID key = {posReport.t, posReport.v};
+  PosID key = {posReport.t, posReport.v};
   //add to posReports
-  posReports.insert(pair<posID,p>(key,posReport));
+  posReports.insert(pair<PosID,PosReport>(key,posReport));
 }
 
 //TODO: should be done during outdated notification
@@ -291,28 +291,28 @@ Minute M(Time t) {
 }
 
 /* Denotes the i'th position report emitted by v prior to t. */
-p Last(int i, VID v, Time t) {
+PosReport Last(int i, VID v, Time t) {
 
   //get the bounds for the iterator
   Time timeLowerBound = t - 30 * i;
   Time timeUpperBound = (t - 30 * (i - 1)) - 1;
 
-  posID keyLowerBound = {timeLowerBound, v};
-  posID keyUpperBound = {timeUpperBound, v};
+  PosID keyLowerBound = {timeLowerBound, v};
+  PosID keyUpperBound = {timeUpperBound, v};
 
   //get a fitting posReport
-  for (std::map<posID,p>::iterator it = posReports.lower_bound(keyLowerBound); it != posReports.upper_bound(keyUpperBound); ++it) {
+  for (std::map<PosID,PosReport>::iterator it = posReports.lower_bound(keyLowerBound); it != posReports.upper_bound(keyUpperBound); ++it) {
     //key
-    posID key = it -> first;
+    PosID key = it -> first;
     //element
-    p posReport = it -> second;
+    PosReport posReport = it -> second;
 
     return posReport;
   }
 
   //automatically assigns the corresponding NULL values to all fields in p
   //if no fitting posReport was found
-  struct p nullStruct = {0};
+  struct PosReport nullStruct = {0};
 
   return nullStruct;
 }
@@ -321,7 +321,7 @@ p Last(int i, VID v, Time t) {
 bool Stop(VID v, Time t, XWay x, Lane l, Pos pos, Dir d) {
 
   for (int i = 1; i <= 4; i++) {
-    p last = Last(i, v, t);
+    PosReport last = Last(i, v, t);
     if ((last.x != x) || (last.l != l) || (last.pos != pos) || (last.d != d)) {
       return false;
     }
@@ -330,10 +330,10 @@ bool Stop(VID v, Time t, XWay x, Lane l, Pos pos, Dir d) {
 }
 
 /* Returns the segment if there was an accident in the segment that is exactly i segments downstream of s, in expressway x and in the travel lanes for direction d during minute m. */
-Seg DetectAccident(p posReport) {
+Seg DetectAccident(PosReport posReport) {
 
   //get accident key
-  accidentID accID = {posReport.x, posReport.s, posReport.v, M(posReport.t), posReport.d};
+  AccidentID accID = {posReport.x, posReport.s, posReport.v, M(posReport.t), posReport.d};
 
   //only insert into accidents, if lane equals 'TRAVEL'
   if (posReport.l != 0 && posReport.l != 4) {
@@ -353,8 +353,8 @@ Seg DetectAccident(p posReport) {
   //if more than one entry, an accident occured
   int numEntriesFound = 0;
   //check if accident occured
-  for (set<accidentID>::iterator it = accidents.begin(); it != accidents.end(); ++it) {
-    accidentID accID = *it;
+  for (set<AccidentID>::iterator it = accidents.begin(); it != accidents.end(); ++it) {
+    AccidentID accID = *it;
 
     //check if entry fits XWay and segment
     //therefore, we need the direction, to either look upstream or downstream
@@ -380,9 +380,9 @@ Seg DetectAccident(p posReport) {
 }
 
 /* Add pos report to map spdOfSegments, used to calculate avg spd. */
-void addToSpeedEntries(p posReport) {
+void addToSpeedEntries(PosReport posReport) {
 
-  segID key = {M(posReport.t), posReport.x, posReport.s, posReport.d};
+  SegID key = {M(posReport.t), posReport.x, posReport.s, posReport.d};
 
   //try to get the current entry for this segment in this minute
   try {
@@ -400,25 +400,25 @@ void addToSpeedEntries(p posReport) {
 
     } catch (const out_of_range& oor) {
       //no entry for this vehicle existed, create new one
-      avgSpd avgSpdEntry = {posReport.spd, 1};
-      (*segMap).insert(pair<VID, avgSpd>(posReport.v, avgSpdEntry));
+      AvgSpd AvgSpdEntry = {posReport.spd, 1};
+      (*segMap).insert(pair<VID, AvgSpd>(posReport.v, AvgSpdEntry));
     }
 
   } catch (const out_of_range& oor) {
     //no entry for this segment in this minute existed
     //create new speed entry
-    avgSpd avgSpdEntry = {posReport.spd, 1};
+    AvgSpd AvgSpdEntry = {posReport.spd, 1};
     //create new segment map value and insert speed entry
-    map<VID,avgSpd> segMap;
-    segMap.insert(pair<VID, avgSpd>(posReport.v, avgSpdEntry));
+    map<VID,AvgSpd> segMap;
+    segMap.insert(pair<VID, AvgSpd>(posReport.v, AvgSpdEntry));
     //insert new seg map
-    spdOfSegments.insert(pair<segID,map<VID,avgSpd>>(key, segMap));
+    spdOfSegments.insert(pair<SegID,map<VID,AvgSpd>>(key, segMap));
   }
 }
 
 /* Specifies the average speed of all vehicles that emitted a position report from segment s of expressway x in direction d during minute m. */
 float Avgs(Minute m, XWay x, Seg s, Dir d) {
-  segID key = {m, x, s, d};
+  SegID key = {m, x, s, d};
   float sumSpeeds = 0.0;
   float numSpeeds = 0.0;
 
@@ -427,9 +427,9 @@ float Avgs(Minute m, XWay x, Seg s, Dir d) {
     //throws an out-of-range exception if element does not exist
     auto segMap = &spdOfSegments.at(key);
     //iterate over map to calculate average speed of all vehicles
-    for (std::map<VID,avgSpd>::iterator it=(*segMap).begin(); it!=(*segMap).end(); ++it) {
+    for (std::map<VID,AvgSpd>::iterator it=(*segMap).begin(); it!=(*segMap).end(); ++it) {
       //spd entry
-      avgSpd spdEntry = it -> second;
+      AvgSpd spdEntry = it -> second;
       //get avg speed and increase counter
       sumSpeeds += static_cast<float>(spdEntry.sum) / static_cast<float>(spdEntry.n);
       numSpeeds += 1.0;
@@ -468,7 +468,7 @@ Spd Lav(Minute m, XWay x, Seg s, Dir d) {
 
 /* Returns the set of all vehicles that emit position reports from segment s on expressway x while traveling in direction d during minute m. */
 int Cars(Minute m, XWay x, Seg s, Dir d) {
-  segID key = {m, x, s, d};
+  SegID key = {m, x, s, d};
   //try to get the current entry for this segment in this minute
   try {
     //throws an out-of-range exception if element does not exist
@@ -525,7 +525,7 @@ int main(int argc, char* argv[]) {
   .where([](auto tp, bool outdated) {
 
     //get posReport from tuple
-    p posReport = {get<1>(tp), get<2>(tp), get<3>(tp), get<4>(tp), get<5>(tp), get<6>(tp), get<7>(tp), get<8>(tp)};
+    PosReport posReport = {get<1>(tp), get<2>(tp), get<3>(tp), get<4>(tp), get<5>(tp), get<6>(tp), get<7>(tp), get<8>(tp)};
 
     if(posReport.t > 12000) {
       cout << "Problem with time: " << posReport.t << endl;
@@ -570,7 +570,7 @@ int main(int argc, char* argv[]) {
         }
 
         //print toll notification
-        tollNote note = {0, posReport.v, posReport.t, globalTimeSeconds, lav, toll};
+        TollNote note = {0, posReport.v, posReport.t, globalTimeSeconds, lav, toll};
 
         //normally, all toll notes would have to be printed
         if (toll > 0) {
@@ -579,7 +579,7 @@ int main(int argc, char* argv[]) {
 
         if (accSegment != -1) {
           //generate accident alert
-          accAlert alert = {1, posReport.t, globalTimeSeconds, accSegment};
+          AccAlert alert = {1, posReport.t, globalTimeSeconds, accSegment};
           printAccidentAlert(alert);
         }
       }

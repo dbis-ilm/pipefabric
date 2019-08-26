@@ -72,6 +72,9 @@ class TxTable : public BaseTable {
   typedef HashMapTable<RecordType, KeyType> Table;
 #endif
 
+  using RType = RecordType;
+  using KType = KeyType;
+
   //< typedef for a predicate evaluated using a scan
   // typedef std::function<bool(const RecordType&)> Predicate;
 
@@ -105,6 +108,12 @@ class TxTable : public BaseTable {
     * Destructor for table.
     */
   ~TxTable() {}
+
+  void transactionBegin(const TransactionID& txID) {}
+
+  void transactionPreCommit(const TransactionID& txID) {
+    transactionCommit(txID);
+  }
 
   void transactionCommit(const TransactionID& txID) {
     // TODO: use a more efficient way (lock per transaction)
@@ -284,6 +293,7 @@ class TxTable : public BaseTable {
   unsigned long size() const { return tbl.size(); }
 
   void drop() { tbl.drop(); }
+  void truncate() { tbl.truncate(); }
 
  private:
   std::mutex tblMtx;

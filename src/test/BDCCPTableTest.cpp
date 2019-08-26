@@ -20,17 +20,16 @@
 #include "catch.hpp"
 #include "fmt/format.h"
 
-#include "core/Tuple.hpp"
 #include "pfabric.hpp"
-#include "table/NVMTable.hpp"
+#include "table/BDCCPTable.hpp"
 
 using namespace pfabric;
 
-using MyTuple = Tuple<int, int, string, double>;
-using TableType = NVMTable<MyTuple, int>;
+using MyTuple = pfabric::Tuple<int, int, string, double>;
+using TableType = Table<MyTuple, int>;
 
 TEST_CASE("Creating a table with a given schema and inserting data",
-          "[NVMTable]") {
+          "[BDCCPTable]") {
   auto testTable = std::make_shared<TableType>("MyTestTable1");
   for (int i = 0; i < 10000; i++) {
     auto tp = MyTuple((unsigned long) i, i + 100, fmt::format("String#{}", i), i / 100.0);
@@ -50,7 +49,7 @@ TEST_CASE("Creating a table with a given schema and inserting data",
 
 
 TEST_CASE("Creating a table with a given schema and deleting data",
-          "[NVMTable]") {
+          "[BDCCPTable]") {
   auto testTable = std::make_shared<TableType>("MyTestTable2");
   for (int i = 0; i < 10000; i++) {
     auto tp = MyTuple((unsigned long)i, i + 100, fmt::format("String#{}", i),
@@ -75,7 +74,7 @@ TEST_CASE("Creating a table with a given schema and deleting data",
   testTable->drop();
 }
 
-TEST_CASE("scanning the whole table", "[NVMTable]") {
+TEST_CASE("scanning the whole table", "[BDCCPTable]") {
   auto testTable = std::make_shared<TableType>("MyTestTable7");
   for (int i = 0; i < 10000; i++) {
     auto tp = MyTuple((unsigned long)i, i + 100, fmt::format("String#{}", i),
@@ -92,7 +91,7 @@ TEST_CASE("scanning the whole table", "[NVMTable]") {
   testTable->drop();
 }
 
-TEST_CASE("scanning the table with a predicate", "[NVMTable]") {
+TEST_CASE("scanning the table with a predicate", "[BDCCPTable]") {
   auto testTable = std::make_shared<TableType>("MyTestTable8");
   for (int i = 0; i < 10000; i++) {
     auto tp = MyTuple((unsigned long)i, i + 100, fmt::format("String#{}", i),

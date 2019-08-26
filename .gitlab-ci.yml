@@ -11,7 +11,7 @@ build:
   script:
     - mkdir build
     - cd build
-    - cmake -DCMAKE_BUILD_TYPE=Release ../src
+    - cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TEST_CASES=ON ../src
     - make
     # clean up unnecessary files and strip binaries
     - rm -rf *-src  *-download *-build 3rdparty
@@ -33,6 +33,8 @@ test:
 
 coverage:
   stage: build
+  only:
+    - master
   tags: 
     - grouprunner
   script:
@@ -40,7 +42,7 @@ coverage:
     - pip install gcovr --user
     - mkdir build
     - cd build
-    - cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-g -O0 -fprofile-arcs -ftest-coverage" ../src
+    - cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-g -O0 -fprofile-arcs -ftest-coverage" -DBUILD_TEST_CASES=ON ../src
     - make
     - ctest
     - ~/.local/bin/gcovr -r .. --exclude 3rdparty --exclude '(.+/)?catch\.hpp$'

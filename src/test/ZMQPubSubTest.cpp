@@ -63,15 +63,14 @@ TEST_CASE("Transfer a binary tuple stream via ZMQ", "[ZMQSource][ZMQSink]") {
 	CREATE_DATA_LINK(src, deserializer);
 	CREATE_DATA_LINK(deserializer, mockup);
 
-	using namespace std::chrono_literals;
-	std::this_thread::sleep_for(2s);
+	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
 	auto handle = std::async(std::launch::async, [&mockup](){
 		mockup->start();
 	});
 
   handle.get();
-  std::this_thread::sleep_for(2s);
+	std::this_thread::sleep_for(std::chrono::milliseconds(100));
   src->stop();
   REQUIRE(mockup->numTuplesProcessed() == numTuples);
 }

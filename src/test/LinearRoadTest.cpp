@@ -19,11 +19,7 @@
 
 #include "catch.hpp"
 
-#include "core/Tuple.hpp"
-
-#include "dsl/Topology.hpp"
-#include "dsl/Pipe.hpp"
-#include "dsl/PFabricContext.hpp"
+#include "pfabric.hpp"
 
 using namespace pfabric;
 
@@ -50,8 +46,7 @@ TEST_CASE("Running the linear road producer with sample file", "[LinearRoad]") {
   auto t = ctx.createTopology();
 
   std::vector<int> res;
-
-  auto s = t->newStreamFromLinRoad<lrTuples>("../3rdparty/linroad/data/datafile20seconds.dat")
+  auto s = t->newStreamFromLinRoad<lrTuples>(pfabric::gDataPath + "linroad/datafile20seconds.dat")
     .notify([&res](auto tp, bool outdated) {
       int v = get<0>(tp);
       res.push_back(v);

@@ -47,6 +47,8 @@ typedef TuplePtr<TransactionID, uint_t, std::string, double> AccountPtr;
 // AccountID, CustomerName, Balance
 typedef TuplePtr<uint_t, std::string, double> ResultPtr;
 
+using TableType = TxTable<AccountPtr::element_type, uint_t>;
+
 // A state class for chopping the data stream into transactions
 struct TxState {
   TxState() : lastTx(0) {}
@@ -80,19 +82,19 @@ int main(int argc, char **argv) {
     if (self.state()->lastTx == 0)
       // we received the first tuple - let's begin a new transaction
       self.publishPunctuation(
-          std::make_shared<Punctuation>(Punctuation::TxBegin, txID, 0));
+          std::make_shared<Punctuation>(Punctuation::TxBegin, txID, Timestamp(0)));
     else if (self.state()->lastTx != txID) {
       // we start a new transaction but first commit the previous one
       std::cout << "Commit of tx #" << self.state()->lastTx << std::endl;
       self.publishPunctuation(std::make_shared<Punctuation>(
-          Punctuation::TxCommit, self.state()->lastTx, 0));
+          Punctuation::TxCommit, self.state()->lastTx, Timestamp(0)));
       self.state()->lastTx = txID;
 
       // we wait 10 seconds to run another query concurrently
       using namespace std::chrono_literals;
       std::this_thread::sleep_for(10s);
       self.publishPunctuation(
-          std::make_shared<Punctuation>(Punctuation::TxBegin, txID, 0));
+          std::make_shared<Punctuation>(Punctuation::TxBegin, txID, Timestamp(0)));
     }
     self.state()->lastTx = txID;
     return tp;
@@ -105,7 +107,7 @@ int main(int argc, char **argv) {
                .statefulMap<AccountPtr, TxState>(txChopping)
                .assignTransactionID([](auto tp) { return get<0>(tp); })
                .keyBy<1, uint_t>()
-               .toTxTable<uint_t>(accountTable);
+               .toTxTable<TableType>(accountTable);
   t1->start();
 
   /* --- Topology #2: Every 5 seconds print out the accounts table --- */

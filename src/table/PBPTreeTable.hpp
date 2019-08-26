@@ -17,8 +17,8 @@
  * along with PipeFabric. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef NVMTable_hpp_
-#define NVMTable_hpp_
+#ifndef PBPTreeTable_hpp_
+#define PBPTreeTable_hpp_
 
 #include <iostream>
 #include <vector>
@@ -26,7 +26,7 @@
 #include <functional>
 #include <exception>
 #include <iterator>
-#include <stdint.h>
+#include <cstdint>
 #include <unistd.h>
 #include <cstdio>
 #include <type_traits>
@@ -34,16 +34,15 @@
 #include <boost/signals2.hpp>
 
 #include <libpmemobj++/make_persistent.hpp>
-#include <libpmemobj++/p.hpp>
 #include <libpmemobj++/persistent_ptr.hpp>
 #include <libpmemobj++/pool.hpp>
 #include <libpmemobj++/transaction.hpp>
 #include <libpmemobj++/utils.hpp>
 #include <libpmempool.h>
 
-#include "fmt/format.h"
-#include "PTable.hpp"
+#include "pbptree/PBPTree.hpp"
 
+#include "pfabric_config.h"
 #include "core/Tuple.hpp"
 #include "table/TableException.hpp"
 #include "table/BaseTable.hpp"
@@ -51,110 +50,43 @@
 
 namespace pfabric {
 
-//TODO: Maybe the pmem device path prefix should be a CMake variable?
-const std::string pathPrefix = "/mnt/pmem/test/";
-
-namespace detail {
-
-struct GetType {
-  template<typename T>
-  static auto apply(T &t) {
-    return ColumnInfo::Void_Type;
-  }
-};
-
-template<>
-inline auto GetType::apply<int>(int &t) {
-  return ColumnInfo::Int_Type;
-}
-
-template<>
-inline auto GetType::apply<double>(double &t) {
-  return ColumnInfo::Double_Type;
-}
-
-template<>
-inline auto GetType::apply<std::string>(std::string &t) {
-  return ColumnInfo::String_Type;
-}
-
-template<class Tuple, std::size_t CurrentIndex>
-struct TupleTypes;
-
-template<class Tuple, std::size_t CurrentIndex>
-struct TupleTypes {
-  static void apply(Tuple tp, std::vector<ColumnInfo> &cols) {
-    TupleTypes<Tuple, CurrentIndex - 1>::apply(tp, cols);
-    auto type = GetType::apply(std::get<CurrentIndex - 1>(tp));
-    cols.push_back(ColumnInfo("", type));
-  }
-};
-
-template<class Tuple>
-struct TupleTypes<Tuple, 1> {
-  static void apply(Tuple tp, std::vector<ColumnInfo> &cols) {
-    auto type = GetType::apply(std::get<0>(tp));
-    cols.push_back(ColumnInfo("", type));
-  }
-};
-
-template<class Tuple>
-TableInfo constructSchema(const std::string &tableName) {
-  typedef typename Tuple::Base Base;
-  Base t; // create default initialized std::tuple
-
-  std::vector<ColumnInfo> cols;
-  detail::TupleTypes<Base, std::tuple_size<Base>::value>::apply(t, cols);
-  TableInfo tInfo(tableName);
-  tInfo.setColumns(cols);
-  return tInfo;
-}
-
-template<typename T>
-struct is_tuple_impl : std::false_type {};
-template<typename... Ts>
-struct is_tuple_impl<pfabric::Tuple<Ts...>> : std::true_type {};
-template<typename T>
-struct is_tuple : is_tuple_impl<std::decay_t<T>> {};
-
-} /* namespace detail */
+constexpr auto poolSize = 1024 * 1024 *1024; ///< 1GB
+constexpr auto BRANCHSIZE = 32;
+constexpr auto LEAFSIZE = 16;
 
 using pmem::obj::delete_persistent;
 using pmem::obj::make_persistent;
-using pmem::obj::p;
 using pmem::obj::persistent_ptr;
 using pmem::obj::pool;
 using pmem::obj::transaction;
-using dbis::ptable::PTable;
-using dbis::ptable::PTuple;
+using dbis::pbptree::PBPTree;
 
 template<typename KeyType, typename RecordType>
-class NVMIterator {
+class PBPTreeIterator {
  public:
-  static_assert(detail::is_tuple<RecordType>::value, "Value type must be a pfabric::Tuple");
+  static_assert(is_tuple<RecordType>::value, "Value type must be a pfabric::Tuple");
   using TupleType = typename RecordType::Base;
-//  using Predicate = std::function<bool(const PTuple<TupleType, KeyType> &)>;
   using Predicate = std::function<bool(const RecordType &)>;
-  using PTableType = PTable<KeyType, TupleType>;
+  using PBTreeType = PBPTree<KeyType, TupleType, BRANCHSIZE, LEAFSIZE>;
 
-  explicit NVMIterator() {
+  explicit PBPTreeIterator() {
   }
 
-  explicit NVMIterator(typename PTableType::iterator &&_iter, typename PTableType::iterator &&_end, Predicate _pred) :
+  explicit PBPTreeIterator(typename PBTreeType::iterator &&_iter, typename PBTreeType::iterator &&_end, Predicate _pred) :
     iter(std::move(_iter)), end(std::move(_end)), pred(_pred) {
 
-    while (isValid() && !pred(*(*iter).createTuple()))
+    while (isValid() && !pred((*iter).second))
       iter++;
   }
 
-  NVMIterator &operator++() {
+  PBPTreeIterator &operator++() {
     iter++;
-    while (isValid() && !pred(*(*iter).createTuple()))
+    while (isValid() && !pred((*iter).second))
       iter++;
     return *this;
   }
 
-  NVMIterator operator++(int) {
+  PBPTreeIterator operator++(int) {
     auto tmp = *this;
     ++(*this);
     return tmp;
@@ -165,28 +97,28 @@ class NVMIterator {
   }
 
   SmartPtr<RecordType> operator*() {
-    SmartPtr<RecordType> tptr(new RecordType(*(*iter).createTuple()));
+    SmartPtr<RecordType> tptr(new RecordType((*iter).second));
     return tptr; //TODO: Is this to expensive?
   }
 
  protected:
   // PTable Iterator
-  typename PTableType::iterator iter, end;
+  typename PBTreeType::iterator iter, end;
   // Selection predicate
   Predicate pred;
 
 };
 
 template<typename KeyType, typename RecordType>
-inline NVMIterator<KeyType, RecordType> makeNVMIterator(
-  typename PTable<KeyType, typename RecordType::Base>::iterator &&iter,
-  typename PTable<KeyType, typename RecordType::Base>::iterator &&end,
-  typename NVMIterator<KeyType, RecordType>::Predicate pred) {
-  return NVMIterator<KeyType, RecordType>(std::move(iter), std::move(end), pred);
+inline PBPTreeIterator<KeyType, RecordType> makePBPTreeIterator(
+  typename PBPTree<KeyType, typename RecordType::Base, BRANCHSIZE, LEAFSIZE>::iterator &&iter,
+  typename PBPTree<KeyType, typename RecordType::Base, BRANCHSIZE, LEAFSIZE>::iterator &&end,
+  typename PBPTreeIterator<KeyType, RecordType>::Predicate pred) {
+  return PBPTreeIterator<KeyType, RecordType>(std::move(iter), std::move(end), pred);
 }
 
 /**************************************************************************//**
- * \brief NVMTable is a class for storing a relation of tuples of the same type.
+ * \brief PBPTreeTable is a class for storing a relation of tuples of the same type.
  *
  * Table implements a relational table for storing tuples of a given type
  * \c RecordType which are indexed by the key of type \c KeyType.
@@ -199,14 +131,14 @@ inline NVMIterator<KeyType, RecordType> makeNVMIterator(
  *         the data type of the key column (default = int)
  *****************************************************************************/
 template<typename RecordType, typename KeyType = DefaultKeyType>
-class NVMTable : public BaseTable {
+class PBPTreeTable : public BaseTable {
  public:
-  static_assert(detail::is_tuple<RecordType>::value, "Value type must be a pfabric::Tuple");
+  static_assert(is_tuple<RecordType>::value, "Value type must be a pfabric::Tuple");
   using TupleType = typename RecordType::Base;
-  using PTableType = PTable<KeyType, TupleType>;
+  using PBTreeType = PBPTree<KeyType, TupleType, BRANCHSIZE, LEAFSIZE>;
 
   struct root {
-    persistent_ptr<PTableType> pTable;
+    persistent_ptr<PBTreeType> btree;
   };
 
   /** typedef for a updater function which returns a modification of the parameter tuple */
@@ -218,11 +150,13 @@ class NVMTable : public BaseTable {
    **/
   using UpdelFunc = std::function<bool(RecordType &)>;
 
+  using InsertFunc = std::function<RecordType()>;
+
   /** typedef for a callback function which is invoked when the table was updated */
   using ObserverCallback = boost::signals2::signal<void(const RecordType &, TableParams::ModificationMode)>;
 
   /** typedef for an iterator to scan the table */
-  using TableIterator = NVMIterator<KeyType, RecordType>;
+  using TableIterator = PBPTreeIterator<KeyType, RecordType>;
 
   /** typedef for a predicate evaluated using a scan: see \TableIterator for details */
   using Predicate = typename TableIterator::Predicate;
@@ -230,14 +164,14 @@ class NVMTable : public BaseTable {
   /************************************************************************//**
    * \brief Constructor for creating an empty table with only a given name.
    *****************************************************************************/
-  NVMTable(const std::string &tableName) : BaseTable(detail::constructSchema<RecordType>(tableName)) {
-    openOrCreateTable(detail::constructSchema<RecordType>(tableName));
+  PBPTreeTable(const std::string &tableName) : BaseTable(constructSchema<RecordType>(tableName)) {
+    openOrCreateTable(constructSchema<RecordType>(tableName));
   }
 
   /************************************************************************//**
    * \brief Constructor for creating an empty table with a given schema.
    *****************************************************************************/
-  NVMTable(const TableInfo &tInfo) :
+  PBPTreeTable(const TableInfo &tInfo) :
     BaseTable(tInfo) {
     openOrCreateTable(tInfo);
   }
@@ -245,7 +179,7 @@ class NVMTable : public BaseTable {
   /************************************************************************//**
    * \brief Destructor for table.
    *****************************************************************************/
-  ~NVMTable() {
+  ~PBPTreeTable() {
     // pop.close();
   }
 
@@ -259,7 +193,7 @@ class NVMTable : public BaseTable {
    * \param rec the actual tuple
    *****************************************************************************/
   void insert(KeyType key, const RecordType &rec) noexcept(false) {
-    pTable->insert(key, rec.data());
+    btree->insert(key, rec.data());
     notifyObservers(rec, TableParams::Insert, TableParams::Immediate);
   }
 
@@ -273,7 +207,7 @@ class NVMTable : public BaseTable {
    * \return the number of deleted tuples
    *****************************************************************************/
   unsigned long deleteByKey(KeyType key) {
-    return pTable->deleteByKey(key);
+    return btree->erase(key);
   }
 
   /************************************************************************//**
@@ -352,12 +286,12 @@ class NVMTable : public BaseTable {
    *****************************************************************************/
   const SmartPtr<RecordType> getByKey(KeyType key) noexcept(false) {
     //TODO: ugly, can we do better?
-    try {
-      SmartPtr<RecordType> tptr(new RecordType(*pTable->getByKey(key).createTuple()));
-      return tptr;
-    } catch (dbis::ptable::PTableException &pex) {
-      throw TableException(pex.what());
+    TupleType tt;
+    if(btree->lookup(key, &tt)) {
+      return new RecordType(tt);
     }
+
+    else throw TableException("Key not found: " + key);
   }
 
   /************************************************************************//**
@@ -379,7 +313,7 @@ class NVMTable : public BaseTable {
    * \return a pair of iterators
    *****************************************************************************/
   TableIterator select(Predicate func) {
-    return makeNVMIterator<KeyType, RecordType>(std::move(pTable->begin()), std::move(pTable->end()), func);
+    return makePBPTreeIterator<KeyType, RecordType>(std::move(btree->begin()), std::move(btree->end()), func);
   }
 
   /************************************************************************//**
@@ -397,7 +331,7 @@ class NVMTable : public BaseTable {
    *****************************************************************************/
   TableIterator select() {
     auto alwaysTrue = [](const RecordType &) { return true; };
-    return makeNVMIterator<KeyType, RecordType>(std::move(pTable->begin()), std::move(pTable->end()), alwaysTrue);
+    return makePBPTreeIterator<KeyType, RecordType>(std::move(btree->begin()), std::move(btree->end()), alwaysTrue);
   }
 
   /************************************************************************//**
@@ -406,7 +340,10 @@ class NVMTable : public BaseTable {
    * \return the number of tuples
    *****************************************************************************/
   unsigned long size() const {
-    return pTable->count();
+    //TODO: Maybe there is a more efficient way
+    auto cnt = 0u;
+    for(auto e: *btree) cnt++;
+    return cnt;
   }
 
   /************************************************************************//**
@@ -430,41 +367,46 @@ class NVMTable : public BaseTable {
   void drop() {
     auto pop = pool_by_pptr(q);
     transaction::run(pop, [&] {
-      delete_persistent<PTableType>(pTable);
-      pTable = nullptr;
+      delete_persistent<PBTreeType>(q->btree);
+      q->btree = nullptr;
       delete_persistent<root>(q);
       q = nullptr;
     });
     pop.close();
-    pmempool_rm((pathPrefix + BaseTable::mTableInfo->tableName() + ".db").c_str(), 1);
-    //std::remove((BaseTable::mTableInfo->tableName()+".db").c_str());
+    //pmempool_rm((pfabric::gPmemPath + BaseTable::mTableInfo->tableName() + ".db").c_str(), 1);
+    std::remove((BaseTable::mTableInfo->tableName()+".db").c_str());
+  }
+
+  void truncate() {
+    auto pop = pool_by_pptr(q);
+    transaction::run(pop, [&] {
+      delete_persistent<PBTreeType>(q->btree);
+      q->btree = make_persistent<PBTreeType>();
+      btree = q->btree;
+    });
+  
   }
 
   void print() {
-    pTable->print(false);
+    btree->print(false);
   }
 
  private:
   void openOrCreateTable(const TableInfo &tableInfo) noexcept(false) {
-    const std::string path = pathPrefix + tableInfo.tableName() + ".db";
+    const std::string path = pfabric::gPmemPath + tableInfo.tableName() + ".db";
     pool<root> pop;
 
     if (access(path.c_str(), F_OK) != 0) {
       //TODO: How do we estimate the required pool size
-      pop = pool<root>::create(path, dbis::ptable::LAYOUT, 64 * 1024 * 1024);
+      pop = pool<root>::create(path, "PBPTree", poolSize);
       transaction::run(pop, [&] {
-          dbis::ptable::StringVector sVector;
-        for (const auto &c : tableInfo) {
-          sVector.emplace_back(c.getName());
-        }
-        dbis::ptable::VTableInfo<KeyType, TupleType> vTableInfo(tableInfo.tableName(), std::move(sVector));
-        pop.root()->pTable = make_persistent<PTableType>(std::move(vTableInfo));
+        pop.root()->btree = make_persistent<PBTreeType>();
       });
     } else {
-      pop = pool<root>::open(path, dbis::ptable::LAYOUT);
+      pop = pool<root>::open(path, "PBPTree");
     }
     q = std::move(pop.root());
-    pTable = q->pTable;
+    btree = (q->btree); ///< retrieve volatile address of btree
   }
 
   /************************************************************************//**
@@ -487,11 +429,11 @@ class NVMTable : public BaseTable {
   }
 
   persistent_ptr<struct root> q;
-  persistent_ptr<PTableType> pTable;
+  persistent_ptr<PBTreeType> btree;
   ObserverCallback mImmediateObservers, mDeferredObservers;
 
-}; /* class NVMTable */
+}; /* class PBPTreeTable */
 
 } /* namespace pfabric */
 
-#endif /* NVMTable_hpp_ */
+#endif /* PBPTreeTable_hpp_ */

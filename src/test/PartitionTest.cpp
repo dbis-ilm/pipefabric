@@ -99,7 +99,7 @@ TEST_CASE("Partitioning a data stream and merging the results.",
   mockup->start();
 
   using namespace std::chrono_literals;
-  std::this_thread::sleep_for(1s);
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
   REQUIRE(mockup->numTuplesProcessed() == numTuples / 2);
 }

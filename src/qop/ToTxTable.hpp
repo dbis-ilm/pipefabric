@@ -34,29 +34,31 @@ namespace pfabric {
    * of the key value, the tuple is newly inserted or an existing tuple is
    * updated.
    *
+   * @tparam TableType
+   *    the type of the underlying transactional table
    * @tparam StreamElement
    *    the data stream element type which shall be stored in the table
-   * @tparam KeyType
-   *    the data type of the key for identifying tuples in the table
    */
   template<
-    typename StreamElement,
-    typename KeyType = DefaultKeyType
+    typename TableType,
+    typename StreamElement
   >
   class ToTxTable : public UnaryTransform<StreamElement, StreamElement> {
   private:
     PFABRIC_UNARY_TRANSFORM_TYPEDEFS(StreamElement, StreamElement);
+    using KeyType = typename TableType::KType;
 
   public:
-    //< Typedef for a pointer to the table.
-    typedef std::shared_ptr<TxTable<typename StreamElement::element_type, KeyType>> TablePtr;
+    /** Alias for a pointer to the table. */
+    using TablePtr = std::shared_ptr<TableType>;
 
-    //< the function for deriving the key of an incoming stream element
-  	typedef std::function< KeyType(const StreamElement&) > KeyFunc;
+    /** the function for deriving the key of an incoming stream element */
+    using KeyFunc = std::function<KeyType(const StreamElement&)>;
 
-    //< the function for deriving the TransactionID of an incoming stream element
-  	typedef std::function< TransactionID(const StreamElement&) > TxIDFunc;
-  /**
+    /** the function for deriving the TransactionID of an incoming stream element */
+    using TxIDFunc = std::function<TransactionID(const StreamElement&)>;
+ 
+    /**
      * Create a new ToTable operator to store incoming tuples in the
      * given table.
      *
@@ -91,9 +93,11 @@ namespace pfabric {
      */
     void processPunctuation(const PunctuationPtr& punctuation) {
       if (punctuation->ptype() == Punctuation::TxCommit)
-        mTable->transactionCommit(boost::any_cast<TransactionID>(punctuation->data()));
+        mTable->transactionPreCommit(boost::any_cast<TransactionID>(punctuation->data()));
       else if (punctuation->ptype() == Punctuation::TxAbort)
         mTable->transactionAbort(boost::any_cast<TransactionID>(punctuation->data()));
+      else if (punctuation->ptype() == Punctuation::TxBegin)
+        mTable->transactionBegin(boost::any_cast<TransactionID>(punctuation->data()));
 
       this->getOutputPunctuationChannel().publish(punctuation);
     }

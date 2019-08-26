@@ -153,7 +153,7 @@ public:
 	 * send a string by this socket
 	 * @param string a string to be sent
 	 */
-	bool sendString(const std::string &string);
+  int sendString(const std::string &string);
 	/**
 	 * receive a string from this socket
 	 * @param string a string to store the result
@@ -164,9 +164,9 @@ public:
 	 * @param buf a buffer to be sent
 	 * @param len the length of the buffer
 	 */
-	bool sendBuffer(char *buf, int len);
+	int sendBuffer(char *buf, int len);
 
-	bool sendBuffer(const std::vector<uint8_t>& buf);
+  int sendBuffer(const std::vector<uint8_t>& buf);
 
 	/**
 	 * configure (create) the socket according to its path and type

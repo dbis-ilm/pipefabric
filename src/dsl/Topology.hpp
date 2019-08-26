@@ -39,8 +39,10 @@
 #include "qop/MemorySource.hpp"
 #include "qop/ToTable.hpp"
 #include "qop/FromTable.hpp"
+#include "qop/FromTxTables.hpp"
 #include "qop/SelectFromTable.hpp"
 #include "qop/SelectFromTxTable.hpp"
+#include "qop/SelectFromMVCCTable.hpp"
 #include "qop/StreamGenerator.hpp"
 #ifdef SUPPORT_MATRICES
   #include "qop/FromMatrix.hpp"
@@ -162,6 +164,9 @@ namespace pfabric {
      *  the period of time between two invocations
      */
     void runEvery(unsigned long secs);
+
+    void cleanStartupFunctions();
+    void stopThreads();
 
     /**
      * @brief Waits until the execution of the topology stopped.
@@ -385,6 +390,26 @@ namespace pfabric {
       registerStartupFunction([=]() -> unsigned long { return op->start(); });
       return Pipe<T>(dataflow, dataflow->addPublisher(op));
     }
+
+    template<typename T, typename KeyType = DefaultKeyType>
+    Pipe<T> selectFromMVCCTable(
+      std::shared_ptr<MVCCTable<typename T::element_type, KeyType>> tbl,
+      std::atomic<TransactionID>& aCnter,
+      typename MVCCTable<typename T::element_type,
+                         KeyType>::Predicate pred = nullptr) {
+      auto op = std::make_shared<SelectFromMVCCTable<T, KeyType>>(tbl, aCnter, pred);
+      registerStartupFunction([=]() -> unsigned long { return op->start(); });
+      return Pipe<T>(dataflow, dataflow->addPublisher(op));
+    }
+
+    template<typename TableType, typename T, size_t TxSize>
+    Pipe<T> fromTxTables(StateContext<TableType>& sCtx) {
+      auto op = std::make_shared<FromTxTables<TableType, T, TxSize>>(sCtx);
+      registerStartupFunction([=]() -> unsigned long { return op->start(); });
+      return Pipe<T>(dataflow, dataflow->addPublisher(op));
+    }
+
+
     /**
      * @brief Create a StreamGenerator operator as data source.
      *

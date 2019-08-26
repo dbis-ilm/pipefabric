@@ -5,7 +5,7 @@ PipeFabric relies on several open source components which have to be installed b
 
  + [CMake](https://cmake.org/) 3.2 (or newer) build environment
  + [Boost](http://www.boost.org/) 1.61 (or newer) C++ libraries (build all libraries)
- + [ZeroMQ](http://zeromq.org/) socket library (including [zmq.hpp](https://github.com/zeromq/cppzmq/blob/master/zmq.hpp))
+ + [ZeroMQ](http://zeromq.org/) 4.3.1 (or newer) socket library (including [zmq.hpp](https://github.com/zeromq/cppzmq/blob/master/zmq.hpp))
  + JeMalloc or TCMalloc library (optional)
 
 There are some additional 3rd party libraries such as [Catch](https://github.com/philsquared/Catch) for testing, 

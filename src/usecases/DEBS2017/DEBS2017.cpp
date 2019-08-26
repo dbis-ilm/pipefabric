@@ -53,7 +53,7 @@ long long anomalies_found = 0;
  */
 
 //metadata location and dataset file
-std::string metadata_loc = "./3rdparty/DEBS2017/data_10M/molding_machine_10M.metadata.nt";
+std::string metadata_loc = pfabric::gDataPath + "DEBS2017/data_10M/molding_machine_10M.metadata.nt";
 
 //the structure of tuples we receive after extract as well as tuplifying
 typedef TuplePtr<std::string, std::string, std::string> Triple;
@@ -112,7 +112,7 @@ inline void streamMetadata() {
  */
 
 //input data location and dataset file
-std::string inputdata_loc = "./3rdparty/DEBS2017/data_10M/molding_machine_10M.nt";
+std::string inputdata_loc = pfabric::gDataPath + "DEBS2017/data_10M/molding_machine_10M.nt";
 
 //the structure of a tuple after RDF processing input data stream
 typedef TuplePtr<std::string, std::string, std::string, std::string, std::string> Input_tp;
@@ -123,7 +123,7 @@ typedef TuplePtr<int, int, std::string, std::string, Timestamp, int, double, std
 struct InputState {
   //constructor
   InputState() : valueDouble(0.0), thresholdNumber(0.0), property_cnt(0), passTuple(0), hasMetadata(0),
-    numberOfClusters(0), metadataIDString(""), timestamp_str(""), observation(""), value(""), timestamp(0.0) {
+    numberOfClusters(0), metadataIDString(""), timestamp_str(""), observation(""), value(""), timestamp(0) {
   }
 
   double valueDouble; //stores current input value

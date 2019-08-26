@@ -39,6 +39,10 @@ void Topology::registerStartupFunction(StartupFunc func) {
   startupList.push_back(func);
 }
 
+void Topology::cleanStartupFunctions() {
+  startupFutures.clear();
+}
+
 void Topology::registerPrepareFunction(StartupFunc func) {
   prepareList.push_back(func);
 }
@@ -83,10 +87,21 @@ void Topology::wait() {
 void Topology::runEvery(unsigned long secs) {
   wakeupTimers.push_back(boost::thread([this, secs](){
         while(true) {
-          boost::this_thread::sleep_for(boost::chrono::seconds(secs));
+          boost::this_thread::sleep_for(boost::chrono::nanoseconds(secs));
           this->start(false);
         }
   }));
+}
+
+void Topology::stopThreads() {
+  if (!wakeupTimers.empty()) {
+    for (auto &thr : wakeupTimers) {
+      thr.interrupt();
+    }
+    for (auto &thr : wakeupTimers) {
+      thr.join();
+    }
+  }
 }
     
 Pipe<TStringPtr> Topology::newStreamFromFile(const std::string& fname, unsigned long limit) {

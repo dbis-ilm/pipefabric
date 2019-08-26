@@ -94,7 +94,7 @@ TEST_CASE("Building and running a topology with partitioned aggregation",
 
   t.start(false);
 
-  std::this_thread::sleep_for(2s);
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
   REQUIRE(results.size() == num);
 }

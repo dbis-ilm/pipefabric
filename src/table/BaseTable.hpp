@@ -34,8 +34,6 @@
 #include "table/TableInfo.hpp"
 #include "table/TableException.hpp"
 
-#include "fmt/format.h"
-
 namespace pfabric {
 
 /**
