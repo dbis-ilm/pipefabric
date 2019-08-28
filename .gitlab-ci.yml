@@ -12,7 +12,7 @@ build:
     - mkdir build
     - cd build
     - cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TEST_CASES=ON ../src
-    - make
+    - make -j 3
     # clean up unnecessary files and strip binaries
     - rm -rf _deps generated
     - strip test/*Test
@@ -43,7 +43,7 @@ coverage:
     - mkdir build
     - cd build
     - cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-g -O0 -fprofile-arcs -ftest-coverage" -DBUILD_TEST_CASES=ON ../src
-    - make
+    - make -j 3
     - ctest
     - ~/.local/bin/gcovr -r .. --exclude 3rdparty --exclude '(.+/)?catch\.hpp$'
   coverage: '/^TOTAL.*\s+(\d+\%)$/'
