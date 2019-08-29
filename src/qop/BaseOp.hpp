@@ -21,8 +21,12 @@
 #define BaseOp_hpp_
 
 #include <string>
+#include "core/Tuple.hpp"
 
 namespace pfabric {
+
+  using TString = Tuple<StringRef>;       ///< a tuple containing a line of text
+  using TStringPtr = TuplePtr<StringRef>; ///< a tuple pointer
 
 /**
  * @brief BaseOp represents a common base class for all parameterizable query operators.

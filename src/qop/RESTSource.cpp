@@ -17,9 +17,7 @@
  * along with PipeFabric. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "SimpleWeb/server_http.hpp"
 #include "RESTSource.hpp"
-#include "core/Tuple.hpp"
 
 using namespace pfabric;
 

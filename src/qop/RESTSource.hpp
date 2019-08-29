@@ -20,18 +20,12 @@
 #ifndef RESTSource_hpp_
 #define RESTSource_hpp_
 
-#include <iostream>
-#include <fstream>
-#include <memory>
-#include <mutex>
-
 #include "core/Punctuation.hpp"
 #include "core/Tuple.hpp"
-#include "qop/DataSource.hpp"
 #include "pubsub/channels/ConnectChannels.hpp"
 #include "qop/BaseOp.hpp"
+#include "qop/DataSource.hpp"
 #include "qop/OperatorMacros.hpp"
-#include "qop/TextFileSource.hpp"
 #include "SimpleWeb/server_http.hpp"
 
 namespace pfabric {

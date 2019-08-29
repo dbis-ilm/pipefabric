@@ -20,10 +20,10 @@
 #ifndef DataSource_hpp_
 #define DataSource_hpp_
 
-#include "qop/BaseOp.hpp"
 #include "core/StreamElementTraits.hpp"
-#include "pubsub/Source.hpp"
+#include "qop/BaseOp.hpp"
 #include "pubsub/signals/DefaultSourceSignal.hpp"
+#include "pubsub/Source.hpp"
 
 
 namespace pfabric {
