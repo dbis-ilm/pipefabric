@@ -20,8 +20,9 @@
 #ifndef STRINGREF_HPP_
 #define STRINGREF_HPP_
 
-namespace pfabric {
+#include <string>
 
+namespace pfabric {
 
 /**
  * TODO docs
@@ -65,9 +66,13 @@ struct StringRef {
 	int size_;
 };
 
+inline bool operator==(const StringRef &a, const StringRef &b) {
+  //TODO: Should this be based on pointer and size or content?
+  std::string s1 (a.begin_, a.size_);
+  std::string s2 (b.begin_, b.size_);
+  return (s1 == s2);
+}
 
 } /* end namespace pfabric */
-
-
 
 #endif /* STRINGREF_HPP_ */
