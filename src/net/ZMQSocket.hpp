@@ -86,6 +86,10 @@ private:
 	 */
 	std::string mSocketPath;
 	/**
+	 * the path of the socket where the synchronization will be done
+	 */
+	std::string mSocketSyncPath;
+	/**
 	 * socket type whether publisher ZMQ_PUB, subscriber ZMQ_SUB, requester ZMQ_REQ or replier ZMQ_REP
 	 */
 	int mSocketType;
@@ -93,6 +97,10 @@ private:
 	 * the created socket
 	 */
 	zmq::socket_t * mZMQSockPtr;
+	/**
+	 * the created sync socket (possibly nullptr)
+	 */
+	zmq::socket_t * mZMQSyncSockPtr;
 	/**
 	 * socket context
 	 */
@@ -108,7 +116,7 @@ public:
 	/**
 	 * constructor to create the socket according to its path and type
 	 */
-	ZMQSocket(const std::string& path, int type, short value = '\0', size_t len = 0,
+	ZMQSocket(const std::string& path, const std::string& synPath, int type, short value = '\0', size_t len = 0,
 				const std::string& name = "");
 	/**
 	 * destructor

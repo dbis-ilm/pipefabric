@@ -26,9 +26,9 @@
 using namespace pfabric;
 using namespace pfabric::sock;
 
-ZMQSocket::ZMQSocket(const std::string& path, int type, short value, size_t len,
+ZMQSocket::ZMQSocket(const std::string& path, const std::string& syncPath, int type, short value, size_t len,
     const std::string& name) :
-  mSocketName(name), mSocketPath(path), mSocketType(type), value(value) {
+  mSocketName(name), mSocketPath(path), mSocketSyncPath(syncPath), mSocketType(type), value(value) {
     mCtxPtr = new zmq::context_t(1);
     configureSocket(len);
   }
@@ -60,6 +60,8 @@ void ZMQSocket::setSocketType(int socket_type) {
 ZMQSocket::~ZMQSocket() {
   if (mZMQSockPtr)
     delete mZMQSockPtr;
+  if (mSocketSyncPath != "")
+    delete mZMQSyncSockPtr;
   if (mCtxPtr)
     delete mCtxPtr;
 }
@@ -68,11 +70,18 @@ void ZMQSocket::configureSocket(size_t len) {
   mZMQSockPtr = new zmq::socket_t(*mCtxPtr, mSocketType);
   const char *path = mSocketPath.c_str();
   switch (mSocketType) {
+    // Fall through cases!
     case ZMQ_PULL:
     case ZMQ_PUB:
     case ZMQ_REP:
       mZMQSockPtr->setsockopt(ZMQ_SNDHWM, &value, sizeof(int));
       mZMQSockPtr->bind(path);
+      if(mSocketSyncPath != "") {
+        mZMQSyncSockPtr = new zmq::socket_t(*mCtxPtr, ZMQ_REP);
+        mZMQSyncSockPtr->bind(mSocketSyncPath.c_str());
+        zmq::message_t message(0);
+        mZMQSyncSockPtr->recv(message, zmq::recv_flags::none);
+      }
       break;
     case ZMQ_SUB:
       //mZMQSockPtr->setsockopt(ZMQ_RCVHWM, &value, sizeof(int));
@@ -80,6 +89,12 @@ void ZMQSocket::configureSocket(size_t len) {
     case ZMQ_PUSH:
     case ZMQ_REQ:
       mZMQSockPtr->connect(path);
+      if(mSocketSyncPath != "") {
+        mZMQSyncSockPtr = new zmq::socket_t(*mCtxPtr, ZMQ_REQ);
+        mZMQSyncSockPtr->connect(mSocketSyncPath.c_str());
+        zmq::message_t message(0);
+        mZMQSyncSockPtr->send(message, zmq::send_flags::none);
+      }
   }
   int timeout = 2000;
   mZMQSockPtr->setsockopt(ZMQ_RCVTIMEO, &timeout, sizeof(timeout));
@@ -197,6 +212,7 @@ zmq::message_t& ZMQSocket::recvMessage(bool blocking) {
   int retval = -1;
   const auto flags = (blocking == false) ? zmq::recv_flags::dontwait : zmq::recv_flags::none;
 
+  std::cout << "Receiving ...\n";
   if (mZMQSockPtr != NULL) {
     try {
       retval = mZMQSockPtr->recv(message, flags).value_or(-1);

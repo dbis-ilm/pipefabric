@@ -52,15 +52,15 @@ namespace pfabric {
      * @param mode the encoding mode for messages (binary, ascii, ...)
      * @param tlen the (optional) length of the tuple (in bytes) used for allocating a buffer
      */
-    ZMQSink(const std::string& path, ZMQParams::SinkType stype = ZMQParams::PublisherSink,
+    ZMQSink(const std::string& path, const std::string& syncPath = "", ZMQParams::SinkType stype = ZMQParams::PublisherSink,
        ZMQParams::EncodingMode mode = ZMQParams::BinaryMode, unsigned int tlen = 1024) :
         mMode(mode), mSinkType(stype) {
       if (mSinkType == ZMQParams::PublisherSink) {
-        mSocket = std::make_unique< sock::ZMQSocket >(path, ZMQ_PUB);
+        mSocket = std::make_unique< sock::ZMQSocket >(path, syncPath, ZMQ_PUB);
         // mSync = new ZMQSinkSync(path);
       }
       else if (mSinkType == ZMQParams::PushSink)
-        mSocket = std::make_unique< sock::ZMQSocket >(path, ZMQ_PUSH);
+        mSocket = std::make_unique< sock::ZMQSocket >(path, syncPath, ZMQ_PUSH);
       if (mMode == ZMQParams::BinaryMode)
         mBuf.resize(tlen);
     }
@@ -81,7 +81,7 @@ namespace pfabric {
     /**
      * @brief Bind the callback for the punctuation channel.
      */
-    BIND_INPUT_CHANNEL_DEFAULT( InputPunctuationChannel, ZMQSink, processPunctuation );
+     BIND_INPUT_CHANNEL_DEFAULT( InputPunctuationChannel, ZMQSink, processPunctuation );
 
     private:
 

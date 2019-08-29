@@ -56,69 +56,71 @@ public:
   typedef std::function< void(TBufPtr) > BufCallbackFunc;
   typedef std::function< void(PunctuationPtr) > PunctuationCallbackFunc;
 
-	/**
-	 * Constructor for a ZMQSource implementation to assign a path for the socket,
+  /**
+   * Constructor for a ZMQSource implementation to assign a path for the socket,
    * the type of source, and the encoding.
    *
-	 * @param path  the socket path where we receive the tuples
-	 * @param stype the type of 0MQ source (pull or sink)
-	 * @param emode the type of encoding (binary or ascii)
-   * @param cb1 a callback function for receiving string tuples
-   * @param cb2 a callback function for receiving serialized tuples
-   * @param cb3 a callback function for receiving punctuations
-	 */
+   * @param path     the socket path where we receive the tuples
+   * @param syncPath the socket path where we synchronize sub and pub
+   * @param stype    the type of 0MQ source (pull or sink)
+   * @param emode    the type of encoding (binary or ascii)
+   * @param cb1      a callback function for receiving string tuples
+   * @param cb2      a callback function for receiving serialized tuples
+   * @param cb3      a callback function for receiving punctuations
+   */
   ZMQSourceImpl(const std::string& path,
+    const std::string& syncPath,
     ZMQParams::SourceType stype,
     ZMQParams::EncodingMode emode,
-		TStringCallbackFunc const& cb1,
+    TStringCallbackFunc const& cb1,
     BufCallbackFunc const& cb2,
     PunctuationCallbackFunc const& cb3);
 
-	/**
-	 * Destructor for releasing resources.
-	 */
-	~ZMQSourceImpl();
+  /**
+   * Destructor for releasing resources.
+   */
+  ~ZMQSourceImpl();
 
-	/**
-	 * Start the processing.
-	 */
-	void start();
+  /**
+   * Start the processing.
+   */
+  void start();
 
-	/**
-	 * Stop the processing.
-	 */
-	void stop();
+  /**
+   * Stop the processing.
+   */
+  void stop();
 
-	/**
-	 * Check whether the processing was interrupted or not.
+  /**
+   * Check whether the processing was interrupted or not.
    *
    * @return true if processing was interrupted
-	 */
-	bool isInterrupted() const;
+   */
+  bool isInterrupted() const;
 
 private:
 
-	/**
-	 * Try to receive and process incoming tuples.
+  /**
+   * Try to receive and process incoming tuples.
    *
-	 * @return number of received tuples
-	 */
-	unsigned long process();
+   * @return number of received tuples
+   */
+  unsigned long process();
 
   typedef std::unique_ptr< sock::ZMQSocket > ZMQSocketPtr;
 
- 	TStringCallbackFunc mTStringCB;          //<
-	BufCallbackFunc mBufCB;                  //<
-	PunctuationCallbackFunc mPunctuationCB;  //<
+  TStringCallbackFunc mTStringCB;          //<
+  BufCallbackFunc mBufCB;                  //<
+  PunctuationCallbackFunc mPunctuationCB;  //<
 
-	ZMQSocketPtr mSocket;                //< the subscriber socket
-	int mNumTuples;                      //< number tuple processed by the socket
-	ZMQParams::EncodingMode mMode;       //< the encoding mode
-	bool mInterrupted;                   //< a flag for interrupting
+  ZMQSocketPtr mSocket;                //< the subscriber socket
+  int mNumTuples;                      //< number tuple processed by the socket
+  ZMQParams::EncodingMode mMode;       //< the encoding mode
+  bool mInterrupted;                   //< a flag for interrupting
   std::thread mSourceThread;           //< the socket  reader thread
-	mutable std::mutex mZmqMtx;          //<
-	mutable std::mutex mStartMtx;        //<
-	ZMQParams::SourceType mType;         //<
+  mutable std::mutex mZmqMtx;          //<
+  mutable std::mutex mStartMtx;        //<
+  ZMQParams::SourceType mType;         //<
 };
 
  /**
@@ -129,36 +131,36 @@ private:
   * @tparam Tout
   *         the data stream element type which is produced by the source
   */
-	template<typename Tout>
-	class ZMQSourceBase : public DataSource<Tout> {
+  template<typename Tout>
+  class ZMQSourceBase : public DataSource<Tout> {
     PFABRIC_SOURCE_TYPEDEFS(Tout)
 
-	public:
-		/**
-		 * Constructor to create a ZMQSourceBase object delegating the
+  public:
+    /**
+     * Constructor to create a ZMQSourceBase object delegating the
      * actual processing to a ZMQSourceImpl instance.
      *
      * @param path  the socket path where we receive the tuples
-  	 * @param stype the type of 0MQ source (pull or sink)
-  	 * @param emode the type of encoding (binary or ascii)
+     * @param stype the type of 0MQ source (pull or sink)
+     * @param emode the type of encoding (binary or ascii)
      * @param cb1 a callback function for receiving string tuples
      * @param cb2 a callback function for receiving serialized tuples
-	 */
-		ZMQSourceBase(const std::string& path,
-              ZMQParams::SourceType stype = ZMQParams::SubscriberSource,
-							 ZMQParams::EncodingMode emode = ZMQParams::BinaryMode,
-               ZMQSourceImpl::TStringCallbackFunc const& cb1 = nullptr,
-               ZMQSourceImpl::BufCallbackFunc const& cb2 = nullptr) :
-			mImpl(new ZMQSourceImpl( path, stype, emode,
-        cb1, cb2,
-        std::bind(&ZMQSourceBase::publishPunctuation, this, std::placeholders::_1))) {}
+   */
+    ZMQSourceBase(const std::string& path,
+                  const std::string& syncPath,
+                  ZMQParams::SourceType stype = ZMQParams::SubscriberSource,
+                  ZMQParams::EncodingMode emode = ZMQParams::BinaryMode,
+                  ZMQSourceImpl::TStringCallbackFunc const& cb1 = nullptr,
+                  ZMQSourceImpl::BufCallbackFunc const& cb2 = nullptr) :
+      mImpl(new ZMQSourceImpl( path, syncPath, stype, emode, cb1, cb2,
+            std::bind(&ZMQSourceBase::publishPunctuation, this, std::placeholders::_1))) {}
 
     /**
      * Stop the processing.
      */
-		void stop() {
-			mImpl->stop();
-		}
+    void stop() {
+      mImpl->stop();
+    }
 
     /**
      * Start the processing.
@@ -170,7 +172,7 @@ private:
       return 0;
     }
 
-	protected:
+  protected:
 
     /**
      * Produce and forward a punctuation tuple. This method is used as callback
@@ -178,13 +180,13 @@ private:
      *
      * @param pp the punctuation tuple
      */
-		void publishPunctuation(PunctuationPtr pp) {
-			this->getOutputPunctuationChannel().publish(pp);
-		}
+    void publishPunctuation(PunctuationPtr pp) {
+      this->getOutputPunctuationChannel().publish(pp);
+    }
 
-	private:
-		std::unique_ptr< ZMQSourceImpl > mImpl; //< pointer to the actual implementation
-	};
+  private:
+    std::unique_ptr< ZMQSourceImpl > mImpl; //< pointer to the actual implementation
+  };
 
   /**
    * ZMQSource is a source operator for receiving tuples via 0MQ and produce
@@ -212,8 +214,8 @@ private:
      * @param path  the socket path where we receive the tuples
      * @param stype the type of 0MQ source (pull or sink)
      */
-    ZMQSource(const std::string& path, ZMQParams::SourceType stype = ZMQParams::SubscriberSource) :
-      ZMQSourceBase<TBufPtr>(path, stype, ZMQParams::BinaryMode,
+    ZMQSource(const std::string& path, const std::string& syncPath = "", ZMQParams::SourceType stype = ZMQParams::SubscriberSource) :
+      ZMQSourceBase<TBufPtr>(path, syncPath, stype, ZMQParams::BinaryMode,
         nullptr,
         std::bind(&ZMQSource<TBufPtr>::publishTuple, this, std::placeholders::_1)) {}
 
@@ -224,7 +226,7 @@ private:
      * @param tp a serialized tuple that is published
      */
     void publishTuple(TBufPtr tp) {
-    	this->getOutputDataChannel().publish(tp, false);
+      this->getOutputDataChannel().publish(tp, false);
     }
 
 
@@ -245,8 +247,8 @@ private:
      * @param path  the socket path where we receive the tuples
      * @param stype the type of 0MQ source (pull or sink)
    */
-    ZMQSource(const std::string& path, ZMQParams::SourceType stype = ZMQParams::SubscriberSource) :
-    ZMQSourceBase<TStringPtr>(path, stype, ZMQParams::AsciiMode,
+    ZMQSource(const std::string& path, const std::string& syncPath = "", ZMQParams::SourceType stype = ZMQParams::SubscriberSource) :
+    ZMQSourceBase<TStringPtr>(path, syncPath, stype, ZMQParams::AsciiMode,
       std::bind(&ZMQSource<TStringPtr>::publishTuple, this, std::placeholders::_1),
     nullptr) {}
 
