@@ -63,45 +63,48 @@ TEST_CASE("Building and running a simple topology", "[Topology]") {
 
   t.start();
   t.wait();
+
   REQUIRE(strm.str() == expected);
 }
 
 TEST_CASE("Building and running a topology with ZMQ", "[Topology]") {
   typedef TuplePtr<int, int> T1;
 
-  zmq::context_t context (1);
-  zmq::socket_t publisher (context, ZMQ_PUB);
-  publisher.bind("tcp://*:5678");
+  zmq::context_t context(1);
+  zmq::socket_t publisher(context, ZMQ_PUB);
+  publisher.bind("tcp://*:7890");
+  zmq::socket_t syncservice(context, ZMQ_REP);
+  syncservice.bind("tcp://*:7891");
 
-  std::stringstream strm;
-
-  Topology t;
-  auto s = t.newAsciiStreamFromZMQ("tcp://localhost:5678")
-    .extract<T1>(',')
-    .print(strm);
-
-  t.start(false);
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-  auto handle = std::async(std::launch::async, [&publisher](){
+  auto handle = std::async(std::launch::async, [&publisher, &syncservice](){
     std::vector<std::string> input = {
       "0,10", "1,11", "2,12", "3,13", "4,14", "5,15"
     };
+
+    zmq::message_t message;
+    syncservice.recv(message, zmq::recv_flags::none);
+    
     for(const std::string &s : input) {
-      zmq::message_t request (4);
-      memcpy (request.data (), s.c_str(), 4);
+      zmq::message_t request(4);
+      memcpy(request.data(), s.c_str(), 4);
       publisher.send(request, zmq::send_flags::none);
     }
   });
 
-  handle.get();
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  Topology t;
+  std::stringstream strm;
+  auto s = t.newAsciiStreamFromZMQ("tcp://localhost:7890", "tcp://localhost:7891")
+    .extract<T1>(',')
+    .print(strm);
+
+  t.start();
+  handle.wait();
+  t.wait();
 
   std::string expected = "0,10\n1,11\n2,12\n3,13\n4,14\n5,15\n";
-
   REQUIRE(strm.str() == expected);
-
+  syncservice.close();
+  publisher.close();
 }
 
 TEST_CASE("Building and running a topology with ToTable", "[Topology]") {
@@ -155,8 +158,7 @@ TEST_CASE("Building and running a topology with partitioning", "[Topology]") {
     });
 
   t.start(false);
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  t.wait();
 
   REQUIRE(results.size() == 500);
 
@@ -221,9 +223,8 @@ TEST_CASE("Building and running a topology with batcher", "[Topology]") {
     })
     ;
 
-  t2.start(false);
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  t2.start();
+  t2.wait();
 
   REQUIRE(procBatchCount == 100);
   REQUIRE(procTupleCount == 1000);
@@ -365,9 +366,8 @@ TEST_CASE("Combining tuples from two streams to one stream", "[ToStream]") {
       results++;
     });
 
-  t.start(false);
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  t.start();
+  t.wait();
 
   REQUIRE(results == 200);
 }

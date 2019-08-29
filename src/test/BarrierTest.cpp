@@ -86,8 +86,7 @@ TEST_CASE("Controlling stream processing by a barrier", "[Barrier]") {
   // set counter to 10 and send tuples 1, 2, 3, 4, 11, 12:
   // => only tuples 1, 2, 3, 4 should arrive
   mockup->start();
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  mockup->wait();
   REQUIRE(mockup->numTuplesProcessed() == 4);
 
   // now set counter to 13:
@@ -95,7 +94,7 @@ TEST_CASE("Controlling stream processing by a barrier", "[Barrier]") {
   mockup->addExpected({makeTuplePtr(11), makeTuplePtr(12)});
   counter.set(13);
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  mockup->wait();
   REQUIRE(mockup->numTuplesProcessed() == 6);
 
   // set counter to 25:
@@ -103,6 +102,6 @@ TEST_CASE("Controlling stream processing by a barrier", "[Barrier]") {
   mockup->addExpected({makeTuplePtr(20), makeTuplePtr(21), makeTuplePtr(22)});
   counter.set(25);
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  mockup->wait();
   REQUIRE(mockup->numTuplesProcessed() == 9);
 }

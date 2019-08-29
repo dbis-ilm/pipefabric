@@ -17,10 +17,7 @@
  * along with PipeFabric. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <boost/thread.hpp>
-#include <boost/chrono.hpp>
 #include "Topology.hpp"
-#include "qop/ZMQSource.hpp"
 
 using namespace pfabric;
 
@@ -74,14 +71,21 @@ void Topology::prepare() {
     }
 }
 
-void Topology::wait() {
+void Topology::wait(const std::chrono::milliseconds &dur) {
     if (!asyncStarted)
       return;
 
     std::lock_guard<std::mutex> guard(mMutex);
     // let's wait until the function finished
     for(auto &f : startupFutures)
-      f.get();
+      f.wait();
+    //TODO: wait for EndOfStream Punctuations on all sinks
+    //TODO: what about merging streams or no actual sinks?
+    std::unique_lock<std::mutex> lk(mCv_m);
+    const auto now = std::chrono::system_clock::now();
+    if (mCv.wait_until(lk, now + dur) == std::cv_status::timeout) {
+      //Timeout!
+    }
 }
 
 void Topology::runEvery(unsigned long secs) {
@@ -159,14 +163,16 @@ Pipe<TStringPtr> Topology::newStreamFromREST(unsigned int port,
   return Pipe<TStringPtr>(dataflow, dataflow->addPublisher(op));
 }
 
-Pipe<TStringPtr> Topology::newAsciiStreamFromZMQ(const std::string& path,
+Pipe<TStringPtr> Topology::newAsciiStreamFromZMQ(const std::string& path, const std::string& syncPath,
                                  ZMQParams::SourceType stype) {
-    auto op = std::make_shared<ZMQSource<TStringPtr> >(path, stype);
+    auto op = std::make_shared<ZMQSource<TStringPtr> >(path, syncPath, stype);
+    registerStartupFunction(std::bind(&ZMQSource<TStringPtr>::start, op.get()));
     return Pipe<TStringPtr>(dataflow, dataflow->addPublisher(op));
 }
 
-Pipe<TBufPtr> Topology::newBinaryStreamFromZMQ(const std::string& path,
+Pipe<TBufPtr> Topology::newBinaryStreamFromZMQ(const std::string& path, const std::string& syncPath,
                                  ZMQParams::SourceType stype) {
-    auto op = std::make_shared<ZMQSource<TBufPtr> >(path, stype);
+    auto op = std::make_shared<ZMQSource<TBufPtr> >(path, syncPath, stype);
+    registerStartupFunction(std::bind(&ZMQSource<TBufPtr>::start, op.get()));
     return Pipe<TBufPtr>(dataflow, dataflow->addPublisher(op));
 }

@@ -55,8 +55,8 @@ TEST_CASE("Stream from matrix", "[FromMatrixTest]")
     for(auto &tuple : inputs) {
       matrix->insert(tuple);
     }
-    using namespace std::chrono_literals;
-    std::this_thread::sleep_for(2s);
+
+    mockup->wait(2000ms);
 
   	REQUIRE(mockup->numTuplesProcessed() == size);
 }

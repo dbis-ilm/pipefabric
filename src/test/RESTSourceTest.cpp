@@ -17,65 +17,47 @@
  * along with PipeFabric. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <boost/filesystem.hpp>
-#include <iostream>
 #include <future>
 
-// using namespace boost::filesystem;
-
 #include "catch.hpp"
-
 #include "fmt/format.h"
 #include "SimpleWeb/client_http.hpp"
 
-#include "core/Tuple.hpp"
 #include "qop/RESTSource.hpp"
-#include "qop/DataSink.hpp"
-#include "qop/OperatorMacros.hpp"
+#include "StreamMockup.hpp"
 
 using namespace pfabric;
 using namespace ns_types;
 
-class TestConsumer : public SynchronizedDataSink<TStringPtr> {
-public:
-  PFABRIC_SYNC_SINK_TYPEDEFS(TStringPtr)
-
-  TestConsumer() : tupleNum(0) {}
-
-  BIND_INPUT_CHANNEL_DEFAULT(InputDataChannel, TestConsumer, processDataElement);
-  BIND_INPUT_CHANNEL_DEFAULT(InputPunctuationChannel, TestConsumer, processPunctuation);
-
-  void processPunctuation(const PunctuationPtr& punctuation) {}
-
-  void processDataElement( const TStringPtr& data, const bool outdated ) {
-    std::string input (data->getAttribute<0>().begin_, data->getAttribute<0>().size_);
-    std::string expected = fmt::format("(\"key\": \"{0}\",\"value\": \"Always the same\")", tupleNum);
-
-    REQUIRE(input == expected);
-    tupleNum++;
-  }
-
-private:
-  int tupleNum;
-};
-
-typedef SimpleWeb::Client<SimpleWeb::HTTP> HttpClient;
+using HttpClient = SimpleWeb::Client<SimpleWeb::HTTP>;
 
 TEST_CASE("Receiving data via REST", "[RESTSource]" ) {
-  auto restSource = std::make_shared<RESTSource>(8099, "^/publish$", RESTSource::POST_METHOD);
-  auto consumer = std::make_shared<TestConsumer>();
-  CREATE_LINK(restSource, consumer);
+  constexpr auto numTuples = 1000;
+  std::vector<TStringPtr> expected;
+  std::vector<std::string> stringVec;
 
-  // note we have to start the REST server asynchronously
-  auto handle = std::async(std::launch::async, [&](std::shared_ptr<RESTSource> src){ src->start(); }, restSource);
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  HttpClient client("localhost:8099");
-  for (int i = 0; i < 100; i++) {
-    std::string param_string = fmt::format("(\"key\": \"{0}\",\"value\": \"Always the same\")", i);
-    auto res = client.request("POST", "/publish", param_string);
+  for (int i = 0; i < numTuples; i++) {
+    auto param_string = fmt::format("(\"key\": \"{0}\",\"value\": \"Always the same\")", i);
+    stringVec.push_back(std::move(param_string));
+    expected.push_back(makeTuplePtr(StringRef(stringVec[i].c_str(), stringVec[i].size())));
   }
+
+  auto restSource = std::make_shared<RESTSource>(8099, "^/publish$", RESTSource::POST_METHOD);
+  auto mockup = std::make_shared<StreamMockup<TStringPtr, TStringPtr> >(expected, expected);
+  CREATE_LINK(restSource, mockup);
+
+  /// NOTE: we have to start the REST server asynchronously
+  auto handle = std::async(std::launch::async, [&restSource, &stringVec](){
+    restSource->start();
+  });
+
+  HttpClient client("localhost:8099");
+  for (int i = 0; i < numTuples; i++) {
+    auto res = client.request("POST", "/publish", stringVec[i]);
+  }
+
   restSource->stop();
   handle.get();
 
+  REQUIRE(mockup->numTuplesProcessed() == numTuples);
 }

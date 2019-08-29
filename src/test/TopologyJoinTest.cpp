@@ -57,7 +57,6 @@ TEST_CASE("Building and running a topology with ScaleJoin (3 instances)", "[Scal
 
   t.prepare();
   t.start(false);
-
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
   REQUIRE(results == num);
@@ -165,9 +164,8 @@ TEST_CASE("Building and running a topology with a join on one partitioned stream
         results.push_back(tmp_vec);
     });
 
-  t.start(false);
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  t.start();
+  t.wait();
 
   REQUIRE(results.size() == num*10);
 
@@ -207,9 +205,8 @@ TEST_CASE("Building and running a topology with a join on another partitioned st
         results.push_back(tmp_vec);
     });
 
-  t.start(false);
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  t.start();
+  t.wait();
 
   REQUIRE(results.size() == num*10);
 
@@ -248,9 +245,8 @@ TEST_CASE("Building and running a topology with a join on another partitioned st
         results.push_back(tmp_vec);
     });
 
-  t.start(false);
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  t.start();
+  t.wait();
 
   REQUIRE(results.size() == num*10);
 
@@ -291,9 +287,8 @@ TEST_CASE("Building and running a topology with a join on two partitioned stream
         results.push_back(tmp_vec);
     });
 
-  t.start(false);
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  t.start();
+  t.wait();
 
   REQUIRE(results.size() == num*10);
 

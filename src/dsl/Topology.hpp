@@ -20,12 +20,15 @@
 #ifndef Topology_hpp_
 #define Topology_hpp_
 
+#include <chrono>
+#include <condition_variable>
 #include <string>
 #include <list>
 #include <vector>
 #include <future>
 #include <mutex>
-#include <chrono>
+
+#include <boost/chrono.hpp>
 #include <boost/thread.hpp>
 
 #include "core/Tuple.hpp"
@@ -102,6 +105,8 @@ namespace pfabric {
     std::vector<std::future<unsigned long> > startupFutures; //< futures for the startup functions
     std::vector<boost::thread> wakeupTimers; //< interruptible threads for runEvery queries
     std::mutex mMutex;                    //< mutex for accessing startupFutures
+    std::condition_variable mCv;          //< condition variable to check if sinks have received EndOfStream
+    std::mutex mCv_m;
 
     DataflowPtr dataflow;
 
@@ -174,7 +179,7 @@ namespace pfabric {
      * If the topology was started asynchronously the call of wait()
      * blocks until the execution stopped.
      */
-    void wait();
+    void wait(const std::chrono::milliseconds &dur = 500ms);
 
     /**
      * @brief Creates a pipe from a TextFileSource as input.
@@ -289,9 +294,11 @@ namespace pfabric {
      *    a new pipe where ZMQSource acts as a producer.
      */
     Pipe<TStringPtr> newAsciiStreamFromZMQ(const std::string& path,
+      const std::string& syncPath = "",
       ZMQParams::SourceType stype = ZMQParams::SubscriberSource);
 
     Pipe<TBufPtr> newBinaryStreamFromZMQ(const std::string& path,
+      const std::string& syncPath = "",
       ZMQParams::SourceType stype = ZMQParams::SubscriberSource);
 
     /**

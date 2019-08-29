@@ -130,13 +130,11 @@ void TopologyPartitionedWhereBeforeMapTest(benchmark::State& state) {
       })
 	  .merge();
 
-    t.start();
-    t.wait();
+    t.start(false);
 
 	//BAD: Takes far too long because of iteration number
 	//wait for results - stop timer
 	//state.PauseTiming();
-    //std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	//state.ResumeTiming();
   }
 }
@@ -217,7 +215,6 @@ void TopologyPartitionedGroupByTest(benchmark::State& state) {
 	//BAD: Takes far too long because of iteration number
 	//wait for results - stop timer
 	//state.PauseTiming();
-    //std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	//state.ResumeTiming();
   }
 }
@@ -253,7 +250,6 @@ void TopologyPartitionedJoinTest(benchmark::State& state) {
 	//BAD: Takes far too long because of iteration number
 	//wait for results - stop timer
 	//state.PauseTiming();
-    //std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	//state.ResumeTiming();
   }
 }

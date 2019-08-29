@@ -92,9 +92,8 @@ TEST_CASE("Building and running a topology with partitioned aggregation",
         tuplesProcessed++;
     });
 
-  t.start(false);
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  t.start();
+  t.wait();
 
   REQUIRE(results.size() == num);
 }

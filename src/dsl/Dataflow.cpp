@@ -17,40 +17,40 @@
  * along with PipeFabric. If not, see <http://www.gnu.org/licenses/>.
  */
 
- #include "Dataflow.hpp"
+#include "Dataflow.hpp"
 
- using namespace pfabric;
+using namespace pfabric;
 
- Dataflow::BaseOpIterator Dataflow::addPublisher(Dataflow::BaseOpPtr op) {
-   publishers.push_back(op);
-   auto iter = publishers.end();
-   return --iter;
- }
+Dataflow::BaseOpIterator Dataflow::addPublisher(Dataflow::BaseOpPtr op) {
+  publishers.push_back(op);
+  auto iter = publishers.end();
+  return --iter;
+}
 
- Dataflow::BaseOpIterator Dataflow::addPublisherList(const Dataflow::BaseOpList& lst) {
-   publishers.insert(publishers.end(), lst.begin(), lst.end());
-   auto iter = publishers.end();
-   std::advance(iter, -lst.size());
-   return iter;
- }
+Dataflow::BaseOpIterator Dataflow::addPublisherList(const Dataflow::BaseOpList& lst) {
+  publishers.insert(publishers.end(), lst.begin(), lst.end());
+  auto iter = publishers.end();
+  std::advance(iter, -lst.size());
+  return iter;
+}
 
- void Dataflow::addSink(Dataflow::BaseOpPtr op) { sinks.push_back(op); }
+void Dataflow::addSink(Dataflow::BaseOpPtr op) { sinks.push_back(op); }
 
- /**
-  * @brief Returns the operator at the end of the publisher list.
-  *
-  * Returns the operator which acts as the publisher for the next
-  * added operator.
-  *
-  * @return
-  *    the last operator in the publisher list
-  */
+/**
+ * @brief Returns the operator at the end of the publisher list.
+ *
+ * Returns the operator which acts as the publisher for the next
+ * added operator.
+ *
+ * @return
+ *    the last operator in the publisher list
+ */
 Dataflow::BaseOpPtr Dataflow::getPublisher() { return publishers.back(); }
 
- Dataflow::BaseOpIterator Dataflow::getPublishers(unsigned int num) {
-   auto iter = publishers.end();
-   std::advance(iter, -num);
-   return iter;
- }
+Dataflow::BaseOpIterator Dataflow::getPublishers(unsigned int num) {
+  auto iter = publishers.end();
+  std::advance(iter, -num);
+  return iter;
+}
 
- std::size_t Dataflow::size() const { return publishers.size(); }
+std::size_t Dataflow::size() const { return publishers.size(); }

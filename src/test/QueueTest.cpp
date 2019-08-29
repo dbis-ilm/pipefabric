@@ -56,8 +56,7 @@ TEST_CASE("Decoupling producer and consumer via a queue", "[Queue]") {
   CREATE_DATA_LINK(ch, mockup)
     
   mockup->start();
-  
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  mockup->wait();
 
   REQUIRE(mockup->numTuplesProcessed() == expected.size());
 }

@@ -46,7 +46,7 @@ typedef TuplePtr< int, double, std::string > MyTuplePtr;
  * A simple test of the ZMQSource/ZMQSink operators.
  */
 TEST_CASE("Transfer a binary tuple stream via ZMQ", "[ZMQSource][ZMQSink]") {
-	const int numTuples = 10000;
+	constexpr int numTuples = 10000;
 
 	std::vector<MyTuplePtr> input;
 
@@ -55,22 +55,20 @@ TEST_CASE("Transfer a binary tuple stream via ZMQ", "[ZMQSource][ZMQSink]") {
 	}
 
 	auto mockup = std::make_shared< StreamMockup<MyTuplePtr, MyTuplePtr> >(input, input);
-	auto sink = std::make_shared< ZMQSink<MyTuplePtr> > ("tcp://*:5678");
-	CREATE_DATA_LINK(mockup, sink);
+  auto handle = std::async(std::launch::async, [&mockup]() {
+	  auto sink = std::make_shared< ZMQSink<MyTuplePtr> > ("tcp://*:6789", "tcp://*:6790");
+	  CREATE_DATA_LINK(mockup, sink);
+	  mockup->start();
+  });
 
-	auto src = std::make_shared< ZMQSource<TBufPtr> > ("tcp://localhost:5678");
+	auto src = std::make_shared< ZMQSource<TBufPtr> > ("tcp://localhost:6789", "tcp://localhost:6790");
 	auto deserializer = std::make_shared<TupleDeserializer<MyTuplePtr> >();
 	CREATE_DATA_LINK(src, deserializer);
 	CREATE_DATA_LINK(deserializer, mockup);
-
-	std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-	auto handle = std::async(std::launch::async, [&mockup](){
-		mockup->start();
-	});
-
+  
   handle.get();
-	std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  mockup->wait();
   src->stop();
+
   REQUIRE(mockup->numTuplesProcessed() == numTuples);
 }

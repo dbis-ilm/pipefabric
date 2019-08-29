@@ -102,8 +102,6 @@ TEST_CASE("Building and running a topology with simple unpartitioned grouping",
 
   t.start(false);
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
   REQUIRE(results.size() == num);
 
   for (auto i=0u; i<num; i++) {
@@ -159,8 +157,6 @@ TEST_CASE("Building and running a topology with unpartitioned grouping",
 
   t.start(false);
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
   REQUIRE(results.size() == num);
 
   for (auto i=0u; i<num; i++) {
@@ -211,24 +207,22 @@ TEST_CASE("Building and running a topology with partitioned grouping",
   Topology t;
   auto s = t.streamFromGenerator<MyTuplePtr>(streamGen, num)
     .keyBy<0>()
-	.partitionBy([](auto tp) { return get<0>(tp) % 5; }, 5)
+	  .partitionBy([](auto tp) { return get<0>(tp) % 5; }, 5)
     .groupBy<AggregationResultPtr, MyAggrState, unsigned long>(finalFun, iterFun)
     .merge()
     .notify([&](auto tp, bool outdated) {
-        if (tuplesProcessed < num) {
-		  std::vector<double> tmpVec;
-		  tmpVec.push_back(get<0>(tp));
-		  tmpVec.push_back(get<1>(tp));
-
-          results.push_back(tmpVec);
-		}
-        tuplesProcessed++;
+      if (tuplesProcessed < num) {
+		    std::vector<double> tmpVec;
+		    tmpVec.push_back(get<0>(tp));
+		    tmpVec.push_back(get<1>(tp));
+        results.push_back(tmpVec);
+		  }
+      tuplesProcessed++;
     });
 	//.print(std::cout);
 
-  t.start(false);
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  t.start();
+  t.wait();
 
   REQUIRE(results.size() == num);
 

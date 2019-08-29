@@ -19,7 +19,7 @@ endmacro(build_executable)
 macro(build_catch_test arg)
   include_directories("${PROJECT_SOURCE_DIR}/test")
   add_executable( ${arg} "${arg}.cpp" $<TARGET_OBJECTS:TestMain>)
-    target_link_libraries( ${arg}
+  target_link_libraries( ${arg}
       pfabric_core
       ${Boost_SYSTEM_LIBRARY}
       ${ROCKSDB_LIB}
