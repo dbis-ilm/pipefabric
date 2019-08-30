@@ -98,7 +98,7 @@ TEST_CASE("Building and running a topology with ZMQ", "[Topology]") {
     .print(strm);
 
   t.start();
-  handle.wait();
+  handle.get();
   t.wait();
 
   std::string expected = "0,10\n1,11\n2,12\n3,13\n4,14\n5,15\n";
@@ -157,7 +157,7 @@ TEST_CASE("Building and running a topology with partitioning", "[Topology]") {
       results.push_back(v);
     });
 
-  t.start(false);
+  t.start();
   t.wait();
 
   REQUIRE(results.size() == 500);
