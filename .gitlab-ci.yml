@@ -27,7 +27,7 @@ test:
     - grouprunner
   script:
     - cd build
-    - ctest
+    - ctest -V
   dependencies:
     - build
 
@@ -44,6 +44,6 @@ coverage:
     - cd build
     - cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-g -O0 -fprofile-arcs -ftest-coverage" -DBUILD_TEST_CASES=ON ../src
     - make -j 3
-    - ctest
+    - ctest -V
     - ~/.local/bin/gcovr -r .. --exclude 3rdparty --exclude '(.+/)?catch\.hpp$'
   coverage: '/^TOTAL.*\s+(\d+\%)$/'
