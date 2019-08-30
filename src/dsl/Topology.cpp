@@ -78,7 +78,7 @@ void Topology::wait(const std::chrono::milliseconds &dur) {
     std::lock_guard<std::mutex> guard(mMutex);
     // let's wait until the function finished
     for(auto &f : startupFutures)
-      f.wait();
+      f.get();
     //TODO: wait for EndOfStream Punctuations on all sinks
     //TODO: what about merging streams or no actual sinks?
     std::unique_lock<std::mutex> lk(mCv_m);

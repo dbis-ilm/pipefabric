@@ -17,6 +17,7 @@
  * along with PipeFabric. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#pragma once
 #ifndef Topology_hpp_
 #define Topology_hpp_
 
