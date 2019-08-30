@@ -45,5 +45,5 @@ coverage:
     - cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-g -O0 -fprofile-arcs -ftest-coverage" -DBUILD_TEST_CASES=ON ../src
     - make -j 3
     - ctest -V
-    - ~/.local/bin/gcovr -r .. --exclude 3rdparty --exclude '(.+/)?catch\.hpp$'
+    - ~/.local/bin/gcovr -r .. --exclude _deps --exclude '(.+/)?catch\.hpp$'
   coverage: '/^TOTAL.*\s+(\d+\%)$/'
