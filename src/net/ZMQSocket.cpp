@@ -212,7 +212,6 @@ zmq::message_t& ZMQSocket::recvMessage(bool blocking) {
   int retval = -1;
   const auto flags = (blocking == false) ? zmq::recv_flags::dontwait : zmq::recv_flags::none;
 
-  std::cout << "Receiving ...\n";
   if (mZMQSockPtr != NULL) {
     try {
       retval = mZMQSockPtr->recv(message, flags).value_or(-1);
