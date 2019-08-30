@@ -78,7 +78,7 @@ TEST_CASE("Receiving a ascii tuple stream via ZMQSource", "[ZMQSource]") {
   CREATE_DATA_LINK(extractor, mockup);
 
   handle.get();
-  mockup->wait();
+  mockup->wait(4000ms);
   src->stop();
 
   REQUIRE(mockup->numTuplesProcessed() == 6);
@@ -124,7 +124,7 @@ TEST_CASE("Receiving a binary tuple stream via ZMQSource", "[ZMQSource]") {
   CREATE_DATA_LINK(extractor, mockup);
 
   handle.get();
-  mockup->wait();
+  mockup->wait(4000ms);
   src->stop();
 
   REQUIRE(mockup->numTuplesProcessed() == 6);

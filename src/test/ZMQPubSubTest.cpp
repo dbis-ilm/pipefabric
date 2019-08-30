@@ -65,9 +65,9 @@ TEST_CASE("Transfer a binary tuple stream via ZMQ", "[ZMQSource][ZMQSink]") {
 	auto deserializer = std::make_shared<TupleDeserializer<MyTuplePtr> >();
 	CREATE_DATA_LINK(src, deserializer);
 	CREATE_DATA_LINK(deserializer, mockup);
-  
+
   handle.get();
-  mockup->wait();
+  mockup->wait(4000ms);
   src->stop();
 
   REQUIRE(mockup->numTuplesProcessed() == numTuples);
