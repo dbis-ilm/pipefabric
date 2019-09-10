@@ -252,7 +252,8 @@ endif()
 ############################################################################################
 #
 
-find_package(ZeroMQ)
+SET(ZMQ_MIN_VERSION "4.3.1")
+find_package(ZeroMQ ${ZMQ_MIN_VERSION} REQUIRED)
 if (ZEROMQ_FOUND)
   add_definitions( "-DHAS_ZMQ" )
   include_directories(${ZEROMQ_INCLUDE_DIR})
@@ -270,7 +271,7 @@ if (ZEROMQ_FOUND)
     ${ZEROMQ_SOURCES}
   )
 else()
-  set (ZEROMQ_SOURCES "")
+  message(FATAL_ERROR "Fatal error: ZeroMQ (version >= ${ZMQ_MIN_VERSION}) required.\n")
 endif()
 
 
