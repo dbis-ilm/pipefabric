@@ -54,14 +54,14 @@ public:
 	 * @param name the name of the state
 	 *
 	 */
-	NormalState(int stateID, string name): NFAState<Tin>(stateID, name) {}
+	NormalState(int stateID, std::string name): NFAState<Tin>(stateID, name) {}
 	/**
 	 * A constructor to set the state id, name and forward edges for this state
 	 * @param stateID the state id to set
 	 * @param name the name of the state
 	 * @param forwardEdges forward edges from this state
 	 */
-	NormalState(int stateID, string name,
+	NormalState(int stateID, std::string name,
 			std::vector<typename ForwardEdge<Tin, Tout, Tdep>::ForwardEdgePtr> forwardEdges): NFAState<Tin>(stateID, name), forwardEdges(forwardEdges) {}
 	/**
 	 * Get the state type (it should be here a normal state)
@@ -97,12 +97,12 @@ public:
 	 * get all the forward edges that associated with this state
 	 * @return as above
 	 */
-	const vector<typename ForwardEdge<Tin, Tout, Tdep>::ForwardEdgePtr>& getForwardEdges() const { return this->forwardEdges; }
+	const std::vector<typename ForwardEdge<Tin, Tout, Tdep>::ForwardEdgePtr>& getForwardEdges() const { return this->forwardEdges; }
 	/**
 	 * set all the forward edges at once for this state
 	 * @param forwardEdges the forward edges
 	 */
-	void setForwardEdges(vector<typename ForwardEdge<Tin, Tout, Tdep>::ForwardEdgePtr> forwardEdges) { this->forwardEdges = forwardEdges; }
+	void setForwardEdges(std::vector<typename ForwardEdge<Tin, Tout, Tdep>::ForwardEdgePtr> forwardEdges) { this->forwardEdges = forwardEdges; }
 	/**
 	 * Fetch a particular edge pointer from the edge collections given its index
 	 * @return as above

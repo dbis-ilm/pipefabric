@@ -43,14 +43,14 @@ public:
 	 * @param name the name of the state
 	 *
 	 */
-	NegationState(int stateID, string name): NormalState<Tin, Tout, Tdep>(stateID, name){}
+	NegationState(int stateID, std::string name): NormalState<Tin, Tout, Tdep>(stateID, name){}
 	/**
 	 * constructor to set the state id, name and forward edges for this state
 	 * @param stateID the state id to set
 	 * @param name the name of the state
 	 * @param forward_edges forward edges from this state
 	 */
-	NegationState(int stateID, string name,
+	NegationState(int stateID, std::string name,
 			std::vector<typename ForwardEdge<Tin, Tout, Tdep>::ForwardEdgePtr> forwardEdges) : NormalState<Tin, Tout, Tdep>(stateID, name, forwardEdges) {}
 	/**
 	 * @get the type of this state (initial state).

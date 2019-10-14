@@ -27,7 +27,6 @@
 
 #include "core/Tuple.hpp"
 
-using namespace std;
 using namespace boost::posix_time;
 namespace pfabric {
 /**
@@ -151,7 +150,7 @@ public:
 	 * Output member variable information.
 	 * @param os the output stream handle.
 	 */
-	void print(ostream& os = cout) {
+	void print(std::ostream& os = std::cout) {
 		os << "[ " << this->sequenceInComplex << "," << this->state << " ,";
 		//this->originalEvent->print(os);
 		os << " ]\n";

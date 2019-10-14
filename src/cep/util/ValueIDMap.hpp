@@ -22,7 +22,7 @@
 #define ValueIDMap_hpp_
 #include<boost/unordered_map.hpp>
 #include <string>
-using namespace std;
+
 
 namespace pfabric {
 

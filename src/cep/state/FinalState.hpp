@@ -43,7 +43,7 @@ public:
 	 * @param  stateID the state id to set
 	 * @param name the name of the state
 	 */
-	FinalState(int stateID, string name): NFAState<Tin>(stateID, name) {}
+	FinalState(int stateID, std::string name): NFAState<Tin>(stateID, name) {}
 	/**
 	 * Get the type of this state (final).
 	 * @return as above.
