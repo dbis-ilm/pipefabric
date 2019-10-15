@@ -29,7 +29,7 @@ using namespace std::chrono_literals;
 using T1 = TuplePtr<int, int>;
 using RunningAvg = Aggregator1<T1, AggrAvg<double, double>, 1>;
 using Sum = Aggregator1<T1, AggrSum<int>, 1>;
-  
+
 void runTimeExperiment1();
 void runTimeExperiment2();
 void runTimeExperiment3();
@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
     return -1;
   } else {
     winType = strcmp(argv[1], "time") == 0 ?  WinType::Time :
-              strcmp(argv[1], "tuple") == 0 ? WinType::Tuple : WinType::NA; 
+              strcmp(argv[1], "tuple") == 0 ? WinType::Tuple : WinType::NA;
     if (winType == WinType::NA) {
       std::cout << "Invalid window type (allowed: time or tuple)\n";
       return -1;
@@ -120,17 +120,17 @@ void runTimeExperiment1() {
   StreamGenerator<T1>::Generator gen([&input] (size_t n) {
     return input[n];
   });
-  
+
   Topology t;
   auto s = t.streamFromGenerator<T1>(gen, input.size())
     .assignTimestamps(func)
-    .tumblingWindow(WindowParams::RangeWindow, 3) 
+    .tumblingWindow(WindowParams::RangeWindow, 3)
     .aggregate<RunningAvg>(/*TriggerByTimestamp, 3*/)
     .print(std::cout);
-  
+
   std::cout << "\nRunning Time-based Window Experiment 1" << std::endl;
   t.start(true);
-  t.wait(); 
+  t.wait();
 }
 
 /* ---------------------------------------------------------------------------------------------- */
@@ -142,16 +142,16 @@ void runTimeExperiment2() {
   StreamGenerator<T1>::Generator gen([&input] (size_t n) {
     return input[n];
   });
-  
+
   Topology t;
   auto s = t.streamFromGenerator<T1>(gen, input.size())
     .assignTimestamps(func)
-    .slidingWindow(WindowParams::RangeWindow, 5) 
+    .slidingWindow(WindowParams::RangeWindow, 5)
     .print(std::cout);
-  
+
   std::cout << "\nRunning Time-based Window Experiment 2" << std::endl;
   t.start(true);
-  t.wait(); 
+  t.wait();
 }
 
 /* ---------------------------------------------------------------------------------------------- */
@@ -170,17 +170,17 @@ void runTimeExperiment4() {
   StreamGenerator<T1>::Generator gen([&input] (size_t n) {
     return input[n];
   });
-  
+
   Topology t;
   auto s = t.streamFromGenerator<T1>(gen, input.size())
     .assignTimestamps(func)
-    .slidingWindow(WindowParams::RangeWindow, 4) 
+    .slidingWindow(WindowParams::RangeWindow, 4)
     .aggregate<Sum>()
     .print(std::cout);
-  
+
   std::cout << "\nRunning Time-based Window Experiment 4" << std::endl;
   t.start(true);
-  t.wait(); 
+  t.wait();
 }
 
 /* ---------------------------------------------------------------------------------------------- */
@@ -195,17 +195,17 @@ void runTimeExperiment5() {
   StreamGenerator<T1>::Generator gen([&input] (size_t n) {
     return input[n];
   });
-  
+
   Topology t;
   auto s = t.streamFromGenerator<T1>(gen, input.size())
     .assignTimestamps(func)
-    .tumblingWindow(WindowParams::RangeWindow, 3) 
+    .tumblingWindow(WindowParams::RangeWindow, 3)
     .aggregate<Sum>(/*TriggerByTimestamp, 3*/)
     .print(std::cout);
-  
+
   std::cout << "\nRunning Time-based Window Experiment 5" << std::endl;
   t.start(true);
-  t.wait(); 
+  t.wait();
 }
 
 /* ---------------------------------------------------------------------------------------------- */
@@ -220,17 +220,17 @@ void runTimeExperiment6() {
   StreamGenerator<T1>::Generator gen([&input] (size_t n) {
     return input[n];
   });
-  
+
   Topology t;
   auto s = t.streamFromGenerator<T1>(gen, input.size())
     .assignTimestamps(func)
-    .tumblingWindow(WindowParams::RangeWindow, 3) 
+    .tumblingWindow(WindowParams::RangeWindow, 3)
     .aggregate<Sum>()
     .print(std::cout);
-  
+
   std::cout << "\nRunning Time-based Window Experiment 6" << std::endl;
   t.start(true);
-  t.wait(); 
+  t.wait();
 }
 
 /* ---------------------------------------------------------------------------------------------- */
@@ -251,17 +251,17 @@ void runTupleExperiment2() {
   StreamGenerator<T1>::Generator gen([&input] (size_t n) {
     return input[n];
   });
-  
+
   Topology t;
   auto s = t.streamFromGenerator<T1>(gen, input.size())
     .assignTimestamps(func)
-    .tumblingWindow(WindowParams::RowWindow, 3)  
+    .tumblingWindow(WindowParams::RowWindow, 3)
     .aggregate<Sum>()
     .print(std::cout);
-  
+
   std::cout << "\nRunning Tuple-based Window Experiment 2" << std::endl;
   t.start(true);
-  t.wait(); 
+  t.wait();
 }
 
 /* ---------------------------------------------------------------------------------------------- */
@@ -276,17 +276,17 @@ void runTupleExperiment3() {
   StreamGenerator<T1>::Generator gen([&input] (size_t n) {
     return input[n];
   });
-  
+
   Topology t;
   auto s = t.streamFromGenerator<T1>(gen, input.size())
     .assignTimestamps(func)
-    .tumblingWindow(WindowParams::RowWindow, 1)  
+    .tumblingWindow(WindowParams::RowWindow, 1)
     .aggregate<RunningAvg>()
     .print(std::cout);
-  
+
   std::cout << "\nRunning Tuple-based Window Experiment 3" << std::endl;
   t.start(true);
-  t.wait(); 
+  t.wait();
 }
 
 /* ---------------------------------------------------------------------------------------------- */
@@ -307,15 +307,15 @@ void runTupleExperiment5() {
   StreamGenerator<T1>::Generator gen([&input] (size_t n) {
     return input[n];
   });
-  
+
   Topology t;
   auto s = t.streamFromGenerator<T1>(gen, input.size())
     .assignTimestamps(func)
-    .tumblingWindow(WindowParams::RowWindow, 2)  
+    .tumblingWindow(WindowParams::RowWindow, 2)
     .aggregate<Sum>()
     .print(std::cout);
-  
+
   std::cout << "\nRunning Tuple-based Window Experiment 5" << std::endl;
   t.start(true);
-  t.wait(); 
+  t.wait();
 }
