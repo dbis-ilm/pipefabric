@@ -66,7 +66,7 @@ public:
 	 * Output the information  into ostream object
 	 * @param out The output stream handle.
 	 */
-	void print(ostream& out = cout) const {
+	void print(std::ostream& out = std::cout) const {
 		/*
 		 os << std::endl;
 		 for (value_id_multimap<

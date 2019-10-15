@@ -131,7 +131,7 @@ void QueryCompiler::checkPlan(PFabricContext& ctx,
   traverse(plan->sinkOperator(), [&](PlanOpPtr op) {
     switch (op->mOpType) {
       case BasePlanOp::Where_Op: {
-        auto whereOp = static_pointer_cast<PlanOp<WhereInfo>>(op);
+        auto whereOp = std::static_pointer_cast<PlanOp<WhereInfo>>(op);
         // get schema from child
         whereOp->mOutputSchema = whereOp->mChild->mOutputSchema;
         // replace column names in expression by integer positions
@@ -139,14 +139,14 @@ void QueryCompiler::checkPlan(PFabricContext& ctx,
         break;
       }
       case BasePlanOp::Map_Op: {
-        auto mapOp = static_pointer_cast<PlanOp<MapInfo>>(op);
+        auto mapOp = std::static_pointer_cast<PlanOp<MapInfo>>(op);
         // construct outputSchema and map columnNames to integer positions
         constructMapSchema(mapOp);
         mTypeMgr.registerType(mapOp->mOutputSchema);
         break;
       }
       case BasePlanOp::FromTable_Op: {
-        auto tableOp = static_pointer_cast<PlanOp<FromTableInfo>>(op);
+        auto tableOp = std::static_pointer_cast<PlanOp<FromTableInfo>>(op);
         tableOp->payload().tableInfo =
             ctx.getTableInfo(tableOp->payload().tableName);
         tableOp->mOutputSchema = *(tableOp->payload().tableInfo.get());
@@ -303,13 +303,13 @@ void QueryCompiler::generateQuery(std::ostream& os, PFabricContext& ctx,
   traverse(plan->sinkOperator(), [&](PlanOpPtr op) {
     switch (op->mOpType) {
       case BasePlanOp::Where_Op: {
-        auto whereOp = static_pointer_cast<PlanOp<WhereInfo>>(op);
+        auto whereOp = std::static_pointer_cast<PlanOp<WhereInfo>>(op);
         os << "\t\t.where([](auto tp, bool) -> bool {\n\t\t\treturn "
            << generateWhereExpression(whereOp->payload()) << "; })\n";
         break;
       }
       case BasePlanOp::Map_Op: {
-        auto mapOp = static_pointer_cast<PlanOp<MapInfo>>(op);
+        auto mapOp = std::static_pointer_cast<PlanOp<MapInfo>>(op);
         auto inputSchema = mapOp->mChild->mOutputSchema;
         auto resTypeName = mTypeMgr.nameOfType(mapOp->mOutputSchema);
         os << "\t\t.map<" << resTypeName << ">([](auto tp, bool) -> " << resTypeName << " {\n"
@@ -318,7 +318,7 @@ void QueryCompiler::generateQuery(std::ostream& os, PFabricContext& ctx,
         break;
       }
       case BasePlanOp::FromTable_Op: {
-        auto tableOp = static_pointer_cast<PlanOp<FromTableInfo>>(op);
+        auto tableOp = std::static_pointer_cast<PlanOp<FromTableInfo>>(op);
         os << "\ttopology->selectFromTable<"
            << mTypeMgr.nameOfType(tableOp->mOutputSchema) << ", "
            << tableOp->mOutputSchema.typeOfKey() << ">("

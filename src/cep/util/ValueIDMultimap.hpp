@@ -22,7 +22,7 @@
 #define ValueIDMultimap_hpp_
 #include<boost/unordered_map.hpp>
 #include "Partition.hpp"
-using namespace std;
+
 
 namespace pfabric {
 
@@ -56,7 +56,7 @@ public:
 	 * Output the information  into ostream object
 	 * @param out The output stream handle.
 	 */
-	virtual void print(ostream& out = cout) const=0;
+	virtual void print(std::ostream& out = std::cout) const=0;
 
 	/**
 	 * Get the ID of a given value.

@@ -58,7 +58,7 @@ public:
 	 * output member variable information.
 	 * @param out the output stream handle.
 	 */
-	virtual void write(ostream& out = cout) const {
+	virtual void write(std::ostream& out = std::cout) const {
 		out << "This is a loop edge with ID(" << this->edgeID << ") with loop number "
 				<< numOfLoop;
 	}

@@ -111,7 +111,7 @@ public:
 	 * @param name the name of the start state
 	 * @return a pointer to start state
 	 */
-	typename StartState<TinPtr, ToutPtr, TdepPtr>::StartStatePtr createStartState(string name) {
+	typename StartState<TinPtr, ToutPtr, TdepPtr>::StartStatePtr createStartState(std::string name) {
 		start.reset(new StartState<TinPtr, ToutPtr, TdepPtr>(stateCountID++, name));
 		return start;
 	}
@@ -121,7 +121,7 @@ public:
 	 * @param name the name of this normal state
 	 * @return a pointer to a normal state
 	 */
-	typename NormalState<TinPtr, ToutPtr, TdepPtr>::NormalStatePtr createNormalState(string name) {
+	typename NormalState<TinPtr, ToutPtr, TdepPtr>::NormalStatePtr createNormalState(std::string name) {
 		typename NormalState<TinPtr, ToutPtr, TdepPtr>::NormalStatePtr state(
 				new NormalState<TinPtr, ToutPtr, TdepPtr>(stateCountID++, name));
 		normalStates.push_back(state);
@@ -133,7 +133,7 @@ public:
 	 * @param spec the specification of this state (whether kleene star, kleene plus and so on)
 	 * @return a pointer to a kleene state
 	 */
-	typename KleeneState<TinPtr, ToutPtr, TdepPtr>::KleeneStatePtr createKleeneState(string name,
+	typename KleeneState<TinPtr, ToutPtr, TdepPtr>::KleeneStatePtr createKleeneState(std::string name,
 			typename KleeneState<TinPtr, ToutPtr, TdepPtr>::KleeneSpecification spec = KleeneState<
 					TinPtr, ToutPtr, TdepPtr>::Star) {
 		typename KleeneState<TinPtr, ToutPtr, TdepPtr>::KleeneStatePtr state(
@@ -146,7 +146,7 @@ public:
 	 * @param name the name of the final state
 	 * @return a pointer to a final state
 	 */
-	typename FinalState<TinPtr, ToutPtr, TdepPtr>::FinalStatePtr createFinalState(string name) {
+	typename FinalState<TinPtr, ToutPtr, TdepPtr>::FinalStatePtr createFinalState(std::string name) {
 		typename FinalState<TinPtr, ToutPtr, TdepPtr>::FinalStatePtr final(
 				new FinalState<TinPtr, ToutPtr, TdepPtr>(stateCountID++, name));
 		finalStates.push_back(final);
@@ -158,7 +158,7 @@ public:
 	 * @return a pointer to a negated state
 	 */
 	typename NegationState<TinPtr, ToutPtr, TdepPtr>::NegationStatePtr createNegationState(
-			string name) {
+            std::string name) {
 		typename NegationState<TinPtr, ToutPtr, TdepPtr>::NegationStatePtr state(
 				new NegationState<TinPtr, ToutPtr, TdepPtr>(stateCountID++, name));
 		negatedStates.push_back(state);
@@ -432,7 +432,7 @@ public:
 		this->update = update;
 
 	}
-	void print (ostream& out = std::cout) ;
+	void print (std::ostream& out = std::cout) ;
 
 	initDependency init ;
 
@@ -553,7 +553,7 @@ void NFAController<TinPtr, ToutPtr, TdepPtr>::addNormalState(typename NormalStat
 }
 
 template <class TinPtr, class ToutPtr, class TdepPtr>
-void NFAController<TinPtr, ToutPtr, TdepPtr>::print (ostream& out) {
+void NFAController<TinPtr, ToutPtr, TdepPtr>::print (std::ostream& out) {
 	out << this->start->getStateName() << std::endl;
 }
 

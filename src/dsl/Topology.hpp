@@ -66,6 +66,8 @@
   #include "usecases/LinearRoad/DataDriverLR.hpp"
 #endif
 
+using namespace std::chrono_literals;
+
 namespace pfabric {
 
   /**
@@ -135,7 +137,7 @@ namespace pfabric {
     /**
      * @brief Constructs a new empty topology.
      */
-    Topology() : asyncStarted(false), dataflow(make_shared<Dataflow>()) {}
+    Topology() : asyncStarted(false), dataflow(std::make_shared<Dataflow>()) {}
 
     /**
      * @brief Destructor for topology.
