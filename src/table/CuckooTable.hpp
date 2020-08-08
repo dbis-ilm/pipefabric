@@ -94,7 +94,7 @@ template <typename RecordType, typename KeyType = DefaultKeyType>
 class CuckooTable : public BaseTable {
 public:
   //< the actual implementation of the table
-  typedef cuckoohash_map<KeyType, RecordType> TableMap;
+  typedef libcuckoo::cuckoohash_map<KeyType, RecordType> TableMap;
 
   //< typedef for a updater function which returns a modification of the parameter tuple
   typedef std::function<void(RecordType&)> UpdaterFunc;
