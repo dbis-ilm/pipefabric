@@ -34,8 +34,9 @@
 #include "fmt/format.h"
 
 #ifdef USE_ROCKSDB_TABLE
-#include "rocksdb/db.h"
 #include "table/RDBTable.hpp"
+#elif USE_NVM_TABLES
+#include "table/PBPTreeTable.hpp"
 #else
 #include "table/CuckooTable.hpp"
 #include "table/HashMapTable.hpp"
@@ -44,6 +45,7 @@
 #include "core/serialize.hpp"
 
 #include "table/BaseTable.hpp"
+#include "table/StateContext.hpp"
 #include "table/TableException.hpp"
 #include "table/TableInfo.hpp"
 
@@ -125,6 +127,8 @@ class S2PLTable : public BaseTable,
  public:
 #ifdef USE_ROCKSDB_TABLE
   using Table = RDBTable<RecordType, KeyType>;
+#elif USE_NVM_TABLES
+  using Table = PBPTreeTable<RecordType, KeyType>;
 #else
   using Table = CuckooTable<RecordType, KeyType>;
 #endif
@@ -154,16 +158,16 @@ class S2PLTable : public BaseTable,
    * details */
   using Predicate = typename Table::Predicate;
 
-  S2PLTable(const TableInfo& tInfo, SCtxType& sCtx) noexcept(noexcept(Table(tInfo)))
+  explicit S2PLTable(const TableInfo& tInfo, SCtxType& sCtx) noexcept(noexcept(Table(tInfo)))
       : BaseTable(tInfo), tbl(tInfo), sCtx{sCtx} {}
-  
-  S2PLTable(const std::string& tableName, SCtxType& sCtx) noexcept(noexcept(Table(tableName)))
+
+  explicit S2PLTable(const std::string& tableName, SCtxType& sCtx) noexcept(noexcept(Table(tableName)))
       : tbl(tableName), sCtx{sCtx} {}
 
   /**
    * Constructor for creating an empty table.
    */
-  S2PLTable(const std::string& tableName) : tbl(tableName) {}
+  explicit S2PLTable(const std::string& tableName) : tbl{tableName}, sCtx{} {}
 
   /**
     * Destructor for table.
@@ -179,6 +183,11 @@ class S2PLTable : public BaseTable,
 
   void transactionBegin(const TransactionID& txnID) {
     sCtx.txCntW++;
+    /*
+    auto pop = pmem::obj::pool_by_pptr(tbl.q);
+    if (tx == nullptr)
+      tx = new transaction::manual(pop);
+    */
   }
 
   Errc transactionPreCommit(const TransactionID& txnID) {
@@ -193,11 +202,13 @@ class S2PLTable : public BaseTable,
       s = this->transactionCommit(txnID);
       if (s != Errc::SUCCESS) return s;
       s = sCtx.regStates[otherID]->transactionCommit(txnID);
+      //transaction::commit();
+      //delete tx;
       sCtx.removeTx(txnID);
     }
     return s;
   }
-  
+
   Errc transactionCommit(const TransactionID& txnID) {
     for (const auto &k : wKeysLocked) {
       locks.unlockExclusive(k);
@@ -243,7 +254,10 @@ class S2PLTable : public BaseTable,
     locks.lockExclusive(key);
     wKeysLocked.push_back(key);
     // insert
-    tbl.insert(key, rec);
+    auto pop = pmem::obj::pool_by_pptr(tbl.q);
+    transaction::run(pop, [&] {
+      tbl.insert(key, rec);
+    });
   }
 
   /**
@@ -339,18 +353,15 @@ class S2PLTable : public BaseTable,
    * @param key the key value
    * @return the tuple associated with the given key
    */
-  Errc getByKey(const TransactionID txnID, const KeyType key, SmartPtr<RecordType> &outValue) { 
+  Errc getByKey(const TransactionID txnID, const KeyType key, SmartPtr<RecordType> &outValue) {
     if (locks.lockShared(key)) {
       return Errc::ABORT;
     }
-    SmartPtr<RecordType> tplPtr;
-    try {
-      tplPtr = tbl.getByKey(key);
-    } catch (TableException &exc) {
+
+    if (!tbl.getByKey(key, outValue)) {
       locks.unlockShared(key);
       return Errc::NOT_FOUND;
     }
-    outValue = tplPtr;
     return Errc::SUCCESS;
   }
 

@@ -94,7 +94,7 @@ template <typename RecordType, typename KeyType = DefaultKeyType>
 class CuckooTable : public BaseTable {
 public:
   //< the actual implementation of the table
-  typedef cuckoohash_map<KeyType, RecordType> TableMap;
+  typedef libcuckoo::cuckoohash_map<KeyType, RecordType> TableMap;
 
   //< typedef for a updater function which returns a modification of the parameter tuple
   typedef std::function<void(RecordType&)> UpdaterFunc;
@@ -123,7 +123,7 @@ public:
   /**
    * Constructor for creating an empty table with a given schema.
    */
-  CuckooTable(const TableInfo& tInfo) : BaseTable(tInfo) {}
+  explicit CuckooTable(const TableInfo& tInfo) : BaseTable(tInfo) {}
 
   /**
    * Destructor for table.
@@ -236,7 +236,7 @@ public:
       if (ifunc != nullptr) {
         insert(key, ifunc());
         return 1;
-      } 
+      }
     }
     return 0;
   }
@@ -274,7 +274,7 @@ public:
    */
   unsigned long updateWhere(Predicate pfunc, UpdaterFunc ufunc) {
     unsigned long num = 0;
-    
+
     // we perform a full table scan
     auto lt = mDataTable.lock_table();
     for(auto &it : lt) {

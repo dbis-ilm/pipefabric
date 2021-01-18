@@ -40,7 +40,7 @@
 #include <libpmemobj++/utils.hpp>
 #include <libpmempool.h>
 
-#include "pbptree/PBPTree.hpp"
+#include "pbptrees/PBPTree.hpp"
 
 #include "pfabric_config.h"
 #include "core/Tuple.hpp"
@@ -50,7 +50,6 @@
 
 namespace pfabric {
 
-constexpr auto poolSize = 1024 * 1024 *1024; ///< 1GB
 constexpr auto BRANCHSIZE = 32;
 constexpr auto LEAFSIZE = 16;
 
@@ -59,7 +58,7 @@ using pmem::obj::make_persistent;
 using pmem::obj::persistent_ptr;
 using pmem::obj::pool;
 using pmem::obj::transaction;
-using dbis::pbptree::PBPTree;
+using dbis::pbptrees::PBPTree;
 
 template<typename KeyType, typename RecordType>
 class PBPTreeIterator {
@@ -76,13 +75,13 @@ class PBPTreeIterator {
     iter(std::move(_iter)), end(std::move(_end)), pred(_pred) {
 
     while (isValid() && !pred((*iter).second))
-      iter++;
+      ++iter;
   }
 
   PBPTreeIterator &operator++() {
-    iter++;
+    ++iter;
     while (isValid() && !pred((*iter).second))
-      iter++;
+      ++iter;
     return *this;
   }
 
@@ -164,14 +163,14 @@ class PBPTreeTable : public BaseTable {
   /************************************************************************//**
    * \brief Constructor for creating an empty table with only a given name.
    *****************************************************************************/
-  PBPTreeTable(const std::string &tableName) : BaseTable(constructSchema<RecordType>(tableName)) {
+  explicit PBPTreeTable(const std::string &tableName) : BaseTable(constructSchema<RecordType>(tableName)) {
     openOrCreateTable(constructSchema<RecordType>(tableName));
   }
 
   /************************************************************************//**
    * \brief Constructor for creating an empty table with a given schema.
    *****************************************************************************/
-  PBPTreeTable(const TableInfo &tInfo) :
+  explicit PBPTreeTable(const TableInfo &tInfo) :
     BaseTable(tInfo) {
     openOrCreateTable(tInfo);
   }
@@ -186,15 +185,22 @@ class PBPTreeTable : public BaseTable {
   /************************************************************************//**
    * \brief Insert a tuple.
    *
-   * Insert the given tuple \rec with the given key into the table. After the insert
-   * all observers are notified.
+   * Insert or update the given tuple \rec with the given key into the table.
+   * After the insert all observers are notified.
    *
    * \param key the key value of the tuple
    * \param rec the actual tuple
    *****************************************************************************/
-  void insert(KeyType key, const RecordType &rec) noexcept(false) {
-    btree->insert(key, rec.data());
-    notifyObservers(rec, TableParams::Insert, TableParams::Immediate);
+  void insert(const KeyType key, const RecordType &rec) noexcept(false) {
+    TupleType *tptr;
+    if (btree->lookupRef(key, &tptr)) {
+      *tptr = rec.data();
+      notifyObservers(rec, TableParams::Update, TableParams::Immediate);
+    }
+    else {
+      btree->insert(key, rec.data());
+      notifyObservers(rec, TableParams::Insert, TableParams::Immediate);
+    }
   }
 
   /************************************************************************//**
@@ -284,14 +290,25 @@ class PBPTreeTable : public BaseTable {
    * \param key the key value
    * \return the tuple associated with the given key
    *****************************************************************************/
-  const SmartPtr<RecordType> getByKey(KeyType key) noexcept(false) {
-    //TODO: ugly, can we do better?
+  const SmartPtr<RecordType> getByKey(const KeyType key) const {
     TupleType tt;
     if(btree->lookup(key, &tt)) {
       return new RecordType(tt);
     }
-
     else throw TableException("Key not found: " + key);
+  }
+
+  const bool getByKey(const KeyType key, SmartPtr<RecordType> &outValue) const {
+    TupleType tt;
+    if (btree->lookup(key, &tt)) {
+      outValue.reset(new RecordType(tt));
+      return true;
+    }
+    return false;
+  }
+
+  bool getAsRef(const KeyType key, TupleType **val) const {
+    return btree->lookupRef(key, val);
   }
 
   /************************************************************************//**
@@ -341,8 +358,8 @@ class PBPTreeTable : public BaseTable {
    *****************************************************************************/
   unsigned long size() const {
     //TODO: Maybe there is a more efficient way
-    auto cnt = 0u;
-    for(auto e: *btree) cnt++;
+    const auto cnt = std::distance(btree->begin(), btree->end());
+    //for(const auto _: *btree) ++cnt;
     return cnt;
   }
 
@@ -365,7 +382,7 @@ class PBPTreeTable : public BaseTable {
   }
 
   void drop() {
-    auto pop = pool_by_pptr(q);
+    //auto pop = pool_by_pptr(q);
     transaction::run(pop, [&] {
       delete_persistent<PBTreeType>(q->btree);
       q->btree = nullptr;
@@ -378,32 +395,40 @@ class PBPTreeTable : public BaseTable {
   }
 
   void truncate() {
-    auto pop = pool_by_pptr(q);
+    pobj_alloc_class_desc alloc_class = pop.template ctl_get<struct pobj_alloc_class_desc>("heap.alloc_class.128.desc");
     transaction::run(pop, [&] {
       delete_persistent<PBTreeType>(q->btree);
-      q->btree = make_persistent<PBTreeType>();
+      q->btree = make_persistent<PBTreeType>(alloc_class);
       btree = q->btree;
     });
-  
+
   }
 
   void print() {
     btree->print(false);
   }
 
+  persistent_ptr<struct root> q;
+  persistent_ptr<PBTreeType> btree;
+
  private:
+  pool<root> pop;
+
   void openOrCreateTable(const TableInfo &tableInfo) noexcept(false) {
     const std::string path = pfabric::gPmemPath + tableInfo.tableName() + ".db";
-    pool<root> pop;
 
     if (access(path.c_str(), F_OK) != 0) {
       //TODO: How do we estimate the required pool size
-      pop = pool<root>::create(path, "PBPTree", poolSize);
+      pop = pool<root>::create(path, "PBPTree", pfabric::gPmemPoolSize);
+      pobj_alloc_class_desc alloc_class = pop.ctl_set("heap.alloc_class.128.desc",
+                                                      PBTreeType::AllocClass);
       transaction::run(pop, [&] {
-        pop.root()->btree = make_persistent<PBTreeType>();
+        pop.root()->btree = make_persistent<PBTreeType>(alloc_class);
       });
     } else {
       pop = pool<root>::open(path, "PBPTree");
+      pobj_alloc_class_desc alloc_class = pop.ctl_set("heap.alloc_class.128.desc",
+                                                      PBTreeType::AllocClass);
     }
     q = std::move(pop.root());
     btree = (q->btree); ///< retrieve volatile address of btree
@@ -428,8 +453,6 @@ class PBPTreeTable : public BaseTable {
     }
   }
 
-  persistent_ptr<struct root> q;
-  persistent_ptr<PBTreeType> btree;
   ObserverCallback mImmediateObservers, mDeferredObservers;
 
 }; /* class PBPTreeTable */

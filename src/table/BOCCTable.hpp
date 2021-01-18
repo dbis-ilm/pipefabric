@@ -37,8 +37,9 @@
 #include "fmt/format.h"
 
 #ifdef USE_ROCKSDB_TABLE
-#include "rocksdb/db.h"
 #include "table/RDBTable.hpp"
+#elif USE_NVM_TABLES
+#include "table/PBPTreeTable.hpp"
 #else
 #include "table/CuckooTable.hpp"
 #include "table/HashMapTable.hpp"
@@ -76,10 +77,12 @@ class BOCCTable : public BaseTable,
  public:
 #ifdef USE_ROCKSDB_TABLE
   using Table = RDBTable<RecordType, KeyType>;
+#elif USE_NVM_TABLES
+  using Table = PBPTreeTable<RecordType, KeyType>;
 #else
   using Table = CuckooTable<RecordType, KeyType>;
 #endif
- 
+
   /** For external access to template parameters */
   using RType = RecordType;
   using KType = KeyType;
@@ -144,52 +147,54 @@ class BOCCTable : public BaseTable,
 
     WriteSet(const TransactionID _v, const TransactionID _e, const size_t _reserve = 0)
       noexcept : valTS{_v}, endTS{_e} { keys.reserve(_reserve); }
-    void insert(const KeyType& k) { keys.emplace(k); }
-    void insert(KeyType&& k) { keys.emplace(std::move(k)); }
+    WriteSet(const TransactionID _v, const TransactionID _e, std::unordered_set<KeyType>&& _k)
+      noexcept : valTS{_v}, endTS{_e}, keys{std::move(_k)} {}
+    void insert(const KeyType& k) noexcept { keys.emplace(k); }
+    void insert(KeyType&& k) noexcept { keys.emplace(std::move(k)); }
   };
 
   /*******************************************************************************
    * @brief A read-write (shared) lock for handling the writeSet deque
    ******************************************************************************/
-	class RWLock {
-		//cf. https://stackoverflow.com/a/28121513
-		public:
-			void lockShared() {
-				std::unique_lock<std::mutex> lk(shared);
-				while(active_writer)
-					readerQ.wait(lk);
-				++active_readers;
-				lk.unlock();
-			}
+  class RWLock {
+    //cf. https://stackoverflow.com/a/28121513
+    public:
+      void lockShared() {
+        std::unique_lock<std::mutex> lk(shared);
+        while(active_writer)
+          readerQ.wait(lk);
+        ++active_readers;
+        lk.unlock();
+      }
 
-			void lockExclusive() {
-				std::unique_lock<std::mutex> lk(shared);
-				while(active_readers)
-					writerQ.wait(lk);
-				active_writer = true;
-				lk.unlock();
-			}
+      void lockExclusive() {
+        std::unique_lock<std::mutex> lk(shared);
+        while(active_readers)
+          writerQ.wait(lk);
+        active_writer = true;
+        lk.unlock();
+      }
 
-			void unlockShared() {
-				std::unique_lock<std::mutex> lk(shared);
-				--active_readers;
-				lk.unlock();
-				writerQ.notify_one();
-			}
+      void unlockShared() {
+        std::unique_lock<std::mutex> lk(shared);
+        --active_readers;
+        lk.unlock();
+        writerQ.notify_one();
+      }
 
-			void unlockExclusive() {
-				std::unique_lock<std::mutex> lk(shared);
-				active_writer = false;
-				readerQ.notify_all();
-				lk.unlock();
-			}
+      void unlockExclusive() {
+        std::unique_lock<std::mutex> lk(shared);
+        active_writer = false;
+        readerQ.notify_all();
+        lk.unlock();
+      }
 
-			std::mutex              shared{};
-			std::condition_variable readerQ{};
-			std::condition_variable writerQ{};
-			int                     active_readers{0};
-			bool                    active_writer{0};
-	};
+      std::mutex              shared{};
+      std::condition_variable readerQ{};
+      std::condition_variable writerQ{};
+      int                     active_readers{0};
+      bool                    active_writer{0};
+  };
 
   /**
    * Constructors for creating an empty table.
@@ -233,21 +238,25 @@ class BOCCTable : public BaseTable,
     return s;
   }
 
-  Errc transactionCommit(const TransactionID& txnID) { 
-    /* Apply changes and save writeSet */
+  Errc transactionCommit(const TransactionID& txnID) {
     const auto valTS = sCtx.getNewTS();
+    /// Save writeSet
     dQLock.lockExclusive();
-    committedWSs.emplace_front(valTS, DTS_INF, writeSet.set.size());
+    auto &ws = committedWSs.emplace_front(valTS, DTS_INF, writeSet.set.size());
+    for (const auto& e : writeSet.set)
+      ws.keys.emplace(e.first);
     dQLock.unlockExclusive();
-    auto& ws = committedWSs.front();
-    for (const auto& e : writeSet.set) {
-      tbl.insert(e.first, std::move(e.second));
-      ws.insert(std::move(e.first));
-    }
-    ws.endTS = sCtx.getNewTS();
+    /// Actual insert to table
+    auto pop = pmem::obj::pool_by_pptr(tbl.q);
+    transaction::run(pop, [&]{
+      for (const auto& e : writeSet.set) {
+        tbl.insert(std::move(e.first), std::move(e.second));
+      }
+    });
+    ws.endTS = sCtx.getNewTS(); ///< note end of transaction writing in write set
     writeSet.clean();
 
-    /* Cleanup old write sets [remove all where EndTS < oldest active tx] */
+    /// Cleanup old write sets [remove all where EndTS < oldest active tx]
 //    if (committedWSs.size() > 100) {
       auto oldestTx = sCtx.getOldestActiveTx();
       if (oldestTx == txnID) oldestTx = ws.endTS;
@@ -260,7 +269,6 @@ class BOCCTable : public BaseTable,
         }
       }
 //    }
-
     return Errc::SUCCESS;
   }
 
@@ -277,18 +285,18 @@ class BOCCTable : public BaseTable,
     /* Just for easier evaluation (--> always three timestamps per TX): */
     sCtx.getNewTS();
     const auto valTS = sCtx.getNewTS();
-		dQLock.lockShared();
+    dQLock.lockShared();
     for (const auto& ws: committedWSs) {
-      if(txnID < ws.endTS && valTS > ws.valTS) { //< necessary condition
+      if (txnID < ws.endTS && valTS > ws.valTS) { ///< necessary condition
         for (auto i = 0u; i < until; ++i) {
-          if(!ws.keys.empty() && ws.keys.find(keys[i]) != ws.keys.end()) { //< sufficient condition
+          if (!ws.keys.empty() && ws.keys.find(keys[i]) != ws.keys.end()) { ///< sufficient condition
             dQLock.unlockShared();
             return Errc::ABORT;
           }
         }
       }
     }
-		dQLock.unlockShared();
+    dQLock.unlockShared();
 
     return Errc::SUCCESS;
   }
@@ -421,14 +429,10 @@ class BOCCTable : public BaseTable,
         return Errc::SUCCESS;
       }
     }
-    
-    SmartPtr<RecordType> tplPtr;
-    try {
-      tplPtr = tbl.getByKey(key);
-    } catch (TableException& exc) {
+
+    if (!tbl.getByKey(key, outValue)) {
       return Errc::NOT_FOUND;
     }
-    outValue = tplPtr;
     return Errc::SUCCESS;
   }
 
@@ -485,7 +489,7 @@ class BOCCTable : public BaseTable,
    *==========================================================================*/
   ActiveWriteSet writeSet;
   std::deque<WriteSet> committedWSs{};
- 	RWLock dQLock;
+  RWLock dQLock;
   Table tbl;
   TableID tblID;
   SCtxType& sCtx;

@@ -80,7 +80,7 @@ void generateWorkload(const double theta, const std::string &name) {
 
   workload_file.open(name);
 
-  if(Z){
+  if constexpr (Z) {
     ZipfianGenerator zipfGen{0, keyRange-1, theta};
     std::cout << "Using Zipf with theta = " << theta << '\n';
     for (auto t = 1u; t < workloadNumTxs+1; ++t) {
@@ -90,7 +90,6 @@ void generateWorkload(const double theta, const std::string &name) {
       }
     }
   } else {
-
     std::cout << "Using Uni with maximum value = " << uniMax << '\n';
     for (auto t = 1u; t < workloadNumTxs+1; ++t) {
       for(auto k = 0u; k < txSize; ++k) {

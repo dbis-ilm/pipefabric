@@ -1,4 +1,4 @@
-include(../../cmake/Testing.cmake.in)
+include(../cmake/Testing.cmake.in)
 
 #=============================================
 # define the test data directory for the input and output

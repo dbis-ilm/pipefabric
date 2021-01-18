@@ -4,8 +4,9 @@
 #include <string>
 
 namespace pfabric {
-    const std::string gPmemPath("@PMEM_MNT_PATH@/");
-    const std::string gDataPath("@data_SOURCE_DIR@/");
+  const auto gPmemPoolSize{1uLL * 1024*1024*1024}; ///< 1GB
+  const std::string gPmemPath("@PMEM_MNT_PATH@/");
+  const std::string gDataPath("@data_SOURCE_DIR@/");
 }
 
 #endif /* PFABRIC_CONFIG_H */

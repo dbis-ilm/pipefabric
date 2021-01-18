@@ -38,8 +38,6 @@
 
 using namespace pfabric;
 
-
-
 template<typename TableType> class TxExample {
   public:
     TxExample(const std::string& _pName, const bool _tpsScaling) noexcept
@@ -143,6 +141,8 @@ template<typename TableType> class TxExample {
         replicaTable->truncate();
         auto start = std::chrono::high_resolution_clock::now();
         const auto txID = sCtx.newTx();
+        accountTable->transactionBegin(txID);
+        replicaTable->transactionBegin(txID);
         for (auto i = 0u; i < keyRange; i++) {
           accountTable->insert(txID, i, {txID, i, i * 100, i * 1.0});
           replicaTable->insert(txID, i, {txID, i, i * 100, i * 1.0});
@@ -253,12 +253,13 @@ template<typename TableType> class TxExample {
        * Execution                                                                *
        *==========================================================================*/
 
-      if (zipf) {
+      if constexpr (zipf) {
         for(auto t = 0u; t < thetas.size(); t++) {
           theta = thetas[t];
           sCtx.setDistribution(zipf, 0, keyRange-1, theta);
-          for (auto i = 0u; i < repetitions; i++) {
+          for (auto i = 0u; i < repetitions; ++i) {
             generateWorkload<zipf>(theta, "wl_writes_zipf.csv");
+            //prepareTables();
             runTopologies();
             accumulateMeasures();
             resFile.flush();
@@ -267,7 +268,7 @@ template<typename TableType> class TxExample {
       } else {
         generateWorkload<zipf>(0, "wl_writes_uni.csv");
         sCtx.setDistribution(zipf, 0, keyRange-1);
-        for (auto i = 0u; i < repetitions; i++) {
+        for (auto i = 0u; i < repetitions; ++i) {
           runTopologies();
           accumulateMeasures();
         }
@@ -288,7 +289,5 @@ template<typename TableType> class TxExample {
     const std::string pName;
     const bool tpsScaling;
 };
-
-//} /* namespace pfabric */
 
 #endif

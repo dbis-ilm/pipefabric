@@ -28,6 +28,7 @@
 #include <unordered_map>
 
 #include "core/PFabricTypes.hpp"
+#include <libpmem.h>
 
 namespace pfabric {
 
@@ -57,7 +58,7 @@ class ZipfianGenerator {
     ZipfianGenerator(unsigned int min, unsigned int max, double zipfianconstant);
     unsigned int nextValue();
 
-	private:
+  private:
     unsigned int nextInt(unsigned int itemcount);
 
     /** Number of items. */
@@ -72,7 +73,7 @@ class ZipfianGenerator {
     /** Computed parameters for generating the distribution. */
     double alpha, zetan{0}, eta, theta, zeta2theta{0};
 
-    std::mt19937 gen{std::random_device{}()};    
+    std::mt19937 gen{std::random_device{}()};
     std::uniform_real_distribution<> dist{0.0 ,1.0};
 };
 
@@ -164,8 +165,8 @@ class StateContext {
     const auto txnID = nextTxID.fetch_add(1);
     const auto pos = getSetFreePos(usedSlots);
     activeTxs[pos] = std::make_tuple(txnID,
-        WriteInfo{Status::Active, Status::Active}, //< TableID | Status
-        ReadInfo{0});                              //< GroupID | LastCommitID
+        WriteInfo{{Status::Active, Status::Active}}, //< TableID | Status
+        ReadInfo{{0}});                              //< GroupID | LastCommitID
     return txnID;
   }
 
@@ -191,10 +192,10 @@ class StateContext {
           newMin = rCTS;
       }
       /* no other active Tx, use last Snapshot */
-      if (newMin == DTS_INF) newMin = getLastCTS(0); 
+      if (newMin == DTS_INF) newMin = getLastCTS(0);
       while(min < newMin && !oldestVisibleVersion.compare_exchange_weak(min, newMin, std::memory_order_relaxed));
     } else if(min == 0) {
-      const auto newMin = getLastCTS(0); 
+      const auto newMin = getLastCTS(0);
       while(!oldestVisibleVersion.compare_exchange_weak(min, newMin, std::memory_order_relaxed));
     }
   }
@@ -206,7 +207,9 @@ class StateContext {
 
   /** Set last committed transaction ID (snapshot version) */
   void setLastCTS(const GroupID topoID, const TransactionID txnID) {
+    pmem_drain();
     topoGrps[topoID].second.store(txnID, std::memory_order_relaxed);
+    pmem_persist(&topoGrps[topoID].second,  sizeof(TransactionID));
   }
 
   /** Get oldest currently visible version; used for garbage collection */
