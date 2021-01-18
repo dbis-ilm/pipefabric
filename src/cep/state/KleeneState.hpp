@@ -51,7 +51,7 @@ public:
 	 * @param forwardEdges forward edges from this state
 	 * @param spec the type of this kleene state
 	 */
-	KleeneState(int stateID, string name,
+	KleeneState(int stateID, std::string name,
 			std::vector<typename ForwardEdge<Tin, Tout, Tdep>::ForwardEdgePtr> forwardEdges,  KleeneSpecification spec = Star) : NormalState<Tin, Tout, Tdep>(stateID, name, forwardEdges) {this->spec = spec; }
 	/**
 	 * constructor to set the state id and its specification
@@ -66,7 +66,7 @@ public:
 	 * @param name the name of the state
 	 * @param spec the type of this kleene state
 	 */
-	KleeneState(int stateID, string name, KleeneSpecification spec=Star): NormalState<Tin, Tout, Tdep>(stateID, name) {
+	KleeneState(int stateID, std::string name, KleeneSpecification spec=Star): NormalState<Tin, Tout, Tdep>(stateID, name) {
 		this->spec = spec;
 	}
 	/**

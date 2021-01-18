@@ -256,7 +256,7 @@ void NFAStructure<TinPtr, ToutPtr, TdepPtr>::addEvent(const TinPtr& event,
 				((ForwardEdge<TinPtr, ToutPtr, TdepPtr>*) (currentEdge))->getDestState();
 	} else if (currentEdge->getEdgeType() == NFAEdge<TinPtr, ToutPtr, TdepPtr>::Loop) {
 
-		typename vector<std::pair<KleeneState<TinPtr, ToutPtr, TdepPtr>*, short> >::iterator res = std::find_if(
+		typename std::vector<std::pair<KleeneState<TinPtr, ToutPtr, TdepPtr>*, short> >::iterator res = std::find_if(
 				kleeneState.begin(), kleeneState.end(),
 				compare<TinPtr, ToutPtr, TdepPtr>((KleeneState<TinPtr, ToutPtr, TdepPtr>*) (currentState)));
 		res->second = res->second + 1;

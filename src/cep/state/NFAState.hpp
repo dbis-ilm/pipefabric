@@ -23,7 +23,7 @@
 
 #include <iostream>
 #include <boost/shared_ptr.hpp>
-using namespace std;
+
 namespace pfabric {
 /**
  * @brief A NFA state object represents an automaton state in our engine. This state can
@@ -68,7 +68,7 @@ public:
 	 * Output member variable information
 	 * @param out The output stream handle.
 	 */
-	virtual void write(std::ostream& out = cout) const {
+	virtual void write(std::ostream& out = std::cout) const {
 		out << "Name of this state: " << stateName << std::endl;
 		out << " and id = " << stateID << std::endl;
 	}
@@ -97,7 +97,7 @@ public:
 	 * Set the state name as string
 	 * @param stateName the name of this state ro be shown
 	 */
-	void setStateName(string stateName) { this->stateName = stateName; }
+	void setStateName(std::string stateName) { this->stateName = stateName; }
 
 	/**
 	 * Equality comparison operator.

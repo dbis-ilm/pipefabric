@@ -24,7 +24,6 @@
 #include <cassert>
 #include <boost/function.hpp>
 #include "../Instance.hpp"
-using namespace std;
 namespace pfabric {
 
 /**
@@ -79,7 +78,7 @@ public:
 	 * Output member variable information.
 	 * @param out the output stream handle.
 	 */
-	virtual void write(ostream& out = cout) const= 0;
+	virtual void write(std::ostream& out = std::cout) const= 0;
 	/**
 	 * Get the type of this edge either loop or forward
 	 * @return As above.
