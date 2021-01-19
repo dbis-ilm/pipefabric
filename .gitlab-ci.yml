@@ -38,7 +38,7 @@ coverage:
   tags: 
     - grouprunner
   script:
-    - echo pfpass | sudo -S apk add py-pip
+    - echo pfpass | sudo -S apk add libxml2-dev libxslt-dev python3-dev py-pip
     - pip install gcovr --user
     - mkdir build
     - cd build
