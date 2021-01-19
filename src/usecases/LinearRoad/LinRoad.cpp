@@ -1,15 +1,25 @@
+/*
+ * Copyright (C) 2014-2021 DBIS Group - TU Ilmenau, All Rights Reserved.
+ *
+ * This file is part of the PipeFabric package.
+ *
+ * PipeFabric is free software: you can redistribute it and/or modify it under the terms of the GNU
+ * General Public License as published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * PipeFabric is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+ * even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along with PipeFabric. If not,
+ * see <http://www.gnu.org/licenses/>.
+ */
+
 //Examples of operators: TopologyTest.cpp
 //.toStream for parallelism
 //https://github.com/walmartlabs/linearroad for data generation
 //.queue für operatoren, die viel rechnen
 
-/*
-  First version of implementation, no attempt to be efficient, focus is a working implementation.
-  I tried to stay as close to the notations and names used in the Linear Road paper as possible.
-
-  Implementation TODO's:
-  - If correct, smarter/more efficient implementation of data structures + parallelism (substreams)
-*/
 
 #include "pfabric.hpp"
 #include <vector>
