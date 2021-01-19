@@ -28,7 +28,6 @@
 #include <boost/log/trivial.hpp>
 
 #include <fcntl.h>
-#include <sys/fcntl.h>
 #include <sys/stat.h>
 #include <stdio.h>
 
