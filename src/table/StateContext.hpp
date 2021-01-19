@@ -28,7 +28,9 @@
 #include <unordered_map>
 
 #include "core/PFabricTypes.hpp"
+#ifdef USE_NVM_TABLES
 #include <libpmem.h>
+#endif
 
 namespace pfabric {
 
@@ -207,9 +209,13 @@ class StateContext {
 
   /** Set last committed transaction ID (snapshot version) */
   void setLastCTS(const GroupID topoID, const TransactionID txnID) {
+#ifdef USE_NVM_TABLES
     pmem_drain();
     topoGrps[topoID].second.store(txnID, std::memory_order_relaxed);
     pmem_persist(&topoGrps[topoID].second,  sizeof(TransactionID));
+#else
+    topoGrps[topoID].second.store(txnID, std::memory_order_relaxed);
+#endif
   }
 
   /** Get oldest currently visible version; used for garbage collection */

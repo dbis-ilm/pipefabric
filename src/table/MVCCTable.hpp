@@ -290,13 +290,11 @@ class MVCCTable : public BaseTable,
       }
     );
     writeSet.set.erase(lastIt, writeSet.set.end());
-    int i = 0;
+
     for (const auto &e : writeSet.set) {
-      /// if entry exists
-      std::tuple<MVCCTuple> * tptr;
-      if (tbl.getAsRef(e.first, &tptr)) {
-        //newEntries[i] = KeyMVCCPair{e.first, ns_types::get<0>(*tbl.getByKey(e.first))};
-        MVCCTuple &last = std::get<0>(*tptr);;
+      if (updateByKey(e.first, [this, &txnID, &e](std::tuple<MVCCTuple> &tp) {
+        /// if entry exists
+        MVCCTuple &last = std::get<0>(tp);
         auto iPos = getFreePos(last.usedSlots);
         while (iPos > MVCCTuple::Versions - 1) {
           /// If all version slots are occupied, old unused versions must be removed
@@ -308,18 +306,20 @@ class MVCCTable : public BaseTable,
         last.headers[dPos].dts = txnID;
         last.headers[iPos] = {txnID, DTS_INF};
         last.values[iPos] = std::move(e.second);
+#ifdef USE_NVM_TABLES
         pmem_drain(); ///< sfence
+#endif
         last.usedSlots |= (1LL << iPos);
-      }
+      })) {
+        /// already done in condition
+      } else {
       /// Entry does not exist yet
-      else {
         auto mvcc = MVCCObject<TupleType>();
         mvcc.headers[0] = {txnID, DTS_INF};
         mvcc.values[0] = std::move(e.second);
         mvcc.usedSlots = 1;
         tbl.insert(std::move(e.first), std::move(mvcc));
       }
-      ++i;
     }
 
     /* Lock Exclusively for overwriting */

@@ -141,13 +141,13 @@ class PBPTreeTable : public BaseTable {
   };
 
   /** typedef for a updater function which returns a modification of the parameter tuple */
-  using UpdaterFunc = std::function<void(RecordType &)>;
+  using UpdaterFunc = std::function<void(TupleType &)>;
 
   /** typedefs for a function performing updates + deletes. Similar to UpdaterFunc
    *  it allows to update the tuple, but also to delete it (indictated by the
    *  setting the bool component of \c UpdateResult to false)
    **/
-  using UpdelFunc = std::function<bool(RecordType &)>;
+  using UpdelFunc = std::function<bool(TupleType &)>;
 
   using InsertFunc = std::function<RecordType()>;
 
@@ -255,12 +255,15 @@ class PBPTreeTable : public BaseTable {
    * The actual modification is done by the updater function specified as parameter.
    *
    * \param key the key of the tuple to be modified
-   * \param func a function performing the modification by returning a modified
-   *        tuple
+   * \param func a function performing the modification by updating the value in-place
    * \return the number of modified tuples
    *****************************************************************************/
   unsigned long updateByKey(KeyType key, UpdaterFunc ufunc) {
-    //TODO:
+    TupleType * val;
+    if (getAsRef(key, &val)) {
+      ufunc(*val);
+      return 1;
+    }
     return 0;
   }
 

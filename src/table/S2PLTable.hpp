@@ -254,10 +254,14 @@ class S2PLTable : public BaseTable,
     locks.lockExclusive(key);
     wKeysLocked.push_back(key);
     // insert
+#if USE_NVM_TABLES
     auto pop = pmem::obj::pool_by_pptr(tbl.q);
     transaction::run(pop, [&] {
       tbl.insert(key, rec);
     });
+#else
+    tbl.insert(key, rec);
+#endif
   }
 
   /**

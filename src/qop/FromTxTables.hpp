@@ -87,7 +87,7 @@ namespace pfabric {
       assert(mTables[1].get() != nullptr);
 
       SmartPtr<RecordType> tpls[2][TxSize];
-      
+
       auto waitTime = 1u;
       restart:;
       for (auto j = 0u; j < TxSize; j++) {
@@ -106,7 +106,7 @@ namespace pfabric {
           }
         }
       }
-      
+
       /* Only important for BOCC */
       const auto s1 = mTables[0]->readCommit(mTxnID, mKeys, TxSize);
       const auto s2 = mTables[1]->readCommit(mTxnID, mKeys, TxSize);

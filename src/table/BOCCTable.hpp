@@ -247,12 +247,18 @@ class BOCCTable : public BaseTable,
       ws.keys.emplace(e.first);
     dQLock.unlockExclusive();
     /// Actual insert to table
+#ifdef USE_NVM_TABLES
     auto pop = pmem::obj::pool_by_pptr(tbl.q);
     transaction::run(pop, [&]{
       for (const auto& e : writeSet.set) {
         tbl.insert(std::move(e.first), std::move(e.second));
       }
     });
+#else
+    for (const auto& e : writeSet.set) {
+      tbl.insert(std::move(e.first), std::move(e.second));
+    }
+#endif
     ws.endTS = sCtx.getNewTS(); ///< note end of transaction writing in write set
     writeSet.clean();
 

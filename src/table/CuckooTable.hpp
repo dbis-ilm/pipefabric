@@ -93,16 +93,19 @@ inline CuckooIterator<Iter> makeCuckooIterator(Iter j, Iter e,
 template <typename RecordType, typename KeyType = DefaultKeyType>
 class CuckooTable : public BaseTable {
 public:
+  static_assert(is_tuple<RecordType>::value, "Value type must be a pfabric::Tuple");
+  using TupleType = typename RecordType::Base;
+
   //< the actual implementation of the table
-  typedef libcuckoo::cuckoohash_map<KeyType, RecordType> TableMap;
+  typedef libcuckoo::cuckoohash_map<KeyType, TupleType> TableMap;
 
   //< typedef for a updater function which returns a modification of the parameter tuple
-  typedef std::function<void(RecordType&)> UpdaterFunc;
+  typedef std::function<void(TupleType&)> UpdaterFunc;
 
   //< typedefs for a function performing updates + deletes. Similar to UpdaterFunc
   //< it allows to update the tuple, but also to delete it (indictated by the
   //< setting the bool component of @c UpdateResult to false)
-  typedef std::function<bool(RecordType&)> UpdelFunc;
+  typedef std::function<bool(TupleType&)> UpdelFunc;
 
   typedef std::function<RecordType()> InsertFunc;
 
@@ -253,9 +256,9 @@ public:
    * @return the number of modified tuples
    */
   unsigned long updateByKey(KeyType key, UpdaterFunc ufunc) {
-    if (mDataTable.find_fn(key, [](RecordType r){})) {
-      auto res = mDataTable.update_fn(key, ufunc);
-      notifyObservers(res, TableParams::Update, TableParams::Immediate);
+    auto res = mDataTable.update_fn(key, ufunc);
+    if (res) {
+      notifyObservers(mDataTable.find(key), TableParams::Update, TableParams::Immediate);
       return 1;
     }
     return 0;
@@ -307,6 +310,18 @@ public:
       throw TableException("key not found");
     }
   }
+
+  const bool getByKey(const KeyType key, SmartPtr<RecordType> &outValue) const {
+    TupleType tt;
+    auto exists = mDataTable.find(key, tt);
+    if (exists) {
+      outValue.reset(new RecordType(tt));
+      return true;
+    }
+    return false;
+  }
+
+
 
   /**
    * @brief Return a pair of iterators for scanning the table with a
