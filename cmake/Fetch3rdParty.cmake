@@ -165,7 +165,7 @@ if(BUILD_USE_CASES)
     GIT_REPOSITORY https://github.com/dbis-ilm/data.git
     GIT_TAG        master
     GIT_SHALLOW    TRUE
-    SOURCE_DIR     ${THIRD_PARTY_DIR}/data
+    SOURCE_DIR     ${PROJECT_BINARY_DIR}/data
   )
   FetchContent_GetProperties(data)
   if(NOT data_POPULATED)
