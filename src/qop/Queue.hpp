@@ -177,8 +177,8 @@ namespace pfabric {
 		/**
 		 * Creates a new instance of the operator.
 		 */
-		Queue() : mNotifier(new DequeueNotifier(boost::bind(&Queue::dequeueTuple, this, _1),
-                                            boost::bind(&Queue::stopProcessing, this))) {
+		Queue() : mNotifier(new DequeueNotifier(std::bind(&Queue::dequeueTuple, this, std::placeholders::_1),
+                                            std::bind(&Queue::stopProcessing, this))) {
 		}
 
 		/**

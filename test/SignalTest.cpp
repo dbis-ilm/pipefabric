@@ -27,7 +27,6 @@
 
 #include "libcpp/mpl/algorithms/StaticForEach.hpp"
 
-#include <boost/bind.hpp>
 #include <boost/mpl/vector.hpp>
 
 
@@ -145,7 +144,7 @@ struct SignalTest {
 		{ // test global function
 			// create the signal and connect a test slot
 			Signal signal;
-			auto connection = SignalInterface::connect( signal, boost::bind(&globalFunction, ::_1, ::_2 ) );
+			auto connection = SignalInterface::connect( signal, std::bind(&globalFunction, std::placeholders::_1, std::placeholders::_2 ) );
 
 			// invoke the signal
 			testResults.reset();

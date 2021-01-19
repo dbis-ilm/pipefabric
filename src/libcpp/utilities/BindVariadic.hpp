@@ -29,8 +29,7 @@
 
 #include "libcpp/mpl/sequences/GenerateIndexes.hpp"
 
-#include <boost/bind.hpp>
-
+#include <boost/bind/bind.hpp>
 
 namespace ns_utilities {
 
@@ -67,22 +66,22 @@ namespace impl {
  * @return a function object for the bound function
  */
 template<
-	typename ReturnType,
-	class ClassType,
-	class... Args,
-	int... Indexes
+  typename ReturnType,
+  class ClassType,
+  class... Args,
+  int... Indexes
 >
 auto bindVariadicImpl( ReturnType (ClassType::* memberFn) (Args...), ClassType* instance,
-		ns_mpl::IndexTuple< Indexes... > indexes )
-	-> decltype(
-		boost::bind( memberFn, instance, boost::arg< Indexes >()... )
-	)
+    ns_mpl::IndexTuple< Indexes... > indexes )
+  -> decltype(
+    boost::bind( memberFn, instance, boost::arg< Indexes >()... )
+  )
 {
     return boost::bind( memberFn, instance,
-		// generate a placeholder for each index in the Indexes list
-    	// using parameter pack expansion
-		boost::arg< Indexes >()...
-	);
+        // generate a placeholder for each index in the Indexes list
+        // using parameter pack expansion
+    boost::arg< Indexes >()...
+  );
 }
 
 /**
@@ -107,22 +106,22 @@ auto bindVariadicImpl( ReturnType (ClassType::* memberFn) (Args...), ClassType* 
  * @return a function object for the bound function
  */
 template<
-	typename ReturnType,
-	class ClassType,
-	class... Args,
-	int... Indexes
+  typename ReturnType,
+  class ClassType,
+  class... Args,
+  int... Indexes
 >
 auto bindVariadicImpl( ReturnType (ClassType::* memberFn) (Args...) const, const ClassType* instance,
-		ns_mpl::IndexTuple< Indexes... > indexes )
-	-> decltype(
-		boost::bind( memberFn, instance, boost::arg< Indexes >()... )
-	)
+    ns_mpl::IndexTuple< Indexes... > indexes )
+  -> decltype(
+    boost::bind( memberFn, instance, boost::arg< Indexes >()... )
+  )
 {
     return boost::bind( memberFn, instance,
-		// generate a placeholder for each index in the Indexes list
-    	// using parameter pack expansion
-		boost::arg< Indexes >()...
-	);
+    // generate a placeholder for each index in the Indexes list
+    // using parameter pack expansion
+    boost::arg< Indexes >()...
+  );
 }
 
 } /* end namespace impl */
@@ -151,27 +150,27 @@ auto bindVariadicImpl( ReturnType (ClassType::* memberFn) (Args...) const, const
  * @return a function object for the bound function
  */
 template<
-	typename ReturnType,
-	class ClassType,
-	typename ... Args
+  typename ReturnType,
+  class ClassType,
+  typename ... Args
 >
 auto bindVariadic( ReturnType (ClassType::* memberFn) (Args...), ClassType* instance )
-	-> decltype(
-		impl::bindVariadicImpl< ReturnType >(
-			memberFn, instance, typename ns_mpl::generateIndexes< sizeof...(Args), 1 >::type()
-		)
-	)
+  -> decltype(
+    impl::bindVariadicImpl< ReturnType >(
+      memberFn, instance, typename ns_mpl::generateIndexes< sizeof...(Args), 1 >::type()
+    )
+  )
 {
     return impl::bindVariadicImpl< ReturnType >( memberFn, instance,
-		// determine the number of provided arguments during compile time
-		// with generating an appropriate integer tuple with generateIndexes
-		// and provide a default constructed instance of that type to
-		// instantiate the correct implementation of the actual bind helper
-		// function that binds all arguments correctly
-		typename ns_mpl::generateIndexes<
-			sizeof...(Args), // for each argument in the list
-			1                // starting with placeholder index 1
-		>::type()
+    // determine the number of provided arguments during compile time
+    // with generating an appropriate integer tuple with generateIndexes
+    // and provide a default constructed instance of that type to
+    // instantiate the correct implementation of the actual bind helper
+    // function that binds all arguments correctly
+    typename ns_mpl::generateIndexes<
+      sizeof...(Args), // for each argument in the list
+      1                // starting with placeholder index 1
+    >::type()
     );
 }
 
@@ -192,27 +191,27 @@ auto bindVariadic( ReturnType (ClassType::* memberFn) (Args...), ClassType* inst
  * @return a function object for the bound function
  */
 template<
-	typename ReturnType,
-	class ClassType,
-	typename ... Args
+  typename ReturnType,
+  class ClassType,
+  typename ... Args
 >
 auto bindVariadic( ReturnType (ClassType::* memberFn) (Args...) const, const ClassType* instance )
-	-> decltype(
-		impl::bindVariadicImpl< ReturnType >(
-			memberFn, instance, typename ns_mpl::generateIndexes< sizeof...(Args), 1 >::type()
-		)
-	)
+  -> decltype(
+    impl::bindVariadicImpl< ReturnType >(
+      memberFn, instance, typename ns_mpl::generateIndexes< sizeof...(Args), 1 >::type()
+    )
+  )
 {
     return impl::bindVariadicImpl< ReturnType >( memberFn, instance,
-		// determine the number of provided arguments during compile time
-		// with generating an appropriate integer tuple with generateIndexes
-		// and provide a default constructed instance of that type to
-		// instantiate the correct implementation of the actual bind helper
-		// function that binds all arguments correctly
-		typename ns_mpl::generateIndexes<
-			sizeof...(Args), // for each argument in the list
-			1                // starting with placeholder index 1
-		>::type()
+    // determine the number of provided arguments during compile time
+    // with generating an appropriate integer tuple with generateIndexes
+    // and provide a default constructed instance of that type to
+    // instantiate the correct implementation of the actual bind helper
+    // function that binds all arguments correctly
+    typename ns_mpl::generateIndexes<
+      sizeof...(Args), // for each argument in the list
+      1                // starting with placeholder index 1
+    >::type()
     );
 }
 
