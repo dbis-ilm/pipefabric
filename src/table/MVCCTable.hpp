@@ -578,11 +578,21 @@ class MVCCTable : public BaseTable,
     /* Get MVCC Object */
     /// in-place variant
     ///*
+#ifdef USE_NVM_TABLES
     std::tuple<MVCCObject<TupleType>> * tplPtr = nullptr;
     if (!tbl.getAsRef(key, &tplPtr)) {
       return Errc::NOT_FOUND;
     }
-    auto& mvcc = ns_types::get<0>(*tplPtr);//*/
+    auto& mvcc = ns_types::get<0>(*tplPtr);
+#else
+    SmartPtr<pfabric::Tuple<MVCCObject<TupleType>>> tplPtr;
+    if (!tbl.getByKey(key, tplPtr)) {
+      return Errc::NOT_FOUND;
+    }
+    const auto& mvcc = ns_types::get<0>(*tplPtr);
+#endif
+    //*/
+
     /// out-of-place variant
     /*
     locks.lockShared(key);

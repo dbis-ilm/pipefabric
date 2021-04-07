@@ -37,11 +37,13 @@
 
 namespace pfabric {
 
+#ifdef USE_NVM_TABLES
 using pmem::obj::delete_persistent;
 using pmem::obj::make_persistent;
 using pmem::obj::persistent_ptr;
 using pmem::obj::pool;
 using pmem::obj::transaction;
+#endif
 using TableID = unsigned short;
 
 /// Settings, TODO: maybe these should rather be template arguments
@@ -188,7 +190,7 @@ class StateContext {
     topoGrps = pop.root()->topoGrps.get();
     numGroups = &pop.root()->numGrps;
 #else
-    topoGrps = new std::array<TopoGrps, MAX_TOPO_GRPS>;
+    topoGrps = new std::array<TopoGrp, MAX_TOPO_GRPS>;
     numGroups = new GroupID{0u};
 #endif
   }
@@ -313,9 +315,13 @@ class StateContext {
   GroupID registerTopo(const std::array<TableID, MAX_STATES_TOPO> &tbls) {
     auto &numGrps = *numGroups;
     (*topoGrps)[numGrps] = std::make_pair(tbls, 0);
+#ifdef USE_NVM_TABLES
     pmem_flush(&(*topoGrps)[numGrps], sizeof(TableID) * MAX_STATES_TOPO + sizeof(LastCTS));
     ++numGrps;
     pmem_persist(numGroups, sizeof(GroupID));
+#else
+    ++numGrps;
+#endif
     return numGrps-1;
   }
 
