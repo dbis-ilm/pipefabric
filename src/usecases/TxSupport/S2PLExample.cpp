@@ -34,6 +34,14 @@ constexpr auto protocol = "S2PL";
 constexpr auto scaling = false;
 
 int main() {
+  ofstream resFileRec;
+  resFileRec.open(resultFileRec, ios::out | ios::app);
+  auto start = std::chrono::high_resolution_clock::now();
   TxExample<TableType> s2pl{protocol, scaling};
+  auto end = std::chrono::high_resolution_clock::now();
+  auto diff = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  resFileRec << protocol << ',' << keyRange << ',' << simReaders << ",Context Recovery," << diff
+    << '\n';
+  resFileRec.close();
   s2pl.run();
 }

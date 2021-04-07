@@ -30,10 +30,18 @@ using namespace pfabric;
 
 using TableType = MVCCTable<AccountPtr::element_type, uint_t>;
 
-constexpr auto protocol = "MVCC";
+constexpr auto protocol = "MVCC_oop";
 constexpr auto scaling = false;
 
 int main() {
+  ofstream resFileRec;
+  resFileRec.open(resultFileRec, ios::out | ios::app);
+  auto start = std::chrono::high_resolution_clock::now();
   TxExample<TableType> mvcc{protocol, scaling};
+  auto end = std::chrono::high_resolution_clock::now();
+  auto diff = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+  resFileRec << protocol << ',' << keyRange << ',' << simReaders << ",Context Recovery," << diff
+    << '\n';
+  resFileRec.close();
   mvcc.run();
 }

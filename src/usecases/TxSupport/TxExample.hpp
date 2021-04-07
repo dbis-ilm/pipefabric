@@ -36,13 +36,22 @@
 
 using namespace pfabric;
 
-template<typename TableType> class TxExample {
+template<typename TableType>
+class TxExample {
   public:
     TxExample(const std::string& _pName, const bool _tpsScaling) noexcept
-      : pName{_pName}, tpsScaling{_tpsScaling} {}
+      : sCtx{}, pName{_pName}, tpsScaling{_tpsScaling} {}
 
     void run() {
       double theta = 0.0;
+      std::chrono::time_point<std::chrono::high_resolution_clock> start, end;
+      start = std::chrono::high_resolution_clock::now();
+      end = std::chrono::high_resolution_clock::now();
+      auto overhead = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
+      ofstream resFile, resFileRec;
+      resFile.open(resultFile, ios::out | ios::app);
+      resFileRec.open(resultFileRec, ios::out | ios::app);
 
       PFabricContext ctx;
       /* --- Create the table for storing account information --- */
@@ -60,17 +69,24 @@ template<typename TableType> class TxExample {
           ColumnInfo("Balance", ColumnInfo::Double_Type)},
           ColumnInfo::UInt_Type);
 
+      start = std::chrono::high_resolution_clock::now();
       auto accountTable = ctx.createTxTable<TableType>(tblInfo, sCtx);
+      end = std::chrono::high_resolution_clock::now();
+      resFileRec << pName << ',' << keyRange << ',' << simReaders << ",State 1 Recovery,"
+        << std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() - overhead
+        << '\n';
+      start = std::chrono::high_resolution_clock::now();
       auto replicaTable = ctx.createTxTable<TableType>(tblInfo2, sCtx);
+      end = std::chrono::high_resolution_clock::now();
+      resFileRec << pName << ',' << keyRange << ',' << simReaders << ",State 2 Recovery,"
+        << std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() - overhead
+        << '\n';
 
       std::vector<typename std::chrono::duration<int64_t, std::milli>::rep> measures;
       std::vector<TransactionID> txnCnt;
       std::vector<TransactionID> txnCntR;
       std::vector<TransactionID> txnCntW;
       std::vector<uint64_t> restarts;
-
-      ofstream resFile;
-      resFile.open(resultFile, ios::out | ios::app);
 
       /*==========================================================================*
        * The function for chopping the stream into transactions                   *
@@ -104,20 +120,30 @@ template<typename TableType> class TxExample {
       /*==========================================================================*
        * Topology #1: Writer transactional data stream                            *
        *==========================================================================*/
-      sCtx.registerTopo({accountTable, replicaTable});
-      auto tWriter = ctx.createTopology();
+      /// If LastCTS of our topology group > 0 then we recovered from an existing state context
+      start = std::chrono::high_resolution_clock::now();
+      if ((*sCtx.topoGrps)[0].second > 0)
+        sCtx.updateTopo(0, {accountTable->getID(), replicaTable->getID()});
+      else
+        sCtx.registerTopo({accountTable->getID(), replicaTable->getID()});
+      end = std::chrono::high_resolution_clock::now();
+      resFileRec << pName << ',' << keyRange << ',' << simReaders << ",Update Pointers,"
+        << std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() - overhead
+        << '\n';
+      /*auto tWriter = ctx.createTopology();
       auto s = tWriter->newStreamFromMemory<AccountPtr>(zipf? "wl_writes_zipf.csv" : "wl_writes_uni.csv")
         .statefulMap<AccountPtr, TxState>(txChopping)
         .assignTransactionID([&](auto tp) { return sCtx.tToTX[get<0>(tp)]; })
         .template keyBy<1, uint_t>()
         .template toTxTable<TableType>(accountTable)
         .template toTxTable<TableType>(replicaTable)
-        //.print(std::cout)
-        ;
+        // .print(std::cout)
+        ;*/
 
       /*==========================================================================*
        * Topology #2: Readers concurrently/consistent access to both tables       *
        *==========================================================================*/
+      start = std::chrono::high_resolution_clock::now();
       PFabricContext::TopologyPtr tReaders[simReaders];
       for(auto i = 0u; i < simReaders; i++) {
         tReaders[i] = ctx.createTopology();
@@ -128,6 +154,10 @@ template<typename TableType> class TxExample {
         //.print(std::cout)
         ;
       }
+      end = std::chrono::high_resolution_clock::now();
+      resFileRec << pName << ',' << keyRange << ',' << simReaders << ",Recreate Reader Queries,"
+        << std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() - overhead
+        << '\n';
 
 
 
@@ -137,7 +167,7 @@ template<typename TableType> class TxExample {
       auto prepareTables = [&]() {
         accountTable->truncate();
         replicaTable->truncate();
-        auto start = std::chrono::high_resolution_clock::now();
+        // auto start = std::chrono::high_resolution_clock::now();
         const auto txID = sCtx.newTx();
         accountTable->transactionBegin(txID);
         replicaTable->transactionBegin(txID);
@@ -145,20 +175,18 @@ template<typename TableType> class TxExample {
           accountTable->insert(txID, i, {txID, i, i * 100, i * 1.0});
           replicaTable->insert(txID, i, {txID, i, i * 100, i * 1.0});
         }
-        auto end = std::chrono::high_resolution_clock::now();
-        auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(
-            end - start).count();
-        //    std::cout << "Insert time: " << diff << "ms\n";
+        // auto end = std::chrono::high_resolution_clock::now();
+        // auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        // std::cout << "Insert time: " << diff << "ms\n";
 
-        start = std::chrono::high_resolution_clock::now();
+        // start = std::chrono::high_resolution_clock::now();
         accountTable->transactionPreCommit(txID);
         replicaTable->transactionPreCommit(txID);
-        end = std::chrono::high_resolution_clock::now();
-        diff = std::chrono::duration_cast<std::chrono::milliseconds>(
-            end - start).count();
-        //    std::cout << "Commit time: " << diff << "ms\n";
+        // end = std::chrono::high_resolution_clock::now();
+        // diff = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        //  std::cout << "Commit time: " << diff << "ms\n";
 
-        //    std::cout << "Created Tables with " << accountTable->size() << " elements each.\n\n";
+        // std::cout << "Created Tables with " << accountTable->size() << " elements each.\n\n";
       };
 
       /*==========================================================================*
@@ -170,28 +198,35 @@ template<typename TableType> class TxExample {
           prepareTables();
 
           /* Necessary to clear streamFromMemory data vector */
-          tWriter = ctx.createTopology();
+          start = std::chrono::high_resolution_clock::now();
+          auto tWriter = ctx.createTopology();
           tWriter->newStreamFromMemory<AccountPtr>(zipf? "wl_writes_zipf.csv" : "wl_writes_uni.csv")
             .statefulMap<AccountPtr, TxState>(txChopping)
             .assignTransactionID([&](auto tp) { return sCtx.tToTX[get<0>(tp)]; })
             .template keyBy<1, uint_t>()
             .template toTxTable<TableType>(accountTable)
             .template toTxTable<TableType>(replicaTable);
+            //.print(std::cout);
+          end = std::chrono::high_resolution_clock::now();
+          resFileRec << pName << ',' << keyRange << ',' << simReaders << ",Recreate Writer Query,"
+            << std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() - overhead
+            << '\n';
 
           tWriter->prepare();
+          const auto txnIDBefore = sCtx.nextTxID.load();
 
-          auto start = std::chrono::high_resolution_clock::now();
+          start = std::chrono::high_resolution_clock::now();
 
           tWriter->start(true);
           for (const auto &t : tReaders) t->runEvery(readInterval);
           tWriter->wait();
 
-          auto end = std::chrono::high_resolution_clock::now();
+          end = std::chrono::high_resolution_clock::now();
           auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
           measures.push_back(diff);
-          txnCnt.push_back(sCtx.nextTxID.load(memory_order_relaxed));
-          restarts.push_back(sCtx.restarts.load(memory_order_relaxed));
+          txnCnt.push_back(sCtx.nextTxID.load() - txnIDBefore);
+          restarts.push_back(sCtx.restarts.load());
           txnCntR.push_back(sCtx.txCntR.load());
           txnCntW.push_back(sCtx.txCntW.load());
 
@@ -222,7 +257,7 @@ template<typename TableType> class TxExample {
           (std::accumulate(txnCntR.begin(), txnCntR.end(), 0) *
            1000ULL / std::accumulate(measures.begin(), measures.end(), 0));
         const auto wTp=
-          (std::accumulate(txnCntW.begin(), txnCntW.end(), 0) *
+          (std::accumulate(txnCntW.begin(), txnCntW.end(), 0) / 2 *
            1000ULL / std::accumulate(measures.begin(), measures.end(), 0));
 
         /*
@@ -250,7 +285,6 @@ template<typename TableType> class TxExample {
       /*==========================================================================*
        * Execution                                                                *
        *==========================================================================*/
-
       if constexpr (zipf) {
         for(auto t = 0u; t < thetas.size(); t++) {
           theta = thetas[t];
@@ -283,7 +317,7 @@ template<typename TableType> class TxExample {
       TransactionID lastTx;
     };
 
-    StateContext<TableType> sCtx{};
+    StateContext<TableType> sCtx;
     const std::string pName;
     const bool tpsScaling;
 };
