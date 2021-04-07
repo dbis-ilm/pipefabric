@@ -27,12 +27,27 @@
 
 #include "core/PFabricTypes.hpp"
 #ifdef USE_NVM_TABLES
+#include "pfabric_config.h"
 #include <libpmem.h>
+#include <libpmemobj++/pool.hpp>
+#include <libpmemobj++/transaction.hpp>
+#include <libpmemobj++/make_persistent.hpp>
+#include <libpmemobj++/persistent_ptr.hpp>
 #endif
 
 namespace pfabric {
 
+using pmem::obj::delete_persistent;
+using pmem::obj::make_persistent;
+using pmem::obj::persistent_ptr;
+using pmem::obj::pool;
+using pmem::obj::transaction;
 using TableID = unsigned short;
+
+/// Settings, TODO: maybe these should rather be template arguments
+constexpr auto MAX_TOPO_GRPS =   1; ///< number of allowed topology groups
+constexpr auto MAX_STATES =      2; ///< number of globally allowed states
+constexpr auto MAX_STATES_TOPO = 2; ///< number of allowed states per topology group
 
 /** Infinity, used for maximum validity */
 constexpr auto DTS_INF = std::numeric_limits<TransactionID>::max();
@@ -52,20 +67,43 @@ unsigned int hashMe(unsigned int x);
 /** Derived from YCSB.
  *  see: https://github.com/brianfrankcooper/YCSB/blob/master/core/src/main/java/com/yahoo/ycsb/generator/ZipfianGenerator.java
  */
+template<typename T>
 class ZipfianGenerator {
   public:
     static constexpr double ZIPFIAN_CONSTANT = 0.99;
-    ZipfianGenerator(unsigned int min, unsigned int max, double zipfianconstant);
-    unsigned int nextValue();
+    ZipfianGenerator(T min, T max, double zipfianconstant = ZIPFIAN_CONSTANT)
+        : items{max - min + 1}, base{min}, zipfianconstant{zipfianconstant},
+          theta{zipfianconstant} {
+      for(auto i = 0Lu; i < items; i++)
+        zetan += 1 / (std::pow(i + 1, theta));
+      for(auto i = 0Lu; i < 2; i++)
+        zeta2theta += 1 / (std::pow(i + 1, theta));
+      alpha = 1.0 / (1.0 - theta);
+      eta = (1 - std::pow(2.0 / items, 1 - theta)) / (1 - zeta2theta / zetan);
+      nextValue();
+    }
+
+    /* Scrambled version */
+    T nextValue() {
+      auto ret = nextInt(items);
+      return base + 1 + hashMe(ret) % (items-1); ///TODO: Key 0 bugs and is excluded for now
+    }
 
   private:
-    unsigned int nextInt(unsigned int itemcount);
+    T nextInt(size_t itemcount) {
+      double u = dist(gen);
+      double uz = u * zetan;
+
+      if (uz < 1.0) { return base;}
+      if (uz < 1.0 + std::pow(0.5, theta)) { return base + 1; }
+      return base + (int) ((itemcount) * std::pow(eta * u - eta + 1, alpha));
+    }
 
     /** Number of items. */
-    const unsigned int items;
+    const size_t items;
 
     /** Min item to generate. */
-    const unsigned int base;
+    const T base;
 
     /** The zipfian constant to use. */
     const double zipfianconstant;
@@ -89,19 +127,30 @@ class StateContext {
   using LastCTS   = TransactionID;
   using GroupID   = unsigned short;
   using TablePtr  = std::shared_ptr<TableType>;
-  using TopoGrp   = std::pair<std::array<TablePtr,2>, std::atomic<LastCTS>>;
-  using WriteInfo = std::array<Status,2>; //std::tuple<TableID, Status>;
-  using ReadInfo  = std::array<ReadCTS,1>; //std::tuple<TopologyID, ReadCTS>;
+  using TopoGrp   = std::pair<std::array<TableID, MAX_STATES_TOPO>, std::atomic<LastCTS>>;
+  using WriteInfo = std::array<Status, MAX_STATES_TOPO>; //std::tuple<TableID, Status>;
+  using ReadInfo  = std::array<ReadCTS, MAX_TOPO_GRPS>; //std::tuple<TopologyID, ReadCTS>;
   using ActiveTx  = std::tuple<TransactionID, WriteInfo, ReadInfo>;
 
  public:
   /** Atomic counter for assigning global transaction IDs */
-  std::atomic<TransactionID> nextTxID{1};
+  std::atomic<TransactionID> nextTxID{
+    std::chrono::duration_cast<std::chrono::duration<long long unsigned int, std::nano>>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count()
+  };
   /** Registered States and Topology Groups (currently hard-coded, not thread-safe) */
-  TablePtr regStates[2];
-  TopoGrp topoGrps[1];
+#ifdef USE_NVM_TABLES
+  struct sCtxRoot {
+    persistent_ptr<std::array<TopoGrp, MAX_TOPO_GRPS>> topoGrps;
+    GroupID numGrps;
+  };
+  pool<sCtxRoot> pop;
+#endif
+  std::array<TopoGrp, MAX_TOPO_GRPS> * topoGrps;
+  std::array<TablePtr, MAX_STATES> regStates;
   /** Mapping from internal transaction ID to gloabl transaction ID */
   std::unordered_map<TransactionID, TransactionID> tToTX;
+  std::mutex mtx{};
 
   /*---- Only for evaluation -------------------------------------------------*/
   /** Counting necessary restarts of txs */
@@ -112,21 +161,48 @@ class StateContext {
   std::mt19937 rndGen{std::random_device{}()};
   /** Distribution settings */
   bool usingZipf = false;
-  std::unique_ptr<ZipfianGenerator> zipfGen;
+  std::unique_ptr<ZipfianGenerator<KeyType>> zipfGen;
   std::unique_ptr<std::uniform_int_distribution<KeyType>> dis;
 
   void setDistribution(bool zipf, KeyType min, KeyType max, double zipfConst = 0.0) {
     usingZipf = zipf;
     dis.reset(new std::uniform_int_distribution<KeyType>{min, max});
     if(zipf) {
-      zipfGen.reset(new ZipfianGenerator{min, max, zipfConst});
+      zipfGen.reset(new ZipfianGenerator<KeyType>{min, max, zipfConst});
     }
   }
   /*--------------------------------------------------------------------------*/
 
+  StateContext() {
+#ifdef USE_NVM_TABLES
+    const std::string path = pfabric::gPmemPath + "StateContext"; ///TODO: needs a unique ID
+    if (access(path.c_str(), F_OK) != 0) {
+      pop = pool<sCtxRoot>::create(path, "StateContext");
+      transaction::run(pop, [&] {
+        pop.root()->topoGrps = make_persistent<std::array<TopoGrp, MAX_TOPO_GRPS>>();
+        pop.root()->numGrps = 0;
+      });
+    } else {
+      pop = pool<sCtxRoot>::open(path, "StateContext");
+    }
+    topoGrps = pop.root()->topoGrps.get();
+    numGroups = &pop.root()->numGrps;
+#else
+    topoGrps = new std::array<TopoGrps, MAX_TOPO_GRPS>;
+    numGroups = new GroupID{0u};
+#endif
+  }
+
+  ~StateContext() {
+#ifdef USE_NVM_TABLES
+    pop.close();
+#else
+    delete topoGrps;
+#endif
+  }
+
   /** Get status of a writing transaction; either active, commit or abort */
-  const Status &getWriteStatus(const TransactionID txnID,
-                               const TableID tblID) const {
+  const Status &getWriteStatus(const TransactionID txnID, const TableID tblID) const {
     return std::get<1>(activeTxs[getPosFromTxnID(txnID)])[tblID];
   }
 
@@ -135,8 +211,7 @@ class StateContext {
   }
 
   /** Get status of a reading transaction; returns read snapshot version */
-  const ReadCTS getReadCTS(const TransactionID txnID,
-                           const GroupID topoID) const {
+  ReadCTS getReadCTS(const TransactionID txnID, const GroupID topoID) const {
     return std::get<2>(activeTxs[getPosFromTxnID(txnID)])[topoID];
   }
 
@@ -149,99 +224,117 @@ class StateContext {
     std::get<2>(activeTxs[getPosFromTxnID(txnID)])[topoID] = read;
   }
 
-  const TransactionID getOldestActiveTx() const {
+  TransactionID getOldestActiveTx() const {
       auto oldest = DTS_INF;
-      const auto slots = usedSlots.load(std::memory_order_relaxed);
-      for(int pos = 0; pos < 64; ++pos) {
-        const auto bTS = std::get<0>(activeTxs[pos]);
-        if((slots & (1ULL << pos)) && bTS < oldest)
-          oldest = bTS;
+      const auto &slots = usedSlots.load(std::memory_order_relaxed);
+      for(auto pos = 0u; pos < 64; ++pos) {
+        if (slots & (1ULL << pos)) {
+          const auto bTS = std::get<0>(activeTxs[pos]);
+          oldest = std::min(bTS, oldest);
+        }
       }
       return oldest;
   }
 
   /** Registers a new transaction to the context */
-  const TransactionID newTx() {
+  TransactionID newTx() {
     const auto txnID = nextTxID.fetch_add(1);
     const auto pos = getSetFreePos(usedSlots);
-    activeTxs[pos] = std::make_tuple(txnID,
-        WriteInfo{{Status::Active, Status::Active}}, //< TableID | Status
-        ReadInfo{{0}});                              //< GroupID | LastCommitID
+    activeTxs[pos] = std::make_tuple(txnID, WriteInfo{}, ReadInfo{});
+    std::get<1>(activeTxs[pos]).fill(Status::Active); ///< TableID | Status
+    std::get<2>(activeTxs[pos]).fill(0);              ///< GroupID | LastCommitID
     return txnID;
   }
 
-  const TransactionID getNewTS() {
+  TransactionID getNewTS() {
     return nextTxID.fetch_add(1);
   }
 
-  /** Removes a transaction from the context; possibly has to recalculate the
-   *  oldest visible version*/
+  /** Removes a transaction from the context */
   void removeTx(const TransactionID txnID) {
-    const auto readCTS = getReadCTS(txnID, 0);
-    setReadCTS(txnID, 0, 0);
+    for (auto topo = 0u; topo < MAX_TOPO_GRPS; ++topo)
+      setReadCTS(txnID, topo, 0); ///< reset ReadCTSs for next transaction
     unsetPos(usedSlots, getPosFromTxnID(txnID)); //< release slot
+  }
+
+  /** Recalculate the oldest visible version */
+  TransactionID recalcOldestVisible(const TransactionID txnID) {
     TransactionID min = oldestVisibleVersion.load(std::memory_order_relaxed);
+    auto newMin = DTS_INF;
 
     /* find new minimum */
     if(min != 0) {
-      auto newMin = DTS_INF;
       const auto slots = usedSlots.load(std::memory_order_relaxed);
-      for(int pos = 0; pos < 64; ++pos) {
-        const auto rCTS = std::get<2>(activeTxs[pos])[0];
-        if((slots & (1ULL << pos)) && rCTS != 0 && rCTS < newMin)
-          newMin = rCTS;
+      for(auto pos = 0u; pos < 64; ++pos) {
+        if (slots & (1ULL << pos)) {
+          const auto rCTS = std::get<2>(activeTxs[pos])[0];
+          if (rCTS != 0 && rCTS < newMin)
+            newMin = rCTS;
+        }
       }
       /* no other active Tx, use last Snapshot */
       if (newMin == DTS_INF) newMin = getLastCTS(0);
       while(min < newMin && !oldestVisibleVersion.compare_exchange_weak(min, newMin, std::memory_order_relaxed));
     } else if(min == 0) {
-      const auto newMin = getLastCTS(0);
+      newMin = getLastCTS(0);
       while(!oldestVisibleVersion.compare_exchange_weak(min, newMin, std::memory_order_relaxed));
     }
+    return newMin;
   }
 
   /** Get last committed transaction ID (snapshot version) */
-  const TransactionID getLastCTS(const GroupID topoID) {
-    return topoGrps[topoID].second.load(std::memory_order_relaxed);
+  TransactionID getLastCTS(const GroupID topoID) {
+    return (*topoGrps)[topoID].second.load(std::memory_order_relaxed);
   }
 
   /** Set last committed transaction ID (snapshot version) */
   void setLastCTS(const GroupID topoID, const TransactionID txnID) {
 #ifdef USE_NVM_TABLES
     pmem_drain();
-    topoGrps[topoID].second.store(txnID, std::memory_order_relaxed);
-    pmem_persist(&topoGrps[topoID].second,  sizeof(TransactionID));
+    (*topoGrps)[topoID].second.store(txnID, std::memory_order_relaxed);
+    pmem_persist(&(*topoGrps)[topoID].second,  sizeof(TransactionID));
 #else
-    topoGrps[topoID].second.store(txnID, std::memory_order_relaxed);
+    (*topoGrps)[topoID].second.store(txnID, std::memory_order_relaxed);
 #endif
   }
 
   /** Get oldest currently visible version; used for garbage collection */
-  const TransactionID getOldestVisible() const{
+  TransactionID getOldestVisible() const {
     return oldestVisibleVersion.load(std::memory_order_relaxed);
   }
 
   /** Register a new state/table to the context */
-  const TableID registerState(const TablePtr tbl) {
+  TableID registerState(const TablePtr tbl) {
     regStates[numStates] = tbl;
     return numStates++;
   }
 
   /** Register a new topology/continuous query to the context */
-  const GroupID registerTopo(const std::array<TablePtr,2> &tbls) {
-    topoGrps[numGroups] = std::make_pair(tbls, 0);
-    return numGroups++;
+  GroupID registerTopo(const std::array<TableID, MAX_STATES_TOPO> &tbls) {
+    auto &numGrps = *numGroups;
+    (*topoGrps)[numGrps] = std::make_pair(tbls, 0);
+    pmem_flush(&(*topoGrps)[numGrps], sizeof(TableID) * MAX_STATES_TOPO + sizeof(LastCTS));
+    ++numGrps;
+    pmem_persist(numGroups, sizeof(GroupID));
+    return numGrps-1;
   }
+
+  /** Update the table ID of an existing topology group */
+  void updateTopo(const GroupID topoID, const std::array<TableID, MAX_STATES_TOPO> &tbls) {
+    (*topoGrps)[topoID].first = tbls; ///< the tableIDs doesn't need to be persistent
+  }
+
 
   void reset() {
     /* Make sure no thread is using the context anymore! */
-    nextTxID.store(1);
+    nextTxID.store(
+      std::chrono::duration_cast<std::chrono::duration<long long unsigned int, std::nano>>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count());
     restarts.store(0);
     txCntR.store(0);
     txCntW.store(0);
     usedSlots.store(0);
-    oldestVisibleVersion.store(1);
-    topoGrps[0].second.store(0);
+    oldestVisibleVersion.store(0);
     tToTX.clear();
   }
 
@@ -261,7 +354,7 @@ class StateContext {
    *  used for cleaning up version arrays */
   std::atomic<TransactionID> oldestVisibleVersion{0};
   TableID numStates{0u};
-  GroupID numGroups{0u};
+  GroupID * numGroups;
 };
 
 } /* end namespace pfabric */

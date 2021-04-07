@@ -55,7 +55,7 @@ typedef std::size_t TupleLimit;
 typedef unsigned int SlideLength;
 
 /// unique identifier of a transaction
-using TransactionID = unsigned long;
+using TransactionID = unsigned long long;
 
 /// vector of strings
 typedef std::vector< std::string > StringTuple;

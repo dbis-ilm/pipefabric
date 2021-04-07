@@ -61,7 +61,7 @@ namespace pfabric {
      * @param tbl the table that is read
      * @param pred an optional filter predicate
      */
-    FromTxTables(SCtxType& sCtx): mTables{sCtx.regStates[0], sCtx.regStates[1]}, mSCtx{sCtx} {}
+    FromTxTables(SCtxType& sCtx): mTables{sCtx.regStates}, mSCtx{sCtx} {}
 
     /**
      * Deallocates all resources.
@@ -74,69 +74,99 @@ namespace pfabric {
       KeyType mKeys[TxSize];
 
       if (mSCtx.usingZipf) {
-        for(auto i = 0u; i < TxSize; i++)
+        for (auto i = 0u; i < TxSize; i++)
           mKeys[i] = mSCtx.zipfGen->nextValue();
       } else {
-        for(auto i = 0u; i < TxSize; i++)
+        for (auto i = 0u; i < TxSize; i++)
           mKeys[i] = mSCtx.dis->operator()(mSCtx.rndGen);
       }
 
-      assert(mTables[0].get() != nullptr);
-      assert(mTables[1].get() != nullptr);
+      for (auto s = 0u; s < MAX_STATES_TOPO; ++s) {
+        assert(mTables[s].get() != nullptr);
+      }
 
-      SmartPtr<RecordType> tpls[2][TxSize];
+      SmartPtr<RecordType> tpls[MAX_STATES_TOPO][TxSize];
 
       auto waitTime = 1u;
       restart:;
-      for (auto j = 0u; j < TxSize; j++) {
-        for (auto i = 0u; i < 2; i++) {
+      for (auto j = 0u; j < TxSize; ++j) {
+        for (auto i = 0u; i < MAX_STATES_TOPO; ++i) {
           if (mTables[i]->getByKey(mTxnID, mKeys[j], tpls[i][j]) != Errc::SUCCESS) {
             /* restart, caused by inconsistency or other erros */
-//            std::cout << "Key: " << mKeys[j] << std::endl;
+            // std::cout << "Key: " << mKeys[j] << std::endl;
             mSCtx.restarts++;
-            mTables[0]->cleanUpReads(mKeys, i?j+1:j);
-            mTables[1]->cleanUpReads(mKeys, j);
+            for (auto s = 0u; s < MAX_STATES_TOPO; ++s) {
+              mTables[s]->cleanUpReads(mKeys, (i > s)? j+1 : j);
+            }
             mSCtx.setReadCTS(mTxnID, 0, 0);
-            boost::this_thread::sleep_for(boost::chrono::nanoseconds(50*TxSize*waitTime));
-//            waitTime *= 2;
-//            boost::this_thread::interruption_point();
+            boost::this_thread::sleep_for(boost::chrono::nanoseconds(500*TxSize*waitTime));
+            // waitTime *= 2;
+            //boost::this_thread::interruption_point();
             goto restart;
           }
         }
       }
 
       /* Only important for BOCC */
-      const auto s1 = mTables[0]->readCommit(mTxnID, mKeys, TxSize);
-      const auto s2 = mTables[1]->readCommit(mTxnID, mKeys, TxSize);
-      if(s1 != Errc::SUCCESS || s2 != Errc::SUCCESS) {
+      std::array<Errc, MAX_STATES_TOPO> status;
+      for (auto s = 0u; s < MAX_STATES_TOPO; ++s) {
+        status[s] = mTables[s]->readCommit(mTxnID, mKeys, TxSize);
+      }
+      if (std::any_of(status.begin(), status.end(), [](Errc e){ return e != Errc::SUCCESS;})) {
         mSCtx.restarts++;
         mSCtx.removeTx(mTxnID);
         mTxnID = mSCtx.newTx();
         goto restart;
       }
 
-      /* check if same for correctness criteria */
-//      for (auto j = 0u; j < TxSize; j++) {
-//        if (std::get<2>(*tpls[0][j]) != std::get<2>(*tpls[1][j]))
-//          std::cout << "ERROR: INCONSISTENT READ\n";
-//      }
+      /* check if same for correctness criteria *//*
+      using KeyType = typename std::tuple_element<1, typename RecordType::Base>::type;
+      using ElementType = typename std::tuple_element<2, typename RecordType::Base>::type;
+      for (auto s = 0u; s < MAX_STATES_TOPO; ++s) {
+        std::array<SmartPtr<RecordType>, TxSize> tpls_sep;
+        std::copy_n(std::begin(tpls[s]), TxSize, std::begin(tpls_sep));
+        std::sort(tpls_sep.begin(), tpls_sep.end(), [](SmartPtr<RecordType> a, SmartPtr<RecordType> b) {
+          return std::get<1>(*a) > std::get<1>(*b);
+        });
+        KeyType prevKey = 0;
+        ElementType prevValue = 0;
+        for (auto o = 0u; o < TxSize; ++o) {
+          if (std::get<1>(*tpls_sep[o]) == prevKey) {
+            if (std::get<2>(*tpls_sep[o]) != prevValue) {
+              std::cout << "ERROR: INCONSISTENT LOCAL READ\n";
+            }
+          } else {
+            prevKey = std::get<1>(*tpls_sep[o]);
+            prevValue = std::get<2>(*tpls_sep[o]);
+          }
+        }
+      }
+      for (auto o = 0u; o < TxSize; ++o) {
+        std::array<ElementType, MAX_STATES_TOPO> elements;
+        for (auto s = 0u; s < MAX_STATES_TOPO; ++s) {
+          elements[s] = std::get<2>(*tpls[s][o]);
+        }
+        if (std::any_of(elements.begin()+1, elements.end(), [&](ElementType el) {return el != elements[0];}))
+          std::cout << "ERROR: INCONSISTENT ACROSS STATE READ\n";
+      }*/
 
       /* when everything consistent, publish the tuples */
-      for (auto i = 0u; i < 2; i++) {
-        for (auto j = 0u; j < TxSize; j++) {
-          this->getOutputDataChannel().publish(tpls[i][j], false);
+      for (auto s = 0u; s < MAX_STATES_TOPO; ++s) {
+        for (auto o = 0u; o < TxSize; ++o) {
+          this->getOutputDataChannel().publish(tpls[s][o], false);
         }
       }
 
       this->getOutputPunctuationChannel().publish(PunctuationPtr(new Punctuation(Punctuation::EndOfStream)));
-      mTables[0]->cleanUpReads(mKeys, TxSize);
-      mTables[1]->cleanUpReads(mKeys, TxSize);
+      for (auto s = 0u; s < MAX_STATES_TOPO; ++s) {
+        mTables[s]->cleanUpReads(mKeys, TxSize);
+      }
       mSCtx.removeTx(mTxnID);
-      return 2*TxSize;
+      return MAX_STATES_TOPO*TxSize;
     }
 
   private:
-    const TablePtr mTables[2];      //< the table from which the tuples are fetched
+    const std::array<TablePtr, MAX_STATES_TOPO> mTables;  //< the table from which the tuples are fetched
     SCtxType& mSCtx;
   };
 

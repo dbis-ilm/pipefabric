@@ -55,7 +55,7 @@ namespace pfabric {
 
     /** the function for deriving the TransactionID of an incoming stream element */
     using TxIDFunc = std::function<TransactionID(const StreamElement&)>;
- 
+
     /**
      * Create a new ToTable operator to store incoming tuples in the
      * given table.
@@ -90,13 +90,18 @@ namespace pfabric {
      *    the incoming punctuation tuple
      */
     void processPunctuation(const PunctuationPtr& punctuation) {
-      if (punctuation->ptype() == Punctuation::TxCommit)
-        mTable->transactionPreCommit(boost::any_cast<TransactionID>(punctuation->data()));
-      else if (punctuation->ptype() == Punctuation::TxAbort)
-        mTable->transactionAbort(boost::any_cast<TransactionID>(punctuation->data()));
-      else if (punctuation->ptype() == Punctuation::TxBegin)
-        mTable->transactionBegin(boost::any_cast<TransactionID>(punctuation->data()));
-
+      switch (punctuation->ptype()) {
+        case Punctuation::TxBegin:
+          mTable->transactionBegin(boost::any_cast<TransactionID>(punctuation->data()));
+          break;
+        case Punctuation::TxCommit:
+          mTable->transactionPreCommit(boost::any_cast<TransactionID>(punctuation->data()));
+          break;
+        case Punctuation::TxAbort:
+          mTable->transactionAbort(boost::any_cast<TransactionID>(punctuation->data()));
+          break;
+        default: break;
+      }
       this->getOutputPunctuationChannel().publish(punctuation);
     }
 
