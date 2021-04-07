@@ -214,6 +214,10 @@ class BOCCTable : public BaseTable,
     tblID = sCtx.registerState(this->shared_from_this());
   }
 
+  TableID getID() const {
+    return tblID;
+  }
+
   void transactionBegin(const TransactionID& txnID) {
     sCtx.txCntW++;
     writeSet.txnID = txnID;
@@ -227,23 +231,29 @@ class BOCCTable : public BaseTable,
     Errc s = Errc::SUCCESS;
     thisState = Status::Commit;
 
-    if(otherState == Status::Commit) {
+    if (otherState == Status::Commit) {
+      this->saveWriteSet();
+      sCtx.regStates[otherID]->saveWriteSet();
       s = this->transactionCommit(txnID);
       if (s != Errc::SUCCESS) return s;
       s = sCtx.regStates[otherID]->transactionCommit(txnID);
+      sCtx.setLastCTS(0, txnID);
       sCtx.removeTx(txnID);
     }
     return s;
   }
 
-  Errc transactionCommit(const TransactionID& txnID) {
+  void saveWriteSet() {
     const auto valTS = sCtx.getNewTS();
-    /// Save writeSet
     dQLock.lockExclusive();
     auto &ws = committedWSs.emplace_front(valTS, DTS_INF, writeSet.set.size());
     for (const auto& e : writeSet.set)
       ws.keys.emplace(e.first);
     dQLock.unlockExclusive();
+  }
+
+
+  Errc transactionCommit(const TransactionID& txnID) {
     /// Actual insert to table
 #ifdef USE_NVM_TABLES
     auto pop = pmem::obj::pool_by_pptr(tbl.q);
@@ -257,22 +267,23 @@ class BOCCTable : public BaseTable,
       tbl.insert(std::move(e.first), std::move(e.second));
     }
 #endif
+    auto &ws = committedWSs.front();
     ws.endTS = sCtx.getNewTS(); ///< note end of transaction writing in write set
     writeSet.clean();
 
     /// Cleanup old write sets [remove all where EndTS < oldest active tx]
-//    if (committedWSs.size() > 100) {
-      auto oldestTx = sCtx.getOldestActiveTx();
-      if (oldestTx == txnID) oldestTx = ws.endTS;
-      for(auto it = committedWSs.cbegin(); it != committedWSs.cend(); ++it) {
-        if(it->endTS <= oldestTx) {
-          dQLock.lockExclusive();
-          committedWSs.erase(it, committedWSs.cend());
-          dQLock.unlockExclusive();
-          return Errc::SUCCESS;
-        }
+  //  if (committedWSs.size() > 100) {
+    auto oldestTx = sCtx.getOldestActiveTx();
+    if (oldestTx == txnID) oldestTx = ws.valTS;
+    for(auto it = committedWSs.cbegin(); it != committedWSs.cend(); ++it) {
+      if(it->endTS <= oldestTx) {
+        dQLock.lockExclusive();
+        committedWSs.erase(it, committedWSs.cend());
+        dQLock.unlockExclusive();
+        return Errc::SUCCESS;
       }
-//    }
+    }
+  // }
     return Errc::SUCCESS;
   }
 
@@ -301,7 +312,6 @@ class BOCCTable : public BaseTable,
       }
     }
     dQLock.unlockShared();
-
     return Errc::SUCCESS;
   }
 

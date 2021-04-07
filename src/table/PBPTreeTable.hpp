@@ -48,8 +48,9 @@
 
 namespace pfabric {
 
-constexpr auto BRANCHSIZE = 32;
-constexpr auto LEAFSIZE = 16;
+constexpr auto BRANCHSIZE = 30; ///< 1024 Byte
+//constexpr auto LEAFSIZE = 24; ///< 1024 Byte
+constexpr auto LEAFSIZE = 17; ///< for MVCC 8 - 1024, 17 - 2048
 
 using pmem::obj::delete_persistent;
 using pmem::obj::make_persistent;

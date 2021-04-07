@@ -179,6 +179,10 @@ class S2PLTable : public BaseTable,
     tblID = sCtx.registerState(this->shared_from_this());
   }
 
+  TableID getID() const {
+    return tblID;
+  }
+
   void transactionBegin(const TransactionID& txnID) {
     sCtx.txCntW++;
     /*
@@ -200,8 +204,7 @@ class S2PLTable : public BaseTable,
       s = this->transactionCommit(txnID);
       if (s != Errc::SUCCESS) return s;
       s = sCtx.regStates[otherID]->transactionCommit(txnID);
-      //transaction::commit();
-      //delete tx;
+      sCtx.setLastCTS(0, txnID);
       sCtx.removeTx(txnID);
     }
     return s;
